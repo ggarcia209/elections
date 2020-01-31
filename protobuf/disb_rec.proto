@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package protobuf;
+
+message DisbRecipient {
+    string ID = 1;
+    string Name = 2;
+    string City = 3;
+    string State = 4;
+    string Zip = 5;
+    repeated string Disbursements = 6;
+    float TotalDisbursements = 7;
+    float TotalReceived = 8;
+    float AvgReceived = 9;
+    map<string, float> SendersAmt = 10;
+    map<string, float> SendersTxs = 11;
+}

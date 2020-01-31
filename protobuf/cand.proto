@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package protobuf;
+
+message CandEntry {
+    string ID = 1;
+    float Total = 2;
+}
+
+message Candidate {
+	string ID = 1;     
+	string Name = 2; 
+	string Party = 3;
+	int32 ElectnYr = 4;   
+	string OfficeState = 5; 
+	string Office = 6;     
+	string PCC = 7;    
+	string City = 8;       
+	string State = 9; 
+	string Zip = 10;    
+	repeated string OtherAffiliates = 11;
+}
