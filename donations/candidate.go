@@ -18,7 +18,7 @@ type Candidate struct {
 	State                string
 	Zip                  string
 	OtherAffiliates      []string // ID's of other affiliated committees
-	TotalDirectIn        float32
+	TotalDirectInAmt     float32
 	TotalDirectInTxs     float32
 	AvgDirectIn          float32
 	TotalDirectOutAmt    float32
@@ -26,7 +26,7 @@ type Candidate struct {
 	AvgDirectOut         float32
 	NetBalanceDirectTx   float32
 	DirectRecipientsAmts map[string]float32 // Direct recipients receive funds directly from the candidate
-	DirectRecipientstxs  map[string]float32
+	DirectRecipientsTxs  map[string]float32
 	DirectSendersAmt     map[string]float32 // DirectSenders send funds directly to the candidate
 	DirectSendersTxs     map[string]float32
 }
