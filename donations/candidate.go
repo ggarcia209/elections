@@ -27,7 +27,7 @@ type Candidate struct {
 	NetBalanceDirectTx   float32
 	DirectRecipientsAmts map[string]float32 // Direct recipients receive funds directly from the candidate
 	DirectRecipientsTxs  map[string]float32
-	DirectSendersAmt     map[string]float32 // DirectSenders send funds directly to the candidate
+	DirectSendersAmts    map[string]float32 // DirectSenders send funds directly to the candidate
 	DirectSendersTxs     map[string]float32
 }
 
