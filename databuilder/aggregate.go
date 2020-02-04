@@ -18,7 +18,7 @@ func MergeData(years []string, ID, bucket string) (interface{}, error) {
 			return nil, fmt.Errorf("MergeData failed: %v", err)
 		}
 
-		merged = set[years[0]]
+		merged = createMergeObj(set[years[0]])
 		for year, obj := range set {
 			if year == years[0] {
 				continue
@@ -33,7 +33,7 @@ func MergeData(years []string, ID, bucket string) (interface{}, error) {
 			return nil, fmt.Errorf("MergeData failed: %v", err)
 		}
 
-		merged = set[years[0]]
+		merged = createMergeObj(set[years[0]])
 		for year, obj := range set {
 			if year == years[0] {
 				continue
@@ -48,7 +48,7 @@ func MergeData(years []string, ID, bucket string) (interface{}, error) {
 			return nil, fmt.Errorf("MergeData failed: %v", err)
 		}
 
-		merged = set[years[0]]
+		merged = createMergeObj(set[years[0]])
 		for year, obj := range set {
 			if year == years[0] {
 				continue
@@ -63,7 +63,7 @@ func MergeData(years []string, ID, bucket string) (interface{}, error) {
 			return nil, fmt.Errorf("MergeData failed: %v", err)
 		}
 
-		merged = set[years[0]]
+		merged = createMergeObj(set[years[0]])
 		for year, obj := range set {
 			if year == years[0] {
 				continue
@@ -89,6 +89,11 @@ func createMergeSet(years []string, bucket, ID string) (map[string]interface{}, 
 		set[year] = obj
 	}
 	return set, nil
+}
+
+func createMergeObj(obj interface{}) interface{} {
+	merge := obj
+	return merge
 }
 
 func indvTotalsMerge(merge, indv *donations.Individual) {
@@ -159,7 +164,8 @@ func cmteTxTotalsMerge(merge, cmte *donations.CmteTxData) {
 	merge.NetBalance = merge.TotalIncomingAmt - merge.TotalOutgoingAmt
 }
 
-func cmteTxMapMerge(merge, cmte *donations.CmteTxData) {
+func cmteTxMapMerge(merge, cmte *donations.CmteTxData) error {
+	var err error
 	// Top Individual Contribtors
 	for k, v := range cmte.TopIndvContributorsAmt {
 		if len(merge.TopIndvContributorsAmt) < 1000 {
@@ -175,7 +181,8 @@ func cmteTxMapMerge(merge, cmte *donations.CmteTxData) {
 			}
 		} else {
 			// check values against threshold
-			mergeTopTotals(merge.TopIndvContributorsAmt, merge.TopIndvContributorsTxs, cmte.TopIndvContributorsAmt, cmte.TopIndvContributorsTxs, &merge.TopIndvContributorThreshold)
+			merge.TopIndvContributorThreshold, err = mergeTopTotals(merge.TopIndvContributorsAmt, merge.TopIndvContributorsTxs,
+				cmte.TopIndvContributorsAmt, cmte.TopIndvContributorsTxs, merge.TopIndvContributorThreshold)
 		}
 	}
 
@@ -194,7 +201,12 @@ func cmteTxMapMerge(merge, cmte *donations.CmteTxData) {
 			}
 		} else {
 			// check values against threshold
-			mergeTopTotals(merge.TopCmteOrgContributorsAmt, merge.TopCmteOrgContributorsTxs, cmte.TopCmteOrgContributorsAmt, cmte.TopCmteOrgContributorsTxs, &merge.TopCmteOrgContributorThreshold)
+			merge.TopCmteOrgContributorThreshold, err = mergeTopTotals(merge.TopCmteOrgContributorsAmt, merge.TopCmteOrgContributorsTxs,
+				cmte.TopCmteOrgContributorsAmt, cmte.TopCmteOrgContributorsTxs, merge.TopCmteOrgContributorThreshold)
+			if err != nil {
+				fmt.Println("cmteTxMapMerge failed: ", err)
+				return fmt.Errorf("cmteTxMapMerge failed: %v", err)
+			}
 		}
 	}
 
@@ -219,24 +231,30 @@ func cmteTxMapMerge(merge, cmte *donations.CmteTxData) {
 			}
 		} else {
 			// check values against threshold
-			mergeTopTotals(merge.TopExpRecipientsAmt, merge.TopExpRecipientsTxs, cmte.TopExpRecipientsAmt, cmte.TopExpRecipientsTxs, &merge.TopExpThreshold)
+			merge.TopExpThreshold, err = mergeTopTotals(merge.TopExpRecipientsAmt, merge.TopExpRecipientsTxs,
+				cmte.TopExpRecipientsAmt, cmte.TopExpRecipientsTxs, merge.TopExpThreshold)
+			if err != nil {
+				fmt.Println("cmteTxMapMerge failed: ", err)
+				return fmt.Errorf("cmteTxMapMerge failed: %v", err)
+			}
 		}
 	}
+	return nil
 }
 
-func mergeTopTotals(mergeAmts, mergeTxs, mAmts, mTxs map[string]float32, mergeTh *[]interface{}) error {
+func mergeTopTotals(mergeAmts, mergeTxs, mAmts, mTxs map[string]float32, mergeTh []interface{}) ([]interface{}, error) {
 	// set/reset least threshold list
 	var least Entries
 	var err error
-	if len(*mergeTh) == 0 {
+	if len(mergeTh) == 0 {
 		es := sortTopX(mergeAmts)
 		least, err = setThresholdLeast10(es)
 		if err != nil {
 			fmt.Println("mergeTopTotals failed: ", err)
-			return fmt.Errorf("mergeTopTotals failed: %v", err)
+			return nil, fmt.Errorf("mergeTopTotals failed: %v", err)
 		}
 	} else {
-		for _, entry := range merge {
+		for _, entry := range mergeTh {
 			least = append(least, entry.(*donations.Entry))
 		}
 	}
@@ -266,9 +284,8 @@ func mergeTopTotals(mergeAmts, mergeTxs, mAmts, mTxs map[string]float32, mergeTh
 	for _, entry := range least {
 		th = append(th, entry)
 	}
-	mergeTh = append(*mergeTh[:0], th...)
 
-	return nil
+	return th, nil
 }
 
 func candTotalsMerge(merge, cand *donations.Candidate) {
@@ -283,12 +300,12 @@ func candTotalsMerge(merge, cand *donations.Candidate) {
 }
 
 func candMapMerge(merge, cand *donations.Candidate) {
-	for k, v := range cand.DirectRecipientsAmt {
-		merge.DirectRecipientsAmt[k] += v
-		merge.DirectRecipientsTxs[k] += cand.RecipientsTxs[k]
+	for k, v := range cand.DirectRecipientsAmts {
+		merge.DirectRecipientsAmts[k] += v
+		merge.DirectRecipientsTxs[k] += cand.DirectRecipientsTxs[k]
 	}
-	for k, v := range cand.DirectSendersAmt {
-		merge.DirectSendersAmt[k] += v
+	for k, v := range cand.DirectSendersAmts {
+		merge.DirectSendersAmts[k] += v
 		merge.DirectSendersTxs[k] += cand.DirectSendersTxs[k]
 	}
 }
