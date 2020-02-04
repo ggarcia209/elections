@@ -63,7 +63,8 @@ type comparison struct {
 }
 
 
-func compare(comp comparison) error {
+// compare compares the maps set in the comparison object to the threshold
+func compare(comp *comparison) error {
 	var least Entries
 	var err error
 
@@ -71,7 +72,7 @@ func compare(comp comparison) error {
 	if len(comp.Threshold) == 0 {
 		// sort Amts map and take bottom 10 as threshold list
 		es := sortTopX(comp.RecAmts)
-		least, err = setThresholdLeast10(es)
+		least, err = setThresholdLeast3(es) // 3 - TEST ONLY
 		if err != nil {
 			fmt.Println("compare failed: ", err)
 			return fmt.Errorf("compare failed: %v", err)
@@ -84,8 +85,9 @@ func compare(comp comparison) error {
 
 	// compare new sender's total to receiver's threshold value
 	threshold := least[len(least)-1].Total // last/smallest obj in least
+
 	// if amount sent to receiver is > receiver's threshold
-	if comp.SenAmts[comp.RecID] > threshold {  
+	if comp.SenAmts[comp.RecID] > threshold {
 		// create new threshold entry for sender & amount contributed by sender
 		new := newEntry(comp.SenID, comp.SenAmts[comp.RecID])
 		// reSort threshold list w/ new entry and retreive deletion key for obj below threshold
@@ -96,10 +98,13 @@ func compare(comp comparison) error {
 		// add new obj data to records
 		comp.RecAmts[comp.SenID] = comp.SenAmts[comp.RecID]
 		comp.RecTxs[comp.SenID] = comp.SenTxs[comp.RecID]
+	} else {
+		// sender/value does not qualify -- return and continue
+		return nil
 	}
-    
+
 	// update object's threshold list
-	th := []interface{}
+	th := []interface{}{}
 	for _, entry := range least {
 		th = append(th, entry)
 	}

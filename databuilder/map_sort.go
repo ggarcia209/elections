@@ -15,14 +15,14 @@ func (s Entries) Less(i, j int) bool { return s[i].Total < s[j].Total }
 func (s Entries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // PopLeast pops the smalles value from the list of least values
-func (s Entries) popLeast() *donations.Entry {
-	if len(s) == 0 {
+func (s *Entries) popLeast() *donations.Entry {
+	a := *s
+	if len(a) == 0 {
 		return &donations.Entry{}
 	}
-	del := s[len(s)-1]
-	s = s[:len(s)-1]
+	del := a[len(a)-1]
+	*s = a[:len(a)-1]
 	return del
-
 }
 
 // sortTopX sorts the Top x Donors/Recipients maps from greatest -> smallest (decreasing order)
@@ -66,13 +66,12 @@ func reSortLeast(new *donations.Entry, es *Entries) string {
 	// if new.Total >= largest value in threshold list
 	if new.Total >= copy[0].Total {
 		// pop smallest value and get it's ID to delete from records
-		delID := copy.popLeast().ID
-		// update original list of entries by overwriting it with new copy
-		es = &copy
+		delID := es.popLeast().ID
 		return delID
 	}
 	// value falls between threshold range:
-	// add new value to copy of threshold list
+	// add new value to copy of threshold list (# of items remains the same)
+	// len + 1 (append) - 1 (popLeast)
 	copy = append(copy, new)
 	// update original list by overwriting it with copy
 	es = &copy
