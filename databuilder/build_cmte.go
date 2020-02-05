@@ -129,75 +129,10 @@ func deriveTxTypes(cont *donations.Contribution) (string, bool, bool) {
 	return nil
 } */
 
-func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}, memo bool) error {
-	// update maps only if memo == true
-	// account for percentage of amounts received by memo transactions but do not add to totals
-	if memo {
-		// update maps
-		err := mapUpdate(cont, filerData, sender)
-		if err != nil {
-			fmt.Println("incomingTxUpdate failed: ", err)
-			return fmt.Errorf("incomingTxUpdate failed: %v", err)
-		}
-		return nil
-	}
-
-	// corresponding txs - 15Z, 18G, 18K, 30K, 30G, 31K, 31G, 32K, 32G
-	// credit Contributions or OtherReceipts and TotalIncoming
-	if cont.TxType > "15" && cont.TxType < "18" { // REFACTOR to transfers/contributions only
-		filerData.TransfersAmt += cont.TxAmt
-		filerData.TransfersTxs++
-		filerData.AvgTransfer = filerData.TransfersAmt / filerData.TransfersTxs
-	} else {
-		filerData.ExpendituresAmt += cont.TxAmt
-		filerData.ExpendituresTxs++
-		filerData.AvgContributionIn = filerData.ExpendituresAmt / filerData.ExpendituresTxs
-	}
-	filerData.TotalOutgoingAmt = filerData.TransfersAmt + filerData.ExpendituresAmt
-	filerData.TotalOutgoingTxs = filerData.TransfersTxs + filerData.ExpendituresTxs
-	filerData.AvgOutgoing = filerData.TotalOutgoingAmt / filerData.TotalOutgoingTxs
-	filerData.NetBalance = filerData.TotalIncomingAmt - filerData.TotalOutgoingAmt
-
-	// debit sender account
-	// ADD LOGIC TO ACCOUNT FOR CORRESPONDING TXs
-	switch t := sender.(type) {
-	case *donations.Individual:
-		sender.(*donations.Individual).TotalInAmt += cont.TxAmt
-		sender.(*donations.Individual).TotalInTxs++
-		sender.(*donations.Individual).AvgTxIn = sender.(*donations.Individual).TotalInAmt / sender.(*donations.Individual).TotalInTxs
-		sender.(*donations.Individual).NetBalance = sender.(*donations.Individual).TotalInAmt - sender.(*donations.Individual).TotalOutAmt
-	case *donations.Organization:
-		sender.(*donations.Organization).TotalInAmt += cont.TxAmt
-		sender.(*donations.Organization).TotalInTxs++
-		sender.(*donations.Organization).AvgTxIn = sender.(*donations.Organization).TotalInAmt / sender.(*donations.Organization).TotalInTxs
-		sender.(*donations.Organization).NetBalance = sender.(*donations.Organization).TotalInAmt - sender.(*donations.Organization).TotalOutAmt
-	case *donations.Candidate:
-		sender.(*donations.Candidate).TotalDirectInAmt += cont.TxAmt
-		sender.(*donations.Candidate).TotalDirectInTxs++
-		sender.(*donations.Candidate).AvgDirectIn = sender.(*donations.Candidate).TotalDirectInAmt / sender.(*donations.Candidate).TotalDirectInTxs
-		sender.(*donations.Candidate).NetBalanceDirectTx = sender.(*donations.Candidate).TotalDirectInAmt - sender.(*donations.Candidate).TotalDirectOutAmt
-	case *donations.CmteTxData:
-		// special case -- pass sender as filer (receiving committee)
-		// and filer as sender (sending committee) to mapUpdate()
-		err := mapUpdate(cont, sender.(*donations.CmteTxData), filerData)
-		if err != nil {
-			fmt.Println("incomingTxUpdate failed: ", err)
-			return fmt.Errorf("incomingTxUpdate failed: %v", err)
-		}
-		return nil
-	default:
-		return fmt.Errorf("outgoingTxUpdate failed: wrong interface type")
-	}
-
-	// update maps
-	err := mapUpdate(cont, filerData, sender)
-	if err != nil {
-		fmt.Println("incomingTxUpdate failed: ", err)
-		return fmt.Errorf("incomingTxUpdate failed: %v", err)
-	}
-	return nil
-}
-
+// TX CRITERIA
+// if sender == committee: do not credit sender's accounts -- account for corresponding tx
+// 	all filers are committees only and *should* have corresponding transaction for sender
+// if sender != committee: credit accounts -- no corresponding tx
 func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}, memo bool) error {
 	// update maps only if memo == true
 	// account for percentage of amounts received by memo transactions but do not add to totals
@@ -211,7 +146,6 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		return nil
 	}
 
-	// corresponding txs - 15Z, 18G, 18K, 30K, 30G, 31K, 31G, 32K, 32G
 	// debit Contributions or OtherReceipts and TotalIncoming
 	if cont.TxType > "15" && cont.TxType < "18" {
 		filerData.OtherReceiptsInAmt += cont.TxAmt
@@ -256,6 +190,76 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	if err != nil {
 		fmt.Println("incomingTxUpdate failed: ", err)
 		return fmt.Errorf("incomingTxUpdate failed: %v", err)
+	}
+	return nil
+}
+
+func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}, memo bool) error {
+	// update maps only if memo == true
+	// account for percentage of amounts received by memo transactions but do not add to totals
+	if memo {
+		// update maps
+		err := mapUpdate(cont, filerData, sender)
+		if err != nil {
+			fmt.Println("outgoingTxUpdate failed: ", err)
+			return fmt.Errorf("outgoingTxUpdate failed: %v", err)
+		}
+		return nil
+	}
+
+	// credit Transfers or Expenditures and TotalOutgoing
+	if cont.TxType > "15" && cont.TxType < "18" { // REFACTOR to transfers/contributions only
+		// transfers tx types: 22H, 24G, 24H, 24K, 24U, 24Z, 24I*, 24T*,
+		// *unverified through official filings
+		filerData.TransfersAmt += cont.TxAmt
+		filerData.TransfersTxs++
+		filerData.AvgTransfer = filerData.TransfersAmt / filerData.TransfersTxs
+	} else {
+		filerData.ExpendituresAmt += cont.TxAmt
+		filerData.ExpendituresTxs++
+		filerData.AvgContributionIn = filerData.ExpendituresAmt / filerData.ExpendituresTxs
+	}
+	filerData.TotalOutgoingAmt = filerData.TransfersAmt + filerData.ExpendituresAmt
+	filerData.TotalOutgoingTxs = filerData.TransfersTxs + filerData.ExpendituresTxs
+	filerData.AvgOutgoing = filerData.TotalOutgoingAmt / filerData.TotalOutgoingTxs
+	filerData.NetBalance = filerData.TotalIncomingAmt - filerData.TotalOutgoingAmt
+
+	// debit sender account
+	// ADD LOGIC TO ACCOUNT FOR CORRESPONDING TXs
+	switch t := sender.(type) {
+	case *donations.Individual:
+		sender.(*donations.Individual).TotalInAmt += cont.TxAmt
+		sender.(*donations.Individual).TotalInTxs++
+		sender.(*donations.Individual).AvgTxIn = sender.(*donations.Individual).TotalInAmt / sender.(*donations.Individual).TotalInTxs
+		sender.(*donations.Individual).NetBalance = sender.(*donations.Individual).TotalInAmt - sender.(*donations.Individual).TotalOutAmt
+	case *donations.Organization:
+		sender.(*donations.Organization).TotalInAmt += cont.TxAmt
+		sender.(*donations.Organization).TotalInTxs++
+		sender.(*donations.Organization).AvgTxIn = sender.(*donations.Organization).TotalInAmt / sender.(*donations.Organization).TotalInTxs
+		sender.(*donations.Organization).NetBalance = sender.(*donations.Organization).TotalInAmt - sender.(*donations.Organization).TotalOutAmt
+	case *donations.Candidate:
+		sender.(*donations.Candidate).TotalDirectInAmt += cont.TxAmt
+		sender.(*donations.Candidate).TotalDirectInTxs++
+		sender.(*donations.Candidate).AvgDirectIn = sender.(*donations.Candidate).TotalDirectInAmt / sender.(*donations.Candidate).TotalDirectInTxs
+		sender.(*donations.Candidate).NetBalanceDirectTx = sender.(*donations.Candidate).TotalDirectInAmt - sender.(*donations.Candidate).TotalDirectOutAmt
+	case *donations.CmteTxData:
+		// special case -- pass sender as filer (receiving committee)
+		// and filer as sender (sending committee) to mapUpdate()
+		err := mapUpdate(cont, sender.(*donations.CmteTxData), filerData)
+		if err != nil {
+			fmt.Println("outgoingTxUpdate failed: ", err)
+			return fmt.Errorf("outgoingTxUpdate failed: %v", err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("outgoingTxUpdate failed: wrong interface type")
+	}
+
+	// update maps
+	err := mapUpdate(cont, filerData, sender)
+	if err != nil {
+		fmt.Println("outgoingTxUpdate failed: ", err)
+		return fmt.Errorf("outgoingTxUpdate failed: %v", err)
 	}
 	return nil
 }
@@ -318,6 +322,7 @@ func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, se
 			}
 		}
 	case *donations.CmteTxData:
+		// ADD LOGIC TO DISTINGUISH BETWEEN ACCOUNT TYPES
 		// re-initialize maps if nil
 		if len(filerData.TopCmteOrgContributorsAmt) == 0 {
 			filerData.TopCmteOrgContributorsAmt = make(map[string]float32)
