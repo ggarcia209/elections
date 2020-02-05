@@ -84,8 +84,8 @@ type CmteTxData struct {
 	TotalIncomingAmt               float32            // Total $ value of incoming transactions
 	TotalIncomingTxs               float32            // Total # of incoming transactions
 	AvgIncoming                    float32            // Average $ value of incoming transactions
-	TransfersAmt                   float32            // $ value of contributions/transfers to other committees
-	TransfersTxs                   float32            // # of contributions/transfers to other committees
+	TransfersAmt                   float32            // $ value of contributions/transfers/loans to other committees
+	TransfersTxs                   float32            // # of contributions/transfers/loans to other committees
 	AvgTransfer                    float32            // Average value of transfers to other committees
 	ExpendituresAmt                float32            // $ value of expenditure transactions (operating expenses/loan repayments/refunds/etc)
 	ExpendituresTxs                float32            // # of expenditure transactions (operating expenses/loan repayments/refunds/etc)
