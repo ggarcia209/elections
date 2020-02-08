@@ -138,7 +138,7 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	// account for percentage of amounts received by memo transactions but do not add to totals
 	if memo {
 		// update maps
-		err := mapUpdate(cont, filerData, sender)
+		err := mapUpdate(cont, filerData, sender, false)
 		if err != nil {
 			fmt.Println("incomingTxUpdate failed: ", err)
 			return fmt.Errorf("incomingTxUpdate failed: %v", err)
@@ -186,7 +186,7 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	}
 
 	// update maps
-	err := mapUpdate(cont, filerData, sender)
+	err := mapUpdate(cont, filerData, sender, false)
 	if err != nil {
 		fmt.Println("incomingTxUpdate failed: ", err)
 		return fmt.Errorf("incomingTxUpdate failed: %v", err)
@@ -195,11 +195,27 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 }
 
 func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}, memo bool) error {
+	// determine if transfer or expense
+	transfer := false               // indicates transfer (true) vs. expense (false)
+	transferMap := map[string]bool{ // transfer tx codes
+		"22H": true,
+		"24G": true,
+		"24H": true,
+		"24K": true,
+		"24U": true,
+		"24Z": true,
+		"24I": true, // verify
+		"24T": true, // verify
+	}
+	if transferMap[cont.TxType] == true {
+		transfer = true
+	}
+
 	// update maps only if memo == true
 	// account for percentage of amounts received by memo transactions but do not add to totals
 	if memo {
 		// update maps
-		err := mapUpdate(cont, filerData, sender)
+		err := mapUpdate(cont, filerData, sender, transfer)
 		if err != nil {
 			fmt.Println("outgoingTxUpdate failed: ", err)
 			return fmt.Errorf("outgoingTxUpdate failed: %v", err)
@@ -207,10 +223,8 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		return nil
 	}
 
-	// credit Transfers or Expenditures and TotalOutgoing
-	if cont.TxType > "15" && cont.TxType < "18" { // REFACTOR to transfers/contributions only
-		// transfers tx types: 22H, 24G, 24H, 24K, 24U, 24Z, 24I*, 24T*,
-		// *unverified through official filings
+	// debit Transfers or Expenditures and TotalOutgoing
+	if transfer { // tx is transfer
 		filerData.TransfersAmt += cont.TxAmt
 		filerData.TransfersTxs++
 		filerData.AvgTransfer = filerData.TransfersAmt / filerData.TransfersTxs
@@ -224,8 +238,7 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	filerData.AvgOutgoing = filerData.TotalOutgoingAmt / filerData.TotalOutgoingTxs
 	filerData.NetBalance = filerData.TotalIncomingAmt - filerData.TotalOutgoingAmt
 
-	// debit sender account
-	// ADD LOGIC TO ACCOUNT FOR CORRESPONDING TXs
+	// credit sender account
 	switch t := sender.(type) {
 	case *donations.Individual:
 		sender.(*donations.Individual).TotalInAmt += cont.TxAmt
@@ -245,7 +258,7 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	case *donations.CmteTxData:
 		// special case -- pass sender as filer (receiving committee)
 		// and filer as sender (sending committee) to mapUpdate()
-		err := mapUpdate(cont, sender.(*donations.CmteTxData), filerData)
+		err := mapUpdate(cont, sender.(*donations.CmteTxData), filerData, transfer)
 		if err != nil {
 			fmt.Println("outgoingTxUpdate failed: ", err)
 			return fmt.Errorf("outgoingTxUpdate failed: %v", err)
@@ -256,7 +269,7 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	}
 
 	// update maps
-	err := mapUpdate(cont, filerData, sender)
+	err := mapUpdate(cont, filerData, sender, transfer)
 	if err != nil {
 		fmt.Println("outgoingTxUpdate failed: ", err)
 		return fmt.Errorf("outgoingTxUpdate failed: %v", err)
@@ -265,7 +278,7 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 }
 
 // REFACTOR TO ACCOUNT FOR INCOMING VS OUTGOING TXs
-func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}) error {
+func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}, transfer bool) error {
 	switch t := sender.(type) {
 	case *donations.Individual:
 		// re-initialize maps if nil
@@ -288,7 +301,7 @@ func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, se
 			filerData.TopIndvContributorsTxs[sender.(*donations.Individual).ID]++
 		} else {
 			// update filer's top contributors maps
-			err := updateTopDonors(filerData, sender, cont)
+			err := updateTopDonors(filerData, sender, cont, false)
 			if err != nil {
 				fmt.Println("mapUpdate failed: ", err)
 				return fmt.Errorf("mapUpdate failed: %v", err)
@@ -315,7 +328,7 @@ func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, se
 			filerData.TopCmteOrgContributorsTxs[sender.(*donations.Organization).ID]++
 		} else {
 			// update filer's top contributors maps
-			err := updateTopDonors(filerData, sender, cont)
+			err := updateTopDonors(filerData, sender, cont, false)
 			if err != nil {
 				fmt.Println("mapUpdate failed: ", err)
 				return fmt.Errorf("mapUpdate failed: %v", err)
@@ -328,14 +341,33 @@ func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, se
 			filerData.TopCmteOrgContributorsAmt = make(map[string]float32)
 			filerData.TopCmteOrgContributorsTxs = make(map[string]float32)
 		}
-		if len(sender.(*donations.CmteTxData).TransferRecsAmt) == 0 {
+		if len(sender.(*donations.CmteTxData).TransferRecsAmt) == 0 && transfer {
 			sender.(*donations.CmteTxData).TransferRecsAmt = make(map[string]float32)
 			sender.(*donations.CmteTxData).TransferRecsTxs = make(map[string]float32)
 		}
+		if len(sender.(*donations.CmteTxData).TopExpRecipientsAmt) == 0 && !transfer {
+			sender.(*donations.CmteTxData).TopExpRecipientsAmt = make(map[string]float32)
+			sender.(*donations.CmteTxData).TopExpRecipientsTxs = make(map[string]float32)
+		}
 
-		// update sender's Affiliates maps
-		sender.(*donations.CmteTxData).TransferRecsAmt[filerData.CmteID] += cont.TxAmt
-		sender.(*donations.CmteTxData).TransferRecsTxs[filerData.CmteID]++
+		// update sender's TransfersRecs or TopExpRecipients maps
+		if transfer {
+			sender.(*donations.CmteTxData).TransferRecsAmt[filerData.CmteID] += cont.TxAmt
+			sender.(*donations.CmteTxData).TransferRecsTxs[filerData.CmteID]++
+		} else {
+			if len(sender.(*donations.CmteTxData).TopExpRecipientsAmt) < 1000 {
+				sender.(*donations.CmteTxData).TopExpRecipientsAmt[filerData.CmteID] += cont.TxAmt
+				sender.(*donations.CmteTxData).TopExpRecipientsTxs[filerData.CmteID]++
+			} else {
+				// update filer's top contributors maps
+				// Refactor for TopExpRecipients
+				err := updateTopDonors(filerData, sender, cont, transfer)
+				if err != nil {
+					fmt.Println("mapUpdate failed: ", err)
+					return fmt.Errorf("mapUpdate failed: %v", err)
+				}
+			}
+		}
 
 		// update filing committee's Top Contributors maps
 		if len(filerData.TopCmteOrgContributorsAmt) < 1000 {
@@ -343,7 +375,7 @@ func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, se
 			filerData.TopCmteOrgContributorsTxs[sender.(*donations.CmteTxData).CmteID]++
 		} else {
 			// update filer's top contributors maps
-			err := updateTopDonors(filerData, sender, cont)
+			err := updateTopDonors(filerData, sender, cont, transfer)
 			if err != nil {
 				fmt.Println("mapUpdate failed: ", err)
 				return fmt.Errorf("mapUpdate failed: %v", err)
@@ -370,7 +402,7 @@ func mapUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, se
 			filerData.TopIndvContributorsTxs[sender.(*donations.Candidate).ID]++
 		} else {
 			// update filer's top contributors maps
-			err := updateTopDonors(filerData, sender, cont)
+			err := updateTopDonors(filerData, sender, cont, false)
 			if err != nil {
 				fmt.Println("mapUpdate failed: ", err)
 				return fmt.Errorf("mapUpdate failed: %v", err)
