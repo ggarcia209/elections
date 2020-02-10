@@ -75,6 +75,7 @@ type Committee struct {
 type CmteTxData struct {
 	CmteID                         string             // ID of committee directly linked to data
 	CandID                         string             // ID of candidate indirectly linked through Candidate PCC ID (nil if non-affiliated committee)
+	Party                          string             // Committee's political party
 	ContributionsInAmt             float32            // $ value of incoming contributions
 	ContributionsInTxs             float32            // # contributions from individuals, organizations, committees, and candidates
 	AvgContributionIn              float32            // Average $ value of incoming contributions

@@ -38,6 +38,7 @@ func encodeCmteTxData(data donations.CmteTxData) ([]byte, error) {
 	entry := &protobuf.CmteTxData{
 		CmteID:                         data.CmteID,
 		CandID:                         data.CandID,
+		Party:                          data.Party,
 		ContributionsInAmt:             data.ContributionsInAmt,
 		ContributionsInTxs:             data.ContributionsInTxs,
 		AvgContributionIn:              data.AvgContributionIn,
@@ -128,6 +129,7 @@ func decodeCmteTxData(input []byte) (donations.CmteTxData, error) {
 	entry := donations.CmteTxData{
 		CmteID:                         data.GetCmteID(),
 		CandID:                         data.GetCandID(),
+		Party:                          data.GetParty(),
 		ContributionsInAmt:             data.GetContributionsInAmt(),
 		ContributionsInTxs:             data.GetContributionsInTxs(),
 		AvgContributionIn:              data.GetAvgContributionIn(),
