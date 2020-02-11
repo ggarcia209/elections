@@ -12,7 +12,8 @@ import (
 // and the transaction values of the contributing Individual/Organization if applicable.
 // Committees identified in the contribution's OtherID field are not updated.
 
-func TransactionUpdate(year string, txs []interface{}) error {
+// TransactionUpdate updates each sender/receiver data for each transaction in a list of transactions.
+func TransactionUpdate(year string, txs interface{}) error {
 	_, cont := txs.([]*donations.Contribution)
 	if cont { // tx type is standard contribution/disbursement type
 		err := contributionUpdate(year, txs.([]*donations.Contribution))
