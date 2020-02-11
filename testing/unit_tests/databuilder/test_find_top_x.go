@@ -10,24 +10,6 @@ import (
 
 /* TEST TYPES */
 
-// comparison is used to compare corresponding map types (receiver/sender)
-// passed to compare() function
-type comparison struct {
-	RecID     string
-	RecAmts   map[string]float32
-	RecTxs    map[string]float32
-	Threshold []interface{}
-	SenID     string
-	SenAmts   map[string]float32
-	SenTxs    map[string]float32
-}
-
-// test only -- simulated transaction
-type tx struct {
-	ID     string
-	Amount float32
-}
-
 // Entries is a list of entries to be sorted.
 type Entries []*donations.Entry
 
@@ -52,68 +34,95 @@ func (s *Entries) popLeast() *donations.Entry {
 
 var filer = donations.CmteTxData{
 	CmteID:                      "cmte00",
-	TopIndvContributorsAmt:      map[string]float32{"indv1": 100, "indv2": 150, "indv3": 80, "indv4": 200, "indv5": 40, "indv6": 400, "indv7": 120, "indv8": 100, "indv9": 225},
-	TopIndvContributorsTxs:      map[string]float32{"indv1": 2, "indv2": 3, "indv3": 1, "indv4": 3, "indv5": 1, "indv6": 4, "indv7": 3, "indv8": 1, "indv9": 5},
-	TopIndvContributorThreshold: []interface{}{},
+	// TopIndvContributorsAmt:      map[string]float32{"indv1": 100, "indv2": 150, "indv3": 80, "indv4": 200, "indv5": 40, "indv6": 400, "indv7": 120, "indv8": 100, "indv9": 225},
+	// TopIndvContributorsTxs:      map[string]float32{"indv1": 2, "indv2": 3, "indv3": 1, "indv4": 3, "indv5": 1, "indv6": 4, "indv7": 3, "indv8": 1, "indv9": 5},
+	// TopIndvContributorThreshold: []interface{}{},
+}
+
+var cmte01 = donations.CmteTxData{
+	CmteID: "cmte01",
+}
+
+var cand01 = donations.Candidate{
+	ID: "PCand01",
+}
+
+var cand02 = donations.Candidate{
+	ID: "SCand02",
+}
+
+var cand03 = donations.Candidate{
+	ID: "HCand03",
+}
+
+var org01 = donations.Organization{
+	ID: "org01",
+}
+
+var org02 = donations.Organization{
+	ID: "org02",
 }
 
 var indv4 = donations.Individual{
 	ID:            "indv4",
-	RecipientsAmt: map[string]float32{"cmte1": 50, "cmte00": 200, "cmte2": 100},
-	RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 3, "cmte2": 2},
+	// RecipientsAmt: map[string]float32{"cmte1": 50, "cmte00": 200, "cmte2": 100},
+	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 3, "cmte2": 2},
 }
 
 var indv8 = donations.Individual{
 	ID:            "indv8",
-	RecipientsAmt: map[string]float32{"cmte1": 50, "cmte00": 100, "cmte2": 100},
-	RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 1, "cmte2": 2},
+	// RecipientsAmt: map[string]float32{"cmte1": 50, "cmte00": 100, "cmte2": 100},
+	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 1, "cmte2": 2},
 }
 
 var indv10 = donations.Individual{
 	ID:            "indv10",
-	RecipientsAmt: map[string]float32{"cmte1": 40, "cmte2": 200},
-	RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
+	// RecipientsAmt: map[string]float32{"cmte1": 40, "cmte2": 200},
+	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
 }
 
 var indv11 = donations.Individual{
 	ID:            "indv11",
-	RecipientsAmt: map[string]float32{"cmte1": 60, "cmte2": 50},
-	RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
+	// RecipientsAmt: map[string]float32{"cmte1": 60, "cmte2": 50},
+	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
 }
 
 var indv12 = donations.Individual{
 	ID:            "indv12",
-	RecipientsAmt: map[string]float32{"cmte2": 60, "cmte3": 50},
-	RecipientsTxs: map[string]float32{"cmte2": 1, "cmte3": 2},
+	// RecipientsAmt: map[string]float32{"cmte2": 60, "cmte3": 50},
+	// RecipientsTxs: map[string]float32{"cmte2": 1, "cmte3": 2},
 }
 
 var indv13 = donations.Individual{
 	ID:            "indv13",
-	RecipientsAmt: make(map[string]float32),
-	RecipientsTxs: make(map[string]float32),
+	// RecipientsAmt: make(map[string]float32),
+	// RecipientsTxs: make(map[string]float32),
 }
 
 var indv14 = donations.Individual{
 	ID:            "indv14",
-	RecipientsAmt: make(map[string]float32),
-	RecipientsTxs: make(map[string]float32),
+	// RecipientsAmt: make(map[string]float32),
+	// RecipientsTxs: make(map[string]float32),
 }
 
 var indv15 = donations.Individual{
 	ID:            "indv15",
-	RecipientsAmt: make(map[string]float32),
-	RecipientsTxs: make(map[string]float32),
+	// RecipientsAmt: make(map[string]float32),
+	// RecipientsTxs: make(map[string]float32),
 }
 
 var indv16 = donations.Individual{
 	ID:            "indv16",
-	RecipientsAmt: make(map[string]float32),
-	RecipientsTxs: make(map[string]float32),
+	// RecipientsAmt: make(map[string]float32),
+	// RecipientsTxs: make(map[string]float32),
 }
 
-var tx1 = tx{
-	ID:     "indv10",
-	Amount: 175,
+var tx1 = donations.Contribution{
+	CmteID: "cmte00"
+	OtherID:     "indv10",
+	TxAmt: 175,
+	TxType: "",
+	MemoCode: "",
 }
 
 var tx2 = tx{
@@ -348,44 +357,309 @@ func updateCmte(t tx, filer *donations.CmteTxData, sender *donations.Individual)
 	return nil
 }
 
+// derive transaction type from contribution data
+func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
+	// initialize return values
+	incoming := false
+	memo := false
+	transfer := false               // indicates transfer (true) vs. expense (false)
+	transferMap := map[string]bool{ // transfer tx codes
+		"15Z": true,
+		"16R": true,
+		"18G": true,
+		"18J": true,
+		"18K": true,
+		"19J": true,
+		"22H": true,
+		"24G": true,
+		"24H": true,
+		"24K": true,
+		"24U": true,
+		"24Z": true,
+		"24I": true, // verify
+		"24T": true, // verify
+		"30K": true,
+		"30G": true,
+		"30F": true,
+		"31K": true,
+		"31G": true,
+		"31F": true,
+		"32K": true,
+		"32G": true,
+		"32F": true,
+	}
+	var bucket string
+
+	// determine tx type (incoming / outgoing / transfer, memo)
+	numCode := cont.TxType
+	if numCode < "20" || (numCode >= "30" && numCode < "33") {
+		incoming = true
+	}
+
+	// determine if transfer or expense
+	if transferMap[cont.TxType] == true {
+		transfer = true
+	}
+
+	if cont.MemoCode == "X" {
+		memo = true
+	}
+
+	// determine contributor/receiver type - derive from OtherID
+	IDss := strings.Split(cont.OtherID, "")
+	idCode := IDss[0]
+	switch {
+	case idCode == "C":
+		bucket = "cmte_tx_data"
+	case idCode == "H" || idCode == "S" || idCode == "P":
+		bucket = "candidates"
+	default:
+		if cont.Occupation == "" {
+			bucket = "organizations"
+		} else {
+			bucket = "individuals"
+		}
+	}
+	return bucket, incoming, transfer, memo
+}
+
+type comparison struct {
+	RefID        string             // reference object
+	RefAmts      map[string]float32 // marginal amount added to reference amount if compare amount > threshold
+	RefTxs       map[string]float32
+	RefThreshold []interface{}      // compare smallest amount in reference threshold list against compare amount
+	CompID       string             // object being compared to reference object
+	CompAmts     map[string]float32 // marginal amount included before comparison
+	CompTxs      map[string]float32
+}
+
+// update contributor maps for incoming transactions posted by filing committee
+func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *donations.Contribution, transfer bool) (comparison, error) {
+	comp := comparison{}
+	switch t := sender.(type) {
+	case *donations.Individual:
+		comp = comparison{
+			RefID:        receiver.CmteID,
+			RefAmts:      receiver.TopIndvContributorsAmt,
+			RefTxs:       receiver.TopIndvContributorsTxs,
+			RefThreshold: receiver.TopIndvContributorThreshold,
+			CompID:       t.ID,
+			CompAmts:     sender.(*donations.Individual).RecipientsAmt,
+			CompTxs:      sender.(*donations.Individual).RecipientsTxs,
+		}
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	case *donations.Candidate:
+		comp = comparison{
+			RefID:        receiver.CmteID,
+			RefAmts:      receiver.TopIndvContributorsAmt,
+			RefTxs:       receiver.TopIndvContributorsTxs,
+			RefThreshold: receiver.TopIndvContributorThreshold,
+			CompID:       t.ID,
+			CompAmts:     sender.(*donations.Candidate).DirectRecipientsAmts,
+			CompTxs:      sender.(*donations.Candidate).DirectRecipientsTxs,
+		}
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	case *donations.Organization:
+		comp = comparison{
+			RefID:        receiver.CmteID,
+			RefAmts:      receiver.TopCmteOrgContributorsAmt,
+			RefTxs:       receiver.TopCmteOrgContributorsTxs,
+			RefThreshold: receiver.TopCmteOrgContributorThreshold,
+			CompID:       t.ID,
+			CompAmts:     sender.(*donations.Organization).RecipientsAmt,
+			CompTxs:      sender.(*donations.Organization).RecipientsTxs,
+		}
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	case *donations.CmteTxData:
+		// Contribution || Other transfer
+		comp = cmteCompGen(receiver, sender.(*donations.CmteTxData), cont, transfer)
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	default:
+		return comparison{}, fmt.Errorf("updateTopDonors failed: wrong interface type")
+	}
+	return comp, nil
+}
+
+// update contributor maps for outgoing transactions posted by filing committee
+func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, cont *donations.Contribution, transfer bool) (comparison, error) {
+	comp := comparison{}
+	switch t := receiver.(type) {
+	case *donations.Individual:
+		comp = comparison{
+			RefID:        sender.CmteID,
+			RefAmts:      sender.TopExpRecipientsAmt,
+			RefTxs:       sender.TopExpRecipientsTxs,
+			RefThreshold: sender.TopExpThreshold,
+			CompID:       t.ID,
+			CompAmts:     receiver.(*donations.Individual).SendersAmt,
+			CompTxs:      receiver.(*donations.Individual).SendersTxs,
+		}
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	case *donations.Candidate:
+		comp = comparison{
+			RefID:        sender.CmteID,
+			RefAmts:      sender.TopExpRecipientsAmt,
+			RefTxs:       sender.TopExpRecipientsTxs,
+			RefThreshold: sender.TopExpThreshold,
+			CompID:       t.ID,
+			CompAmts:     receiver.(*donations.Candidate).DirectSendersAmts,
+			CompTxs:      receiver.(*donations.Candidate).DirectSendersTxs,
+		}
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	case *donations.Organization:
+		comp = comparison{
+			RefID:        sender.CmteID,
+			RefAmts:      sender.TopExpRecipientsAmt,
+			RefTxs:       sender.TopExpRecipientsTxs,
+			RefThreshold: sender.TopExpThreshold,
+			CompID:       t.ID,
+			CompAmts:     receiver.(*donations.Organization).SendersAmt,
+			CompTxs:      receiver.(*donations.Organization).SendersTxs,
+		}
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	case *donations.CmteTxData:
+		// Contribution || Other transfer
+		comp = cmteCompGen(receiver.(*donations.CmteTxData), sender, cont, transfer)
+		err := compare(&comp)
+		if err != nil {
+			fmt.Println("updateTopDonors failed: ", err)
+			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
+		}
+	default:
+		return comparison{}, fmt.Errorf("updateTopDonors failed: wrong interface type")
+	}
+	return comp, nil
+}
+
+func updateOpExpRecipients(sender *donations.CmteTxData, receiver *donations.Organization) (comparison, error) {
+	comp := comparison{
+		RefID:        sender.CmteID,
+		RefAmts:      sender.TopExpRecipientsAmt,
+		RefTxs:       sender.TopExpRecipientsTxs,
+		RefThreshold: sender.TopExpThreshold,
+		CompID:       receiver.ID,
+		CompAmts:     receiver.SendersAmt,
+		CompTxs:      receiver.SendersTxs,
+	}
+	err := compare(&comp)
+	if err != nil {
+		fmt.Println("updateOpExpRecipients failed: ", err)
+		return comparison{}, fmt.Errorf("updateOpExpRecipients failed: %v", err)
+	}
+	return comp, nil
+}
+
+// generates comparison object corresponding to incoming/outoing transaction
+func cmteCompGen(filer, other *donations.CmteTxData, cont *donations.Contribution, transfer bool) comparison {
+	// determine tx type (incoming / outgoing / memo)
+	var comp comparison
+	if cont.TxType < "20" || (cont.TxType >= "30" && cont.TxType < "33") {
+		// incoming
+		comp = comparison{
+			// values determined by tx type
+			RefID:        filer.CmteID,
+			RefAmts:      filer.TopCmteOrgContributorsAmt,
+			RefTxs:       filer.TopCmteOrgContributorsTxs,
+			RefThreshold: filer.TopCmteOrgContributorThreshold,
+			CompID:       other.CmteID,
+			CompAmts:     other.TopExpRecipientsAmt,
+			CompTxs:      other.TopExpRecipientsTxs,
+		}
+		if transfer {
+			// marginal value added before call to updateTop functions
+			comp.CompAmts = other.TransferRecsAmt
+			comp.CompTxs = other.TransferRecsTxs
+		}
+		// add marginal value from new transaction
+		comp.CompAmts[comp.RefID] += cont.TxAmt
+		comp.CompTxs[comp.RefID]++
+	} else {
+		// outgoing
+		comp = comparison{
+			// values determined by tx type
+			RefID:        filer.CmteID,
+			RefAmts:      filer.TopExpRecipientsAmt,
+			RefTxs:       filer.TopExpRecipientsTxs,
+			RefThreshold: filer.TopExpThreshold,
+			CompID:       other.CmteID,
+			CompAmts:     other.TopCmteOrgContributorsAmt,
+			CompTxs:      other.TopCmteOrgContributorsTxs,
+		}
+
+		if transfer {
+			comp.CompAmts = other.TransferRecsAmt
+			comp.CompTxs = other.TransferRecsTxs
+		}
+		// add marginal value from new transaction
+		comp.CompAmts[comp.RefID] += cont.TxAmt
+		comp.CompTxs[comp.RefID]++
+	}
+	return comp
+}
+
 // compare compares the maps set in the comparison object to the threshold
 func compare(comp *comparison) error {
 	var least Entries
 	var err error
 
 	// if Threshold list is exhausted
-	if len(comp.Threshold) == 0 {
+	if len(comp.RefThreshold) == 0 {
 		// sort Amts map and take bottom 10 as threshold list
-		es := sortTopX(comp.RecAmts)
-		least, err = setThresholdLeast3(es) // 3 - TEST ONLY
+		es := sortTopX(comp.RefAmts)
+		least, err = setThresholdLeast10(es)
 		if err != nil {
 			fmt.Println("compare failed: ", err)
 			return fmt.Errorf("compare failed: %v", err)
 		}
 	} else {
-		for _, entry := range comp.Threshold {
+		for _, entry := range comp.RefThreshold {
 			least = append(least, entry.(*donations.Entry))
 		}
 	}
 
 	// compare new sender's total to receiver's threshold value
 	threshold := least[len(least)-1].Total // last/smallest obj in least
-	fmt.Println("smallest: ", threshold)
-	fmt.Println("compare value: ", comp.SenAmts[comp.RecID])
 
 	// if amount sent to receiver is > receiver's threshold
-	if comp.SenAmts[comp.RecID] > threshold {
+	if comp.CompAmts[comp.RefID] > threshold {
 		// create new threshold entry for sender & amount contributed by sender
-		new := newEntry(comp.SenID, comp.SenAmts[comp.RecID])
+		new := newEntry(comp.CompID, comp.CompAmts[comp.RefID])
 		// reSort threshold list w/ new entry and retreive deletion key for obj below threshold
 		delID := reSortLeast(new, &least)
-		fmt.Println("delID: ", delID)
 		// delete the records for obj below threshold
-		delete(comp.RecAmts, delID)
-		delete(comp.RecTxs, delID)
+		delete(comp.RefAmts, delID)
+		delete(comp.RefTxs, delID)
 		// add new obj data to records
-		comp.RecAmts[comp.SenID] = comp.SenAmts[comp.RecID]
-		comp.RecTxs[comp.SenID] = comp.SenTxs[comp.RecID]
+		comp.RefAmts[comp.CompID] = comp.CompAmts[comp.RefID]
+		comp.RefTxs[comp.CompID] = comp.CompTxs[comp.RefID]
 	} else {
 		// sender/value does not qualify -- return and continue
 		return nil
@@ -396,7 +670,7 @@ func compare(comp *comparison) error {
 	for _, entry := range least {
 		th = append(th, entry)
 	}
-	comp.Threshold = append(comp.Threshold[:0], th...)
+	comp.RefThreshold = append(comp.RefThreshold[:0], th...)
 
 	return nil
 }
