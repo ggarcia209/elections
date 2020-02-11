@@ -7,28 +7,28 @@ import (
 )
 
 type comparison struct {
-	RecID     string
-	RecAmts   map[string]float32
-	RecTxs    map[string]float32
-	Threshold []interface{}
-	SenID     string
-	SenAmts   map[string]float32
-	SenTxs    map[string]float32
+	RefID        string             // reference object
+	RefAmts      map[string]float32 // marginal amount added to reference amount if compare amount > threshold
+	RefTxs       map[string]float32
+	RefThreshold []interface{}      // compare smallest amount in reference threshold list against compare amount
+	CompID       string             // object being compared to reference object
+	CompAmts     map[string]float32 // marginal amount included before comparison
+	CompTxs      map[string]float32
 }
 
 // update contributor maps for incoming transactions posted by filing committee
-func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, tx *donations.Contribution, transfer bool) (comparison, error) {
+func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *donations.Contribution, transfer bool) (comparison, error) {
 	comp := comparison{}
 	switch t := sender.(type) {
 	case *donations.Individual:
 		comp = comparison{
-			RecID:     receiver.CmteID,
-			RecAmts:   receiver.TopIndvContributorsAmt,
-			RecTxs:    receiver.TopIndvContributorsTxs,
-			Threshold: receiver.TopIndvContributorThreshold,
-			SenID:     t.ID,
-			SenAmts:   sender.(*donations.Individual).RecipientsAmt,
-			SenTxs:    sender.(*donations.Individual).RecipientsTxs,
+			RefID:        receiver.CmteID,
+			RefAmts:      receiver.TopIndvContributorsAmt,
+			RefTxs:       receiver.TopIndvContributorsTxs,
+			RefThreshold: receiver.TopIndvContributorThreshold,
+			CompID:       t.ID,
+			CompAmts:     sender.(*donations.Individual).RecipientsAmt,
+			CompTxs:      sender.(*donations.Individual).RecipientsTxs,
 		}
 		err := compare(&comp)
 		if err != nil {
@@ -37,13 +37,13 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, tx *don
 		}
 	case *donations.Candidate:
 		comp = comparison{
-			RecID:     receiver.CmteID,
-			RecAmts:   receiver.TopIndvContributorsAmt,
-			RecTxs:    receiver.TopIndvContributorsTxs,
-			Threshold: receiver.TopIndvContributorThreshold,
-			SenID:     t.ID,
-			SenAmts:   sender.(*donations.Candidate).DirectRecipientsAmts,
-			SenTxs:    sender.(*donations.Candidate).DirectRecipientsTxs,
+			RefID:        receiver.CmteID,
+			RefAmts:      receiver.TopIndvContributorsAmt,
+			RefTxs:       receiver.TopIndvContributorsTxs,
+			RefThreshold: receiver.TopIndvContributorThreshold,
+			CompID:       t.ID,
+			CompAmts:     sender.(*donations.Candidate).DirectRecipientsAmts,
+			CompTxs:      sender.(*donations.Candidate).DirectRecipientsTxs,
 		}
 		err := compare(&comp)
 		if err != nil {
@@ -52,13 +52,13 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, tx *don
 		}
 	case *donations.Organization:
 		comp = comparison{
-			RecID:     receiver.CmteID,
-			RecAmts:   receiver.TopCmteOrgContributorsAmt,
-			RecTxs:    receiver.TopCmteOrgContributorsTxs,
-			Threshold: receiver.TopCmteOrgContributorThreshold,
-			SenID:     t.ID,
-			SenAmts:   sender.(*donations.Organization).RecipientsAmt,
-			SenTxs:    sender.(*donations.Organization).RecipientsTxs,
+			RefID:        receiver.CmteID,
+			RefAmts:      receiver.TopCmteOrgContributorsAmt,
+			RefTxs:       receiver.TopCmteOrgContributorsTxs,
+			RefThreshold: receiver.TopCmteOrgContributorThreshold,
+			CompID:       t.ID,
+			CompAmts:     sender.(*donations.Organization).RecipientsAmt,
+			CompTxs:      sender.(*donations.Organization).RecipientsTxs,
 		}
 		err := compare(&comp)
 		if err != nil {
@@ -67,7 +67,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, tx *don
 		}
 	case *donations.CmteTxData:
 		// Contribution || Other transfer
-		comp = cmteCompGen(receiver, sender.(*donations.CmteTxData), tx.TxType, transfer)
+		comp = cmteCompGen(receiver, sender.(*donations.CmteTxData), cont, transfer)
 		err := compare(&comp)
 		if err != nil {
 			fmt.Println("updateTopDonors failed: ", err)
@@ -80,18 +80,18 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, tx *don
 }
 
 // update contributor maps for outgoing transactions posted by filing committee
-func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, tx *donations.Contribution, transfer bool) (comparison, error) {
+func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, cont *donations.Contribution, transfer bool) (comparison, error) {
 	comp := comparison{}
 	switch t := receiver.(type) {
 	case *donations.Individual:
 		comp = comparison{
-			RecID:     t.ID,
-			RecAmts:   receiver.(*donations.Individual).SendersAmt,
-			RecTxs:    receiver.(*donations.Individual).SendersTxs,
-			Threshold: sender.TopExpThreshold,
-			SenID:     sender.CmteID,
-			SenAmts:   sender.TopExpRecipientsAmt,
-			SenTxs:    sender.TopExpRecipientsTxs,
+			RefID:        sender.CmteID,
+			RefAmts:      sender.TopExpRecipientsAmt,
+			RefTxs:       sender.TopExpRecipientsTxs,
+			RefThreshold: sender.TopExpThreshold,
+			CompID:       t.ID,
+			CompAmts:     receiver.(*donations.Individual).SendersAmt,
+			CompTxs:      receiver.(*donations.Individual).SendersTxs,
 		}
 		err := compare(&comp)
 		if err != nil {
@@ -100,17 +100,13 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, tx 
 		}
 	case *donations.Candidate:
 		comp = comparison{
-			RecID:     t.ID,
-			RecAmts:   receiver.(*donations.Candidate).DirectSendersAmts,
-			RecTxs:    receiver.(*donations.Candidate).DirectSendersTxs,
-			Threshold: sender.TopExpThreshold,
-			SenID:     sender.CmteID,
-			SenAmts:   sender.TopExpRecipientsAmt,
-			SenTxs:    sender.TopExpRecipientsTxs,
-		}
-		if transfer {
-			comp.SenAmts = sender.TransferRecsAmt
-			comp.SenTxs = sender.TransferRecsTxs
+			RefID:        sender.CmteID,
+			RefAmts:      sender.TopExpRecipientsAmt,
+			RefTxs:       sender.TopExpRecipientsTxs,
+			RefThreshold: sender.TopExpThreshold,
+			CompID:       t.ID,
+			CompAmts:     receiver.(*donations.Candidate).DirectSendersAmts,
+			CompTxs:      receiver.(*donations.Candidate).DirectSendersTxs,
 		}
 		err := compare(&comp)
 		if err != nil {
@@ -119,13 +115,13 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, tx 
 		}
 	case *donations.Organization:
 		comp = comparison{
-			RecID:     t.ID,
-			RecAmts:   receiver.(*donations.Organization).SendersAmt,
-			RecTxs:    receiver.(*donations.Organization).SendersTxs,
-			Threshold: sender.TopExpThreshold,
-			SenID:     sender.CmteID,
-			SenAmts:   sender.TopExpRecipientsAmt,
-			SenTxs:    sender.TopExpRecipientsTxs,
+			RefID:        sender.CmteID,
+			RefAmts:      sender.TopExpRecipientsAmt,
+			RefTxs:       sender.TopExpRecipientsTxs,
+			RefThreshold: sender.TopExpThreshold,
+			CompID:       t.ID,
+			CompAmts:     receiver.(*donations.Organization).SendersAmt,
+			CompTxs:      receiver.(*donations.Organization).SendersTxs,
 		}
 		err := compare(&comp)
 		if err != nil {
@@ -134,7 +130,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, tx 
 		}
 	case *donations.CmteTxData:
 		// Contribution || Other transfer
-		comp = cmteCompGen(receiver.(*donations.CmteTxData), sender, tx.TxType, transfer)
+		comp = cmteCompGen(receiver.(*donations.CmteTxData), sender, cont, transfer)
 		err := compare(&comp)
 		if err != nil {
 			fmt.Println("updateTopDonors failed: ", err)
@@ -146,42 +142,68 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, tx 
 	return comp, nil
 }
 
+func updateOpExpRecipients(sender *donations.CmteTxData, receiver *donations.Organization) (comparison, error) {
+	comp := comparison{
+		RefID:        sender.CmteID,
+		RefAmts:      sender.TopExpRecipientsAmt,
+		RefTxs:       sender.TopExpRecipientsTxs,
+		RefThreshold: sender.TopExpThreshold,
+		CompID:       receiver.ID,
+		CompAmts:     receiver.SendersAmt,
+		CompTxs:      receiver.SendersTxs,
+	}
+	err := compare(&comp)
+	if err != nil {
+		fmt.Println("updateOpExpRecipients failed: ", err)
+		return comparison{}, fmt.Errorf("updateOpExpRecipients failed: %v", err)
+	}
+	return comp, nil
+}
+
 // generates comparison object corresponding to incoming/outoing transaction
-func cmteCompGen(filer, other *donations.CmteTxData, txType string, transfer bool) comparison {
+func cmteCompGen(filer, other *donations.CmteTxData, cont *donations.Contribution, transfer bool) comparison {
 	// determine tx type (incoming / outgoing / memo)
 	var comp comparison
-	if txType < "20" || (txType >= "30" && txType < "33") {
+	if cont.TxType < "20" || (cont.TxType >= "30" && cont.TxType < "33") {
 		// incoming
 		comp = comparison{
 			// values determined by tx type
-			RecID:     filer.CmteID,
-			RecAmts:   filer.TopCmteOrgContributorsAmt,
-			RecTxs:    filer.TopCmteOrgContributorsTxs,
-			Threshold: filer.TopCmteOrgContributorThreshold,
-			SenID:     other.CmteID,
-			SenAmts:   other.TopExpRecipientsAmt,
-			SenTxs:    other.TopExpRecipientsTxs,
+			RefID:        filer.CmteID,
+			RefAmts:      filer.TopCmteOrgContributorsAmt,
+			RefTxs:       filer.TopCmteOrgContributorsTxs,
+			RefThreshold: filer.TopCmteOrgContributorThreshold,
+			CompID:       other.CmteID,
+			CompAmts:     other.TopExpRecipientsAmt,
+			CompTxs:      other.TopExpRecipientsTxs,
 		}
 		if transfer {
-			comp.SenAmts = other.TransferRecsAmt
-			comp.SenTxs = other.TransferRecsTxs
+			// marginal value added before call to updateTop functions
+			comp.CompAmts = other.TransferRecsAmt
+			comp.CompTxs = other.TransferRecsTxs
 		}
+		// add marginal value from new transaction
+		comp.CompAmts[comp.RefID] += cont.TxAmt
+		comp.CompTxs[comp.RefID]++
 	} else {
 		// outgoing
 		comp = comparison{
 			// values determined by tx type
-			RecID:     other.CmteID,
-			RecAmts:   other.TopCmteOrgContributorsAmt,
-			RecTxs:    other.TopCmteOrgContributorsTxs,
-			Threshold: other.TopCmteOrgContributorThreshold,
-			SenID:     filer.CmteID,
-			SenAmts:   filer.TopExpRecipientsAmt,
-			SenTxs:    filer.TopExpRecipientsTxs,
+			RefID:        filer.CmteID,
+			RefAmts:      filer.TopExpRecipientsAmt,
+			RefTxs:       filer.TopExpRecipientsTxs,
+			RefThreshold: filer.TopExpThreshold,
+			CompID:       other.CmteID,
+			CompAmts:     other.TopCmteOrgContributorsAmt,
+			CompTxs:      other.TopCmteOrgContributorsTxs,
 		}
+
 		if transfer {
-			comp.SenAmts = filer.TransferRecsAmt
-			comp.SenTxs = filer.TransferRecsTxs
+			comp.CompAmts = other.TransferRecsAmt
+			comp.CompTxs = other.TransferRecsTxs
 		}
+		// add marginal value from new transaction
+		comp.CompAmts[comp.RefID] += cont.TxAmt
+		comp.CompTxs[comp.RefID]++
 	}
 	return comp
 }
@@ -192,16 +214,16 @@ func compare(comp *comparison) error {
 	var err error
 
 	// if Threshold list is exhausted
-	if len(comp.Threshold) == 0 {
+	if len(comp.RefThreshold) == 0 {
 		// sort Amts map and take bottom 10 as threshold list
-		es := sortTopX(comp.RecAmts)
+		es := sortTopX(comp.RefAmts)
 		least, err = setThresholdLeast10(es)
 		if err != nil {
 			fmt.Println("compare failed: ", err)
 			return fmt.Errorf("compare failed: %v", err)
 		}
 	} else {
-		for _, entry := range comp.Threshold {
+		for _, entry := range comp.RefThreshold {
 			least = append(least, entry.(*donations.Entry))
 		}
 	}
@@ -210,17 +232,17 @@ func compare(comp *comparison) error {
 	threshold := least[len(least)-1].Total // last/smallest obj in least
 
 	// if amount sent to receiver is > receiver's threshold
-	if comp.SenAmts[comp.RecID] > threshold {
+	if comp.CompAmts[comp.RefID] > threshold {
 		// create new threshold entry for sender & amount contributed by sender
-		new := newEntry(comp.SenID, comp.SenAmts[comp.RecID])
+		new := newEntry(comp.CompID, comp.CompAmts[comp.RefID])
 		// reSort threshold list w/ new entry and retreive deletion key for obj below threshold
 		delID := reSortLeast(new, &least)
 		// delete the records for obj below threshold
-		delete(comp.RecAmts, delID)
-		delete(comp.RecTxs, delID)
+		delete(comp.RefAmts, delID)
+		delete(comp.RefTxs, delID)
 		// add new obj data to records
-		comp.RecAmts[comp.SenID] = comp.SenAmts[comp.RecID]
-		comp.RecTxs[comp.SenID] = comp.SenTxs[comp.RecID]
+		comp.RefAmts[comp.CompID] = comp.CompAmts[comp.RefID]
+		comp.RefTxs[comp.CompID] = comp.CompTxs[comp.RefID]
 	} else {
 		// sender/value does not qualify -- return and continue
 		return nil
@@ -231,7 +253,7 @@ func compare(comp *comparison) error {
 	for _, entry := range least {
 		th = append(th, entry)
 	}
-	comp.Threshold = append(comp.Threshold[:0], th...)
+	comp.RefThreshold = append(comp.RefThreshold[:0], th...)
 
 	return nil
 }

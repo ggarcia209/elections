@@ -130,6 +130,7 @@ func updateTopOverall(year string, filer *donations.CmteTxData, other interface{
 			}
 		}
 	default:
+		_ = t // discard unused variable
 		return fmt.Errorf("updateTopOverall failed: wrong interface type")
 	}
 
