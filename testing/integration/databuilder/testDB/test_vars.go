@@ -6,18 +6,21 @@ import (
 
 /* TEST OBJECTS */
 var DbSim = map[string]map[string]interface{}{
-	"individuals":   map[string]interface{}{"indv8": &indv8, "indv10": &indv10, "indv11": &indv11, "indv12": &indv12, "indv13": &indv13, "indv14": &indv14, "indv15": &indv15, "indv16": &indv16},
-	"organizations": map[string]interface{}{"org01": &org01, "org02": &org02, "org03": &org03},
-	"cmte_tx_data":  map[string]interface{}{"Cmte00": &Filer, "Cmte01": &cmte01, "Cmte02": &cmte02, "Cmte03": &cmte03},
-	"candidates":    map[string]interface{}{"Pcand01": &cand01, "Scand02": &cand02, "Hcand03": &cand03},
+	"individuals":   map[string]interface{}{"indv8": &Indv8, "indv10": &Indv10, "indv11": &Indv11, "indv12": &Indv12, "indv13": &Indv13, "indv14": &Indv14, "indv15": &Indv15, "indv16": &Indv16},
+	"organizations": map[string]interface{}{"org01": &Org01, "org02": &Org02, "org03": &Org03},
+	"cmte_tx_data":  map[string]interface{}{"Cmte00": &Filer, "Cmte01": &Cmte01, "Cmte02": &Cmte02, "Cmte03": &Cmte03},
+	"candidates":    map[string]interface{}{"Pcand01": &Cand01, "Scand02": &Cand02, "Hcand03": &Cand03},
 }
 
 var Conts = []*donations.Contribution{&tx1, &tx2, &tx3, &tx4, &tx5, &tx6, &tx7, &tx8, &tx9, &tx10, &tx11, &tx12, &tx13, &tx14, &tx15,
-	&tx16, &tx17, &tx18, &tx19, &tx20, &tx21, &tx22, &tx23, &tx24, &tx25, &tx26, &tx27, &tx28, &tx29}
+	&tx16, &tx165, &tx17, &tx175, &tx18, &tx185, &tx19, &tx195, &tx20, &tx205, &tx21, &tx215, &tx22, &tx225, &tx23, &tx24, &tx25, &tx26, &tx27, &tx28, &tx29}
 
 var Disbs = []*donations.Disbursement{&tx30, &tx31, &tx32}
 
 var Transfers = []*donations.Contribution{&tx20, &tx21, &tx24}
+
+var ExpensesConts = []*donations.Contribution{&tx2, &tx14, &tx22, &tx29}
+var ExpensesDisbs = []*donations.Disbursement{&tx30, &tx31, &tx32}
 
 // filing committee
 var Filer = donations.CmteTxData{
@@ -28,41 +31,41 @@ var Filer = donations.CmteTxData{
 }
 
 // committee contributors/recipients
-var cmte01 = donations.CmteTxData{
+var Cmte01 = donations.CmteTxData{
 	CmteID: "Cmte01",
 }
 
-var cmte02 = donations.CmteTxData{
+var Cmte02 = donations.CmteTxData{
 	CmteID: "Cmte02",
 }
 
-var cmte03 = donations.CmteTxData{
+var Cmte03 = donations.CmteTxData{
 	CmteID: "Cmte03",
 }
 
 // candidate contributors/recipients
-var cand01 = donations.Candidate{
+var Cand01 = donations.Candidate{
 	ID: "PCand01",
 }
 
-var cand02 = donations.Candidate{
+var Cand02 = donations.Candidate{
 	ID: "SCand02",
 }
 
-var cand03 = donations.Candidate{
+var Cand03 = donations.Candidate{
 	ID: "HCand03",
 }
 
 // organization contributors/recipients
-var org01 = donations.Organization{
+var Org01 = donations.Organization{
 	ID: "org01",
 }
 
-var org02 = donations.Organization{
+var Org02 = donations.Organization{
 	ID: "org02",
 }
 
-var org03 = donations.Organization{
+var Org03 = donations.Organization{
 	ID: "org03",
 }
 
@@ -74,50 +77,50 @@ var indv4 = donations.Individual{
 	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 3, "cmte2": 2},
 }
 
-var indv8 = donations.Individual{
+var Indv8 = donations.Individual{
 	ID: "indv8",
 	// RecipientsAmt: map[string]float32{"cmte1": 50, "cmte00": 100, "cmte2": 100},
 	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 1, "cmte2": 2},
 }
 
 // total out = 175, total in = 175, bal = 0
-var indv10 = donations.Individual{
+var Indv10 = donations.Individual{
 	ID: "indv10",
 	// RecipientsAmt: map[string]float32{"cmte1": 40, "cmte2": 200},
 	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
 }
 
-var indv11 = donations.Individual{
+var Indv11 = donations.Individual{
 	ID: "indv11",
 	// RecipientsAmt: map[string]float32{"cmte1": 60, "cmte2": 50},
 	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
 }
 
-var indv12 = donations.Individual{
+var Indv12 = donations.Individual{
 	ID: "indv12",
 	// RecipientsAmt: map[string]float32{"cmte2": 60, "cmte3": 50},
 	// RecipientsTxs: map[string]float32{"cmte2": 1, "cmte3": 2},
 }
 
-var indv13 = donations.Individual{
+var Indv13 = donations.Individual{
 	ID: "indv13",
 	// RecipientsAmt: make(map[string]float32),
 	// RecipientsTxs: make(map[string]float32),
 }
 
-var indv14 = donations.Individual{
+var Indv14 = donations.Individual{
 	ID: "indv14",
 	// RecipientsAmt: make(map[string]float32),
 	// RecipientsTxs: make(map[string]float32),
 }
 
-var indv15 = donations.Individual{
+var Indv15 = donations.Individual{
 	ID: "indv15",
 	// RecipientsAmt: make(map[string]float32),
 	// RecipientsTxs: make(map[string]float32),
 }
 
-var indv16 = donations.Individual{
+var Indv16 = donations.Individual{
 	ID: "indv16",
 	// RecipientsAmt: make(map[string]float32),
 	// RecipientsTxs: make(map[string]float32),
@@ -278,9 +281,19 @@ var tx15 = donations.Contribution{
 var tx16 = donations.Contribution{
 	CmteID:   "Cmte00",
 	OtherID:  "Cmte01",
-	TxAmt:    250,
+	TxAmt:    245,
 	TxType:   "18G",
 	TxID:     "tx16",
+	MemoCode: "",
+}
+
+// tx 16 corresponding
+var tx165 = donations.Contribution{
+	CmteID:   "Cmte01",
+	OtherID:  "Cmte00",
+	TxAmt:    245,
+	TxType:   "24G",
+	TxID:     "tx165",
 	MemoCode: "",
 }
 
@@ -293,12 +306,31 @@ var tx17 = donations.Contribution{
 	MemoCode: "",
 }
 
+var tx175 = donations.Contribution{
+	CmteID:   "Cmte02",
+	OtherID:  "Cmte00",
+	TxAmt:    150,
+	TxType:   "24G",
+	TxID:     "tx175",
+	MemoCode: "",
+}
+
 var tx18 = donations.Contribution{
 	CmteID:   "Cmte00",
 	OtherID:  "Cmte03",
 	TxAmt:    350,
 	TxType:   "18G",
 	TxID:     "tx18",
+	MemoCode: "",
+}
+
+// var 18 corresponding tx
+var tx185 = donations.Contribution{
+	CmteID:   "Cmte03",
+	OtherID:  "Cmte00",
+	TxAmt:    350,
+	TxType:   "24G",
+	TxID:     "tx185",
 	MemoCode: "",
 }
 
@@ -309,6 +341,16 @@ var tx19 = donations.Contribution{
 	TxAmt:    250,
 	TxType:   "17R",
 	TxID:     "tx19",
+	MemoCode: "",
+}
+
+// tx19 corresponding tx
+var tx195 = donations.Contribution{
+	CmteID:   "Cmte01",
+	OtherID:  "Cmte00",
+	TxAmt:    250,
+	TxType:   "22Z",
+	TxID:     "tx195",
 	MemoCode: "",
 }
 
@@ -323,6 +365,16 @@ var tx20 = donations.Contribution{
 	MemoCode: "",
 }
 
+// tx20 corresponding tx
+var tx205 = donations.Contribution{
+	CmteID:   "Cmte03",
+	OtherID:  "Cmte00",
+	TxAmt:    225,
+	TxType:   "18G", // transfer
+	TxID:     "tx205",
+	MemoCode: "",
+}
+
 // transfer
 var tx21 = donations.Contribution{
 	CmteID:   "Cmte00",
@@ -333,13 +385,33 @@ var tx21 = donations.Contribution{
 	MemoCode: "",
 }
 
+// tx215 corresponding tx
+var tx215 = donations.Contribution{
+	CmteID:   "Cmte02",
+	OtherID:  "Cmte00",
+	TxAmt:    150,
+	TxType:   "18G", // transfer
+	TxID:     "tx215",
+	MemoCode: "",
+}
+
 // expense
 var tx22 = donations.Contribution{
 	CmteID:   "Cmte00",
 	OtherID:  "Cmte01",
-	TxAmt:    250,
-	TxType:   "40Z", // convention account refund
+	TxAmt:    110,
+	TxType:   "40Z", // convention account disbursement
 	TxID:     "tx22",
+	MemoCode: "",
+}
+
+// tx225 corresponding tx
+var tx225 = donations.Contribution{
+	CmteID:   "Cmte01",
+	OtherID:  "Cmte00",
+	TxAmt:    110,
+	TxType:   "18G",
+	TxID:     "tx225",
 	MemoCode: "",
 }
 
@@ -357,7 +429,7 @@ var tx23 = donations.Contribution{
 var tx24 = donations.Contribution{
 	CmteID:   "Cmte00",
 	OtherID:  "Cmte01",
-	TxAmt:    250,
+	TxAmt:    124,
 	TxType:   "24G", // transfer out
 	TxID:     "tx24",
 	MemoCode: "",
@@ -366,7 +438,7 @@ var tx24 = donations.Contribution{
 var tx25 = donations.Contribution{
 	CmteID:   "Cmte01",
 	OtherID:  "Cmte00",
-	TxAmt:    250,
+	TxAmt:    124,
 	TxType:   "18G", // transfer in
 	TxID:     "tx25",
 	MemoCode: "",
@@ -400,6 +472,7 @@ var tx28 = donations.Contribution{
 	MemoCode: "",
 }
 
+// cand refund
 var tx29 = donations.Contribution{
 	CmteID:   "Cmte00",
 	OtherID:  "Hcand03",

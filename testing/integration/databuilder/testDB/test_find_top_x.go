@@ -241,14 +241,19 @@ func compare(comp *comparison) error {
 			fmt.Println("compare failed: ", err)
 			return fmt.Errorf("compare failed: %v", err)
 		}
+		fmt.Println("new threshold: ")
+		printThreshold(least)
 	} else {
 		for _, entry := range comp.RefThreshold {
 			least = append(least, entry.(*donations.Entry))
+			fmt.Println("current threshold: ")
+			printThreshold(least)
 		}
 	}
 
 	// compare new sender's total to receiver's threshold value
 	threshold := least[len(least)-1].Total // last/smallest obj in least
+	fmt.Println("least: ", threshold)
 
 	// if amount sent to receiver is > receiver's threshold
 	if comp.CompAmts[comp.RefID] > threshold {
@@ -256,6 +261,8 @@ func compare(comp *comparison) error {
 		new := newEntry(comp.CompID, comp.CompAmts[comp.RefID])
 		// reSort threshold list w/ new entry and retreive deletion key for obj below threshold
 		delID := reSortLeast(new, &least)
+		fmt.Println("updated threshold: ")
+		printThreshold(least)
 		// delete the records for obj below threshold
 		delete(comp.RefAmts, delID)
 		delete(comp.RefTxs, delID)
@@ -275,6 +282,12 @@ func compare(comp *comparison) error {
 	comp.RefThreshold = append(comp.RefThreshold[:0], th...)
 
 	return nil
+}
+
+func printThreshold(es Entries) {
+	for _, e := range es {
+		fmt.Printf("\tID: %v\tTotal: %v\n", e.ID, e.Total)
+	}
 }
 
 // reSortLeast re-sorts the least 5 or 10 values when a new value breaks the threshold (least[len(least)-1].Total)
