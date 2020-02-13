@@ -258,6 +258,11 @@ func compare(comp *comparison) error {
 	return nil
 }
 
+// check to see if previous total of entry is in threshold range when updating existing entry
+func checkThreshold(newID string, newTotal float32, tr *[]interface{}) {
+
+}
+
 // DEPRECATED
 
 /*
