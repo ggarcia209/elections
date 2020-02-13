@@ -246,9 +246,9 @@ func compare(comp *comparison) error {
 	} else {
 		for _, entry := range comp.RefThreshold {
 			least = append(least, entry.(*donations.Entry))
-			fmt.Println("current threshold: ")
-			printThreshold(least)
 		}
+		fmt.Println("current threshold: ")
+		printThreshold(least)
 	}
 
 	// compare new sender's total to receiver's threshold value
@@ -284,6 +284,33 @@ func compare(comp *comparison) error {
 	return nil
 }
 
+// check to see if previous total of entry is in threshold range when updating existing entry
+func checkThreshold(newID string, m map[string]float32, th []interface{}) ([]interface{}, error) {
+	inRange := false
+	check := map[string]bool{newID: true}
+	for _, e := range th {
+		if check[e.(*donations.Entry).ID] == true {
+			inRange = true
+		}
+	}
+	if inRange {
+		es := sortTopX(m)
+		newRange, err := setThresholdLeast3(es)
+		if err != nil {
+			fmt.Println("checkThreshold failed: ", err)
+			return []interface{}{}, fmt.Errorf("checkThreshold failed: %v", err)
+		}
+		// update object's threshold list
+		newTh := []interface{}{}
+		for _, entry := range newRange {
+			newTh = append(newTh, entry)
+		}
+		return newTh, nil
+	}
+	return th, nil
+}
+
+// TEST ONLY
 func printThreshold(es Entries) {
 	for _, e := range es {
 		fmt.Printf("\tID: %v\tTotal: %v\n", e.ID, e.Total)
@@ -294,12 +321,15 @@ func printThreshold(es Entries) {
 // and returns the ID of the key to be deleted and the new sorted list of least values
 func reSortLeast(new *donations.Entry, es *Entries) string {
 	copy := *es
+	fmt.Println("resortLeast: new.Total: ", new.Total)
+	fmt.Println("resortLeast: copy[0].Total: ", copy[0].Total)
 	// if new.Total >= largest value in threshold list
 	if new.Total >= copy[0].Total {
 		// update original list of entries by overwriting it with new copy
 		// es = &copy
 		// pop smallest value and get it's ID to delete from records
 		delID := es.popLeast().ID
+		fmt.Println("resortLeast: delID: ", delID)
 		return delID
 	}
 	// value falls between threshold range:
@@ -312,6 +342,7 @@ func reSortLeast(new *donations.Entry, es *Entries) string {
 	sort.Sort(es)
 	// remove smallest item by value from list and return ID
 	delID := es.popLeast().ID
+	fmt.Println("resortLeast: delID: ", delID)
 
 	return delID
 }
@@ -329,8 +360,8 @@ func sortTopX(m map[string]float32) Entries {
 
 // TEST ONLY
 func setThresholdLeast3(es Entries) (Entries, error) {
-	if len(es) < 5 {
-		return nil, fmt.Errorf("=etThresholdLeast5 failed: not enough elements in list")
+	if len(es) < 3 {
+		return nil, fmt.Errorf("setThresholdLeast5 failed: not enough elements in list")
 	}
 	return es[len(es)-3:], nil
 }

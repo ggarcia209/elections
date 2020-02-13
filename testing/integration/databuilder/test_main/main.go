@@ -26,8 +26,14 @@ func main() {
 	}
 	fmt.Println("FILER")
 	printCmte(&testDB.Filer)
-	fmt.Println("indv10")
-	/* printIndv(&testDB.Indv10)
+	/* fmt.Println("indv10")
+	printIndv(&testDB.Indv10)
+	fmt.Println("org01")
+	printOrg(&testDB.Org01)
+	fmt.Println("org02")
+	printOrg(&testDB.Org02)
+	fmt.Println("org03")
+	printOrg(&testDB.Org03)
 	fmt.Println("indv11")
 	printIndv(&testDB.Indv11)
 	fmt.Println("indv8")
@@ -36,14 +42,14 @@ func main() {
 	printOrg(&testDB.Org01)
 	fmt.Println("org03")
 	printOrg(&testDB.Org03) */
-	fmt.Println("cmte01")
-	printCmte(&testDB.Cmte01)
-	fmt.Println("cmte03")
-	printCmte(&testDB.Cmte03)
-	fmt.Println("cand01")
-	/* printCand(&testDB.Cand01)
-	fmt.Println("cand03")
-	printCand(&testDB.Cand03) */
+	/* 	fmt.Println("cmte01")
+	   	printCmte(&testDB.Cmte01)
+	   	fmt.Println("cmte03")
+	   	printCmte(&testDB.Cmte03)
+	   	fmt.Println("cand01")
+	   	printCand(&testDB.Cand01)
+	   	fmt.Println("cand03")
+	   	printCand(&testDB.Cand03)*/
 
 }
 

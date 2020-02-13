@@ -20,7 +20,7 @@ var Disbs = []*donations.Disbursement{&tx30, &tx31, &tx32}
 var Transfers = []*donations.Contribution{&tx20, &tx21, &tx24}
 
 var ExpensesConts = []*donations.Contribution{&tx2, &tx14, &tx22, &tx29}
-var ExpensesDisbs = []*donations.Disbursement{&tx30, &tx31, &tx32}
+var ExpensesDisbs = []*donations.Disbursement{&tx30, &tx31, &tx32, &tx33}
 
 // filing committee
 var Filer = donations.CmteTxData{
@@ -502,6 +502,16 @@ var tx32 = donations.Disbursement{
 	RecID:  "org03",
 	TxAmt:  315,
 	TxID:   "tx32",
+}
+
+// transaction between TopExpThreshold range
+
+// transaction added to existing entry in threshold range
+var tx33 = donations.Disbursement{
+	CmteID: "Cmte00",
+	RecID:  "org01",
+	TxAmt:  222,
+	TxID:   "tx33",
 }
 
 /* END TEST OBJECTS */
