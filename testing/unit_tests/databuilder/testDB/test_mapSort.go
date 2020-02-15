@@ -106,13 +106,6 @@ func TestCompareUnits() error {
 	return nil
 }
 
-func printEntries(es Entries) {
-	for _, e := range es {
-		fmt.Printf("%s: %v\t", e.ID, e.Total)
-	}
-	fmt.Println()
-}
-
 /* Working Code */
 
 // Entries is a list of entries to be sorted.
@@ -204,8 +197,15 @@ func newEntry(k string, v float32) *donations.Entry {
 }
 
 // TEST ONLY
-func printThreshold(es Entries) {
-	for _, e := range es {
-		fmt.Printf("\tID: %v\tTotal: %v\n", e.ID, e.Total)
+func printThreshold(th []interface{}) {
+	for _, e := range th {
+		fmt.Printf("\tID: %v\tTotal: %v\n", e.(*donations.Entry).ID, e.(*donations.Entry).Total)
 	}
+}
+
+func printEntries(es Entries) {
+	for _, e := range es {
+		fmt.Printf("%s: %v\t", e.ID, e.Total)
+	}
+	fmt.Println()
 }
