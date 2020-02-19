@@ -7,6 +7,54 @@ import (
 	"github.com/elections/donations"
 )
 
+// SUCCESS
+func TestTxUpdateInternalLogic() {
+	txType := "17"
+	memo := true
+	if memo {
+		fmt.Println("memo == true")
+	}
+	if txType < "16" || txType > "18" {
+		fmt.Println("account == contributionsIn")
+	} else {
+		fmt.Println("account == otherReceipts")
+	}
+	// switch cases verifed in test_findTopX.go
+}
+
+// SUCCESS
+func TestDeriveTxTypes() {
+	cont1 := &donations.Contribution{
+		TxType:   "15",
+		MemoCode: "",
+		OtherID:  "C0001",
+	}
+	cont2 := &donations.Contribution{
+		TxType:   "32K",
+		MemoCode: "X",
+		OtherID:  "H0001",
+	}
+	cont3 := &donations.Contribution{
+		TxType:     "20",
+		MemoCode:   "",
+		OtherID:    "I0001",
+		Occupation: "worker",
+	}
+	cont4 := &donations.Contribution{
+		TxType:   "24G",
+		MemoCode: "",
+		OtherID:  "O0001",
+	}
+	b, i, t, m := deriveTxTypes(cont1)
+	fmt.Println(b, i, t, m)
+	b, i, t, m = deriveTxTypes(cont2)
+	fmt.Println(b, i, t, m)
+	b, i, t, m = deriveTxTypes(cont3)
+	fmt.Println(b, i, t, m)
+	b, i, t, m = deriveTxTypes(cont4)
+	fmt.Println(b, i, t, m)
+}
+
 // TransactionUpdate updates each sender/receiver data for each transaction in a list of transactions.
 func TransactionUpdate(txs interface{}) error {
 	_, cont := txs.([]*donations.Contribution)
@@ -435,13 +483,9 @@ func mapUpdateIncoming(cont *donations.Contribution, filerData *donations.CmteTx
 			filerData.TopCmteOrgContributorsAmt = make(map[string]float32)
 			filerData.TopCmteOrgContributorsTxs = make(map[string]float32)
 		}
-		if len(sender.(*donations.CmteTxData).TransferRecsAmt) == 0 && transfer {
+		if len(sender.(*donations.CmteTxData).TransferRecsAmt) == 0 {
 			sender.(*donations.CmteTxData).TransferRecsAmt = make(map[string]float32)
 			sender.(*donations.CmteTxData).TransferRecsTxs = make(map[string]float32)
-		}
-		if len(sender.(*donations.CmteTxData).TopExpRecipientsAmt) == 0 && !transfer {
-			sender.(*donations.CmteTxData).TopExpRecipientsAmt = make(map[string]float32)
-			sender.(*donations.CmteTxData).TopExpRecipientsTxs = make(map[string]float32)
 		}
 
 		// update filing committee's Top Contributors maps only --  sending committee's maps updated in corresponding tx
