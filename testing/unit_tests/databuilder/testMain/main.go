@@ -30,6 +30,8 @@ func main() {
 	testDB.TestCmteCompGen() */
 
 	// part 5 - test updateTop internal logic (SUCCESS)
-	testDB.TestUpdateTopInternalLogic()
+	// testDB.TestUpdateTopInternalLogic()
+	testDB.TestTxUpdateInternalLogic()
+	testDB.TestDeriveTxTypes()
 
 }
