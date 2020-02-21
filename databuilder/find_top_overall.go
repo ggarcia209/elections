@@ -397,8 +397,8 @@ func updateAndSave(year, category string, entry *donations.Entry) error {
 // compare obj to top overall threshold
 func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 	// add to Amts map if len(Amts) < Size Limit
-	if len(od.Amts) < od.SizeLimit {
-		od.Amts[e.ID] = e.Total
+	if len(od.Amts) < od.SizeLimit || od.Amts[e.ID] != 0 {
+		od.Amts[e.ID] += e.Total
 		return nil
 	}
 
