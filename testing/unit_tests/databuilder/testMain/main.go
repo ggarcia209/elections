@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/elections/testing/unit_tests/databuilder/testDB"
 )
 
@@ -27,11 +30,20 @@ func main() {
 	}
 
 	// part 4 - cmteCompGen (SUCCESS)
-	testDB.TestCmteCompGen() */
+	testDB.TestCmteCompGen()
 
 	// part 5 - test updateTop internal logic (SUCCESS)
 	// testDB.TestUpdateTopInternalLogic()
 	testDB.TestTxUpdateInternalLogic()
 	testDB.TestDeriveTxTypes()
+
+	*/
+
+	// part 6 - test updateTopOverall
+	err := testDB.TestCompareTopOverall()
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	}
 
 }

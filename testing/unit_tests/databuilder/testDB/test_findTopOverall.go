@@ -6,6 +6,71 @@ import (
 	"github.com/elections/donations"
 )
 
+func TestCompareTopOverall() error {
+	od1 := &donations.TopOverallData{
+		Category:  "top_indv",
+		Amts:      map[string]float32{"indv00": 100, "indv01": 200, "indv02": 50, "indv04": 150, "indv05": 250},
+		Threshold: []*donations.Entry{},
+		SizeLimit: 5,
+	}
+	od2 := &donations.TopOverallData{
+		Category:  "top_indv",
+		Amts:      map[string]float32{"indv00": 100, "indv01": 200, "indv02": 50},
+		Threshold: []*donations.Entry{},
+		SizeLimit: 5,
+	}
+	e := &donations.Entry{ID: "indv03", Total: 75}
+
+	err := compareTopOverall(e, od1)
+	if err != nil {
+		return fmt.Errorf("compareTopOverall failed: %v", err)
+	}
+
+	err = compareTopOverall(e, od2)
+	if err != nil {
+		return fmt.Errorf("compareTopOverall failed: %v", err)
+	}
+
+	fmt.Println("od1")
+	fmt.Println(od1)
+	printODThreshold(od1.Threshold)
+	fmt.Println()
+
+	fmt.Println("od2")
+	fmt.Println(od2)
+	fmt.Println()
+
+	e2 := &donations.Entry{ID: "indv06", Total: 300}
+	err = compareTopOverall(e2, od1)
+	if err != nil {
+		return fmt.Errorf("compareTopOverall failed: %v", err)
+	}
+
+	fmt.Println("od1")
+	fmt.Println(od1)
+	printODThreshold(od1.Threshold)
+	fmt.Println()
+
+	e3 := &donations.Entry{ID: "indv07", Total: 120}
+	err = compareTopOverall(e3, od1)
+	if err != nil {
+		return fmt.Errorf("compareTopOverall failed: %v", err)
+	}
+
+	fmt.Println("od1")
+	fmt.Println(od1)
+	printODThreshold(od1.Threshold)
+	fmt.Println()
+
+	return nil
+}
+
+func printODThreshold(th []*donations.Entry) {
+	for i, e := range th {
+		fmt.Printf("%d: ID: %s\tTotal: %v\n", i, e.ID, e.Total)
+	}
+}
+
 // compare obj to top overall threshold
 func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 	// add to Amts map if len(Amts) < Size Limit
@@ -20,10 +85,10 @@ func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 	var err error
 	if len(od.Threshold) == 0 {
 		es := sortTopX(od.Amts)
-		least, err = setThresholdLeast10(es)
+		least, err = setThresholdLeast3(es)
 		if err != nil {
-			fmt.Println("updateOverall failed: ", err)
-			return fmt.Errorf("updateOverall failed: %v", err)
+			fmt.Println("compareTopOverall failed: ", err)
+			return fmt.Errorf("compareTopOverall failed: %v", err)
 		}
 	} else {
 		for _, entry := range od.Threshold {
@@ -38,7 +103,21 @@ func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 		delID := reSortLeast(new, &least)
 		delete(od.Amts, delID)
 		od.Amts[e.ID] = e.Total
+	} else {
+		newTh := []*donations.Entry{}
+		for _, e := range least {
+			newTh = append(newTh, e)
+		}
+		od.Threshold = append(od.Threshold[:0], newTh...)
+		return nil
 	}
+
+	// update threshold
+	newTh := []*donations.Entry{}
+	for _, e := range least {
+		newTh = append(newTh, e)
+	}
+	od.Threshold = append(od.Threshold[:0], newTh...)
 
 	return nil
 }
