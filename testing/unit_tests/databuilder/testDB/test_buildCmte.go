@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elections/donations"
+	"github.com/elections/persist"
 )
 
 // SUCCESS
@@ -102,7 +103,8 @@ func contributionUpdate(conts []*donations.Contribution) error {
 		}
 
 		// update TopOverall rankings if not memo transaction
-		/* if !memo {
+		// 7/22/20 - refactor & test
+		if !memo {
 			// update top individuals, organizations and committees
 			err := updateTopOverall(year, filer.(*donations.CmteTxData), other, incoming, transfer)
 			if err != nil {
@@ -124,7 +126,7 @@ func contributionUpdate(conts []*donations.Contribution) error {
 					return fmt.Errorf("ContributionUpdate failed: %v", err)
 				}
 			}
-		} */
+		}
 
 		// persist objects
 		DbSim["cmte_tx_data"][cont.CmteID] = filer

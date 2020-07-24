@@ -77,6 +77,23 @@ func TestCompare() error {
 	}
 	printComp(comp4)
 
+	// within threshold range/non-empty threshold range
+	fmt.Println("comp5: within threshold range/non-empty threshold range")
+	comp5 := &comparison{
+		RefID:        "cmte01",
+		RefAmts:      map[string]float32{"indv01": 100, "indv02": 200, "indv03": 50, "indv04": 40, "indv05": 150},
+		RefTxs:       map[string]float32{"indv01": 1, "indv02": 1, "indv03": 1, "indv04": 1, "indv05": 1},
+		RefThreshold: []interface{}{&donations.Entry{"indv01", 100}, &donations.Entry{"indv03", 50}, &donations.Entry{"indv04", 40}},
+		CompID:       "indv06",
+		CompAmts:     map[string]float32{"cmte01": 75, "cmte02": 40},
+		CompTxs:      map[string]float32{"cmte01": 1, "cmte02": 1},
+	}
+	err = compare(comp5)
+	if err != nil {
+		return err
+	}
+	printComp(comp5)
+
 	return nil
 }
 
@@ -360,9 +377,7 @@ func updateOpExpRecipients(sender *donations.CmteTxData, receiver *donations.Org
 func cmteCompGen(filer, other *donations.CmteTxData, cont *donations.Contribution) comparison {
 	// REFACTOR - removed transfer condition -- all transactions between committees should be represented as transfer per FEC data
 	// removed incoming/outgoing condition -- outgoing transactions debited to TransfersRecsAmt directly
-	// determine tx type (incoming / outgoing / memo)
 	comp := comparison{
-		// values determined by tx type
 		RefID:        filer.CmteID,
 		RefAmts:      filer.TopCmteOrgContributorsAmt,
 		RefTxs:       filer.TopCmteOrgContributorsTxs,
@@ -401,14 +416,14 @@ func compare(comp *comparison) error {
 
 	// compare new sender's total to receiver's threshold value
 	threshold := least[len(least)-1].Total // last/smallest obj in least
-	fmt.Println("least: ", threshold)
 
 	// if amount sent to receiver is > receiver's threshold
 	if comp.CompAmts[comp.RefID] > threshold {
 		// create new threshold entry for sender & amount contributed by sender
 		new := newEntry(comp.CompID, comp.CompAmts[comp.RefID])
 		// reSort threshold list w/ new entry and retreive deletion key for obj below threshold
-		delID := reSortLeast(new, &least)
+		delID, newEntries := reSortLeast(new, least)
+		least = newEntries
 		// delete the records for obj below threshold
 		delete(comp.RefAmts, delID)
 		delete(comp.RefTxs, delID)

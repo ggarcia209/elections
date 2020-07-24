@@ -36,59 +36,71 @@ func testSetThresholdLeastX(es Entries) (Entries, error) {
 func testReSortLeast(es Entries) string {
 	fmt.Println("reSortLeast test")
 	fmt.Println("outside range -1")
+	fmt.Println("")
 	copy := es
 	new := newEntry("indv06", 175)
 	fmt.Printf("\tnew: %s: %v\n", new.ID, new.Total)
-	delID := reSortLeast(new, &copy)
+	delID, newEntries := reSortLeast(new, copy)
 	fmt.Println("threshold: ")
-	printEntries(copy)
+	printEntries(newEntries)
 	fmt.Println("	delID: ", delID)
 
 	fmt.Println("within range -1 + 1")
 	new = newEntry("indv07", 75)
 	copy = es
 	fmt.Printf("\tnew: %s: %v\n", new.ID, new.Total)
-	delID = reSortLeast(new, &copy)
+	delID, newEntries = reSortLeast(new, copy)
 	fmt.Println("threshold: ")
-	printEntries(copy)
+	printEntries(newEntries)
 	fmt.Println("	delID: ", delID)
 	fmt.Println()
 
 	fmt.Println("within range -1 + 1")
 	new = newEntry("indv08", 90)
 	fmt.Printf("\tnew: %s: %v\n", new.ID, new.Total)
-	delID = reSortLeast(new, &copy)
+	delID, newEntries = reSortLeast(new, newEntries)
 	fmt.Println("threshold: ")
-	printEntries(copy)
+	printEntries(newEntries)
 	fmt.Println("	delID: ", delID)
 	fmt.Println()
 
 	fmt.Println("outside range -1")
 	new = newEntry("indv09", 200)
 	fmt.Printf("\tnew: %s: %v\n", new.ID, new.Total)
-	delID = reSortLeast(new, &copy)
+	delID, newEntries = reSortLeast(new, newEntries)
 	fmt.Println("threshold: ")
-	printEntries(copy)
+	printEntries(newEntries)
 	fmt.Println("	delID: ", delID)
 	fmt.Println()
 
 	fmt.Println("outside range -1")
 	new = newEntry("indv10", 125)
 	fmt.Printf("\tnew: %s: %v\n", new.ID, new.Total)
-	delID = reSortLeast(new, &copy)
+	delID, newEntries = reSortLeast(new, newEntries)
 	fmt.Println("threshold: ")
-	printEntries(copy)
+	printEntries(newEntries)
 	fmt.Println("	delID: ", delID)
 	fmt.Println()
 
 	fmt.Println("outside range -1")
 	new = newEntry("indv11", 160)
 	fmt.Printf("\tnew: %s: %v\n", new.ID, new.Total)
-	delID = reSortLeast(new, &copy)
+	delID, newEntries = reSortLeast(new, newEntries)
 	fmt.Println("threshold: ")
-	printEntries(copy)
+	printEntries(newEntries)
 	fmt.Println("	delID: ", delID)
 	fmt.Println()
+
+	// panics at this point - index of empty slice newEntries
+
+	/* fmt.Println("outside range -1")
+	new = newEntry("indv12", 120)
+	fmt.Printf("\tnew: %s: %v\n", new.ID, new.Total)
+	delID, newEntries = reSortLeast(new, newEntries)
+	fmt.Println("threshold: ")
+	printEntries(newEntries)
+	fmt.Println("	delID: ", delID)
+	fmt.Println() */
 
 	return delID
 }
@@ -128,30 +140,25 @@ func (s *Entries) popLeast() *donations.Entry {
 
 // reSortLeast re-sorts the least 5 or 10 values when a new value breaks the threshold (least[len(least)-1].Total)
 // and returns the ID of the key to be deleted and the new sorted list of least values
-func reSortLeast(new *donations.Entry, es *Entries) string {
-	copy := *es
+// REFACTOR 6/23/20 - return var least/do not modify in place
+func reSortLeast(new *donations.Entry, es Entries) (string, Entries) {
+	copy := es
 	// if new.Total >= largest value in threshold list
 	if new.Total >= copy[0].Total {
-		// update original list of entries by overwriting it with new copy
-		// es = &copy
 		// pop smallest value and get it's ID to delete from records
-		delID := es.popLeast().ID
-		fmt.Println("resortLeast: delID: ", delID)
-		return delID
+		delID := copy.popLeast().ID
+		return delID, copy
 	}
 	// value falls between threshold range:
 	// add new value to copy of threshold list (# of items remains the same)
-	// len + 1 (append) - 1 (popLeast)
+	//   len + 1 (append) - 1 (popLeast)
 	copy = append(copy, new)
-	// update original list by overwriting it with copy
-	es = &copy
 	// reSort with new value included
-	sort.Sort(es)
+	sort.Sort(copy)
 	// remove smallest item by value from list and return ID
-	delID := es.popLeast().ID
-	fmt.Println("resortLeast: delID: ", delID)
+	delID := copy.popLeast().ID
 
-	return delID
+	return delID, copy
 }
 
 // sortTopX sorts the Top x Donors/Recipients maps from greatest -> smallest (decreasing order)

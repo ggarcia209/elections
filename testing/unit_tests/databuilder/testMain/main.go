@@ -9,6 +9,7 @@ import (
 
 func main() {
 	// Part 1 - compare units (SUCCESS)
+	// 7/22/20 - successful test after refactor
 	/* err := testDB.TestCompareUnits()
 	if err != nil {
 		fmt.Println(err)
@@ -16,6 +17,7 @@ func main() {
 	}
 
 	// part 2 - compare (SUCCESS)
+	// 7/22/20 - successful test after refactor
 	err := testDB.TestCompare()
 	if err != nil {
 		fmt.Println("main failed: ")
@@ -23,7 +25,7 @@ func main() {
 	}
 
 	// part 3 - checkThreshold (SUCCESS)
-	err := testDB.TestCheckThreshold()
+	/* err := testDB.TestCheckThreshold()
 	if err != nil {
 		fmt.Println("main failed: ")
 		os.Exit(1)
@@ -35,11 +37,10 @@ func main() {
 	// part 5 - test updateTop internal logic (SUCCESS)
 	// testDB.TestUpdateTopInternalLogic()
 	testDB.TestTxUpdateInternalLogic()
-	testDB.TestDeriveTxTypes()
-
-	*/
+	testDB.TestDeriveTxTypes() */
 
 	// part 6 - test updateTopOverall
+	// 7/22/20 - SUCCESS
 	err := testDB.TestCompareTopOverall()
 	if err != nil {
 		fmt.Println("main failed: ", err)
