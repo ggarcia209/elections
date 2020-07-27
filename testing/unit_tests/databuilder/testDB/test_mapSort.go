@@ -175,7 +175,7 @@ func sortTopX(m map[string]float32) Entries {
 // TEST ONLY
 func setThresholdLeast3(es Entries) (Entries, error) {
 	if len(es) < 3 {
-		return nil, fmt.Errorf("setThresholdLeast5 failed: not enough elements in list")
+		return nil, fmt.Errorf("setThresholdLeast3 (TEST ONLY) failed: not enough elements in list")
 	}
 	return es[len(es)-3:], nil
 }

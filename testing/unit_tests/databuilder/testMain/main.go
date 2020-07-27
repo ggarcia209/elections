@@ -37,14 +37,42 @@ func main() {
 	// part 5 - test updateTop internal logic (SUCCESS)
 	// testDB.TestUpdateTopInternalLogic()
 	testDB.TestTxUpdateInternalLogic()
-	testDB.TestDeriveTxTypes() */
+	testDB.TestDeriveTxTypes()
 
-	// part 6 - test updateTopOverall
+	/* TopOverall units */
+	// part 6 - test compareTopOverall
 	// 7/22/20 - SUCCESS
-	err := testDB.TestCompareTopOverall()
+	/* err := testDB.TestCompareTopOverall()
 	if err != nil {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)
 	}
 
+	// part 7 - test updateAndSave
+	err := testDB.TestUpdateAndSave()
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	}
+
+	// part 8  - test party switch cases (SUCCESS)
+	err := testDB.TestPartySwitchCases()
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	}
+
+	// part 9 - test type assertion switch cases and nested if/esle statements (SUCCESS)
+	err := testDB.TestTopOverallInternalLogic()
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	}  */
+
+	// part 10 - test updateTopOverall (SUCCESS)
+	err := testDB.TestUpdateTopOverall()
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	}
 }

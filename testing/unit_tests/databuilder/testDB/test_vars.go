@@ -5,11 +5,29 @@ import (
 )
 
 /* TEST OBJECTS */
-var DbSim = map[string]map[string]interface{}{
-	"individuals":   map[string]interface{}{"indv8": &Indv8, "indv10": &Indv10, "indv11": &Indv11, "indv12": &Indv12, "indv13": &Indv13, "indv14": &Indv14, "indv15": &Indv15, "indv16": &Indv16},
-	"organizations": map[string]interface{}{"org01": &Org01, "org02": &Org02, "org03": &Org03},
-	"cmte_tx_data":  map[string]interface{}{"Cmte00": &Filer, "Cmte01": &Cmte01, "Cmte02": &Cmte02, "Cmte03": &Cmte03},
-	"candidates":    map[string]interface{}{"Pcand01": &Cand01, "Scand02": &Cand02, "Hcand03": &Cand03},
+// 7/24/20 - updated to incorporate year key & TopOverall
+// Top Overall Categories:
+//   cmte_recs_all, cmte_recs_r, cmte_recs_d, cmte_recs_na, cmte_recs_misc,
+//   cmte_donors_all, cmte_donors_r, cmte_donors_d, cmte_donors_na, cmte_donors_misc,
+//   cmte_exp_all, cmte_exp_r, cmte_exp_d, cmte_exp_na, cmte_exp_misc,
+//   cand_all, cand_r, cand_d, cand_na, cand_misc,
+//   cand_exp_all, cand_exp_r, cand_exp_d, cand_exp_na, cand_exp_misc,
+//   indv, org_conts, org_recs,
+var DbSim = map[string]map[string]map[string]interface{}{
+	"2018": map[string]map[string]interface{}{
+		"individuals":   map[string]interface{}{"indv8": &Indv8, "indv10": &Indv10, "indv11": &Indv11, "indv12": &Indv12, "indv13": &Indv13, "indv14": &Indv14, "indv15": &Indv15, "indv16": &Indv16},
+		"organizations": map[string]interface{}{"org01": &Org01, "org02": &Org02, "org03": &Org03},
+		"cmte_tx_data":  map[string]interface{}{"Cmte00": &Filer, "Cmte01": &Cmte01, "Cmte02": &Cmte02, "Cmte03": &Cmte03},
+		"candidates":    map[string]interface{}{"Pcand01": &Cand01, "Scand02": &Cand02, "Hcand03": &Cand03},
+		"top_overall": map[string]interface{}{
+			"cmte_recs_all": &donations.TopOverallData{}, "cmte_recs_r": &donations.TopOverallData{}, "cmte_recs_d": &donations.TopOverallData{}, "cmte_recs_na": &donations.TopOverallData{}, "cmte_recs_misc": &donations.TopOverallData{},
+			"cmte_donors_all": &donations.TopOverallData{}, "cmte_donors_r": &donations.TopOverallData{}, "cmte_donors_d": &donations.TopOverallData{}, "cmte_donors_na": &donations.TopOverallData{}, "cmte_donors_misc": &donations.TopOverallData{},
+			"cmte_exp_all": &donations.TopOverallData{}, "cmte_exp_r": &donations.TopOverallData{}, "cmte_exp_d": &donations.TopOverallData{}, "cmte_exp_na": &donations.TopOverallData{}, "cmte_exp_misc": &donations.TopOverallData{},
+			"cand_all": &donations.TopOverallData{}, "cand_r": &donations.TopOverallData{}, "cand_d": &donations.TopOverallData{}, "cand_na": &donations.TopOverallData{}, "cand_misc": &donations.TopOverallData{},
+			"cand_exp_all": &donations.TopOverallData{}, "cand_exp_r": &donations.TopOverallData{}, "cand_exp_d": &donations.TopOverallData{}, "cand_exp_na": &donations.TopOverallData{}, "cand_exp_misc": &donations.TopOverallData{},
+			"indv": &donations.TopOverallData{}, "org_conts": &donations.TopOverallData{}, "org_recs": &donations.TopOverallData{},
+		},
+	},
 }
 
 var Conts = []*donations.Contribution{&tx1, &tx2, &tx3, &tx4, &tx5, &tx6, &tx7, &tx8, &tx9, &tx10, &tx11, &tx12, &tx13, &tx14, &tx15,
@@ -45,7 +63,8 @@ var Cmte03 = donations.CmteTxData{
 
 // candidate contributors/recipients
 var Cand01 = donations.Candidate{
-	ID: "PCand01",
+	ID:    "PCand01",
+	Party: "IND",
 }
 
 var Cand02 = donations.Candidate{

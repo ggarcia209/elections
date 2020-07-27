@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/elections/donations"
-	"github.com/elections/persist"
 )
 
 // SUCCESS
@@ -57,16 +56,18 @@ func TestDeriveTxTypes() {
 }
 
 // TransactionUpdate updates each sender/receiver data for each transaction in a list of transactions.
-func TransactionUpdate(txs interface{}) error {
+// 7/22/20 - Correct logic to incorporate "year" database key
+func TransactionUpdate(year string, txs interface{}) error {
 	_, cont := txs.([]*donations.Contribution)
+
 	if cont { // tx type is standard contribution/disbursement type
-		err := contributionUpdate(txs.([]*donations.Contribution))
+		err := contributionUpdate(year, txs.([]*donations.Contribution))
 		if err != nil {
 			fmt.Println("TransactionUpdate failed: ", err)
 			return fmt.Errorf("TransactionUpdate failed: %v", err)
 		}
 	} else { // tx type is operating expense disbursement
-		err := opExpensesUpdate(txs.([]*donations.Disbursement))
+		err := opExpensesUpdate(year, txs.([]*donations.Disbursement))
 		if err != nil {
 			fmt.Println("TransactionUpdate failed: ", err)
 			return fmt.Errorf("TransactionUpdate failed: %v", err)
@@ -76,16 +77,16 @@ func TransactionUpdate(txs interface{}) error {
 }
 
 // update data from Contribution transactiosn derived from contribution files
-func contributionUpdate(conts []*donations.Contribution) error {
+func contributionUpdate(year string, conts []*donations.Contribution) error {
 	for _, cont := range conts {
 		// get tx type info
 		bucket, incoming, transfer, memo := deriveTxTypes(cont)
 
 		// get filer object
-		filer := DbSim["cmte_tx_data"][cont.CmteID]
+		filer := DbSim[year]["cmte_tx_data"][cont.CmteID]
 
 		// get sender/receiver objects
-		other := DbSim[bucket][cont.OtherID]
+		other := DbSim[year][bucket][cont.OtherID]
 
 		// update incoming/outgoing tx data
 		if incoming {
@@ -111,38 +112,36 @@ func contributionUpdate(conts []*donations.Contribution) error {
 				fmt.Println("ContributionUpdate failed: ", err)
 				return fmt.Errorf("ContributionUpdate failed: %v", err)
 			}
+			/* Moving this block to within func updateTopOverall()
 			// update top candidates by funds received if candidate linked to filing committee
 			if filer.(*donations.CmteTxData).CandID != "" {
 				// get linked candidate
-				cand, err := persist.GetObject(year, "candidates", filer.(*donations.CmteTxData).CandID)
-				if err != nil {
-					fmt.Println("ContributionUpdate failed: ", err)
-					return fmt.Errorf("ContributionUpdate failed: %v", err)
-				}
+				cand := DbSim[year]["candidates"][filer.(*donations.CmteTxData).CandID]
+
 				// update top candidates by total funds incoming/outgoing
 				err = updateTopCandidates(year, cand.(*donations.Candidate), filer.(*donations.CmteTxData), incoming)
 				if err != nil {
 					fmt.Println("ContributionUpdate failed: ", err)
 					return fmt.Errorf("ContributionUpdate failed: %v", err)
 				}
-			}
+			} */
 		}
 
 		// persist objects
-		DbSim["cmte_tx_data"][cont.CmteID] = filer
-		DbSim[bucket][cont.OtherID] = other
+		DbSim[year]["cmte_tx_data"][cont.CmteID] = filer
+		DbSim[year][bucket][cont.OtherID] = other
 	}
 
 	return nil
 }
 
 // update data from Disbursement transactions derived from operating expenses files
-func opExpensesUpdate(disbs []*donations.Disbursement) error {
+func opExpensesUpdate(year string, disbs []*donations.Disbursement) error {
 	for _, disb := range disbs {
 		// get  filing committee
-		filer := DbSim["cmte_tx_data"][disb.CmteID]
+		filer := DbSim[year]["cmte_tx_data"][disb.CmteID]
 		// get receiving organization
-		receiver := DbSim["organizations"][disb.RecID]
+		receiver := DbSim[year]["organizations"][disb.RecID]
 
 		// update object account totals
 		err := disbursementTxUpdate(disb, filer.(*donations.CmteTxData), receiver.(*donations.Organization))
@@ -151,12 +150,30 @@ func opExpensesUpdate(disbs []*donations.Disbursement) error {
 			return fmt.Errorf("OpExpensesUpdate failed: %v", err)
 		}
 
-		// add logic to update TopOverall
+		// update TopOverall rankings
+		// update top individuals, organizations and committees
+		err = updateTopOverall(year, filer.(*donations.CmteTxData), receiver, false, false)
+		if err != nil {
+			fmt.Println("ContributionUpdate failed: ", err)
+			return fmt.Errorf("ContributionUpdate failed: %v", err)
+		}
+		/* Moving this block to within func updateTopOverall()
+		// update top candidates by funds received if candidate linked to filing committee
+		if filer.(*donations.CmteTxData).CandID != "" {
+			// get linked candidate
+			cand := DbSim[year]["candidates"][filer.(*donations.CmteTxData).CandID]
+
+			// update top candidates by total funds incoming/outgoing
+			err = updateTopCandidates(year, cand.(*donations.Candidate), filer.(*donations.CmteTxData), false)
+			if err != nil {
+				fmt.Println("ContributionUpdate failed: ", err)
+				return fmt.Errorf("ContributionUpdate failed: %v", err)
+			}
+		} */
 
 		// persist objects
-		// persist objects
-		DbSim["cmte_tx_data"][disb.CmteID] = filer
-		DbSim["organizations"][disb.RecID] = receiver
+		DbSim[year]["cmte_tx_data"][disb.CmteID] = filer
+		DbSim[year]["organizations"][disb.RecID] = receiver
 	}
 	return nil
 }
