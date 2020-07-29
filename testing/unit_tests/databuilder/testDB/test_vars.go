@@ -18,7 +18,7 @@ var DbSim = map[string]map[string]map[string]interface{}{
 		"individuals":   map[string]interface{}{"indv8": &Indv8, "indv10": &Indv10, "indv11": &Indv11, "indv12": &Indv12, "indv13": &Indv13, "indv14": &Indv14, "indv15": &Indv15, "indv16": &Indv16},
 		"organizations": map[string]interface{}{"org01": &Org01, "org02": &Org02, "org03": &Org03},
 		"cmte_tx_data":  map[string]interface{}{"Cmte00": &Filer, "Cmte01": &Cmte01, "Cmte02": &Cmte02, "Cmte03": &Cmte03},
-		"candidates":    map[string]interface{}{"Pcand01": &Cand01, "Scand02": &Cand02, "Hcand03": &Cand03},
+		"candidates":    map[string]interface{}{"Pcand00": &Cand00, "Pcand01": &Cand01, "Scand02": &Cand02, "Hcand03": &Cand03},
 		"top_overall": map[string]interface{}{
 			"cmte_recs_all": &donations.TopOverallData{}, "cmte_recs_r": &donations.TopOverallData{}, "cmte_recs_d": &donations.TopOverallData{}, "cmte_recs_na": &donations.TopOverallData{}, "cmte_recs_misc": &donations.TopOverallData{},
 			"cmte_donors_all": &donations.TopOverallData{}, "cmte_donors_r": &donations.TopOverallData{}, "cmte_donors_d": &donations.TopOverallData{}, "cmte_donors_na": &donations.TopOverallData{}, "cmte_donors_misc": &donations.TopOverallData{},
@@ -33,116 +33,206 @@ var DbSim = map[string]map[string]map[string]interface{}{
 var Conts = []*donations.Contribution{&tx1, &tx2, &tx3, &tx4, &tx5, &tx6, &tx7, &tx8, &tx9, &tx10, &tx11, &tx12, &tx13, &tx14, &tx15,
 	&tx16, &tx165, &tx17, &tx175, &tx18, &tx185, &tx19, &tx195, &tx20, &tx205, &tx21, &tx215, &tx22, &tx225, &tx23, &tx24, &tx25, &tx26, &tx27, &tx28, &tx29}
 
-var Disbs = []*donations.Disbursement{&tx30, &tx31, &tx32}
+var Disbs = []*donations.Disbursement{&tx30, &tx31, &tx32, &tx33}
 
 var Transfers = []*donations.Contribution{&tx20, &tx21, &tx24}
 
 var ExpensesConts = []*donations.Contribution{&tx2, &tx14, &tx22, &tx29}
 var ExpensesDisbs = []*donations.Disbursement{&tx30, &tx31, &tx32, &tx33}
 
+// SIZE LIMIT == 5 for object maps
+
 // filing committee
 var Filer = donations.CmteTxData{
-	CmteID: "cmte00",
-	// TopIndvContributorsAmt:      map[string]float32{"indv1": 100, "indv2": 150, "indv3": 80, "indv4": 200, "indv5": 40, "indv6": 400, "indv7": 120, "indv8": 100, "indv9": 225},
-	// TopIndvContributorsTxs:      map[string]float32{"indv1": 2, "indv2": 3, "indv3": 1, "indv4": 3, "indv5": 1, "indv6": 4, "indv7": 3, "indv8": 1, "indv9": 5},
-	// TopIndvContributorThreshold: []interface{}{},
+	CmteID:                    "cmte00",
+	CandID:                    "Pcand00",
+	Party:                     "IND",
+	TopIndvContributorsAmt:    instantiate(),
+	TopIndvContributorsTxs:    instantiate(),
+	TopCmteOrgContributorsAmt: instantiate(),
+	TopCmteOrgContributorsTxs: instantiate(),
+	TransferRecsAmt:           instantiate(),
+	TransferRecsTxs:           instantiate(),
+	TopExpRecipientsAmt:       instantiate(),
+	TopExpRecipientsTxs:       instantiate(),
 }
 
 // committee contributors/recipients
 var Cmte01 = donations.CmteTxData{
-	CmteID: "Cmte01",
+	CmteID:                    "Cmte01",
+	Party:                     "DEM",
+	TopIndvContributorsAmt:    instantiate(),
+	TopIndvContributorsTxs:    instantiate(),
+	TopCmteOrgContributorsAmt: instantiate(),
+	TopCmteOrgContributorsTxs: instantiate(),
+	TransferRecsAmt:           instantiate(),
+	TransferRecsTxs:           instantiate(),
+	TopExpRecipientsAmt:       instantiate(),
+	TopExpRecipientsTxs:       instantiate(),
 }
 
 var Cmte02 = donations.CmteTxData{
-	CmteID: "Cmte02",
+	CmteID:                    "Cmte02",
+	Party:                     "IND",
+	TopIndvContributorsAmt:    instantiate(),
+	TopIndvContributorsTxs:    instantiate(),
+	TopCmteOrgContributorsAmt: instantiate(),
+	TopCmteOrgContributorsTxs: instantiate(),
+	TransferRecsAmt:           instantiate(),
+	TransferRecsTxs:           instantiate(),
+	TopExpRecipientsAmt:       instantiate(),
+	TopExpRecipientsTxs:       instantiate(),
 }
 
 var Cmte03 = donations.CmteTxData{
-	CmteID: "Cmte03",
+	CmteID:                    "Cmte03",
+	Party:                     "IND",
+	TopIndvContributorsAmt:    instantiate(),
+	TopIndvContributorsTxs:    instantiate(),
+	TopCmteOrgContributorsAmt: instantiate(),
+	TopCmteOrgContributorsTxs: instantiate(),
+	TransferRecsAmt:           instantiate(),
+	TransferRecsTxs:           instantiate(),
+	TopExpRecipientsAmt:       instantiate(),
+	TopExpRecipientsTxs:       instantiate(),
+}
+
+// Filing Committee Linked Candidate
+var Cand00 = donations.Candidate{
+	ID:                   "PCand00",
+	Party:                "IND",
+	DirectRecipientsAmts: instantiate(),
+	DirectRecipientsTxs:  instantiate(),
+	DirectSendersAmts:    instantiate(),
+	DirectSendersTxs:     instantiate(),
 }
 
 // candidate contributors/recipients
 var Cand01 = donations.Candidate{
-	ID:    "PCand01",
-	Party: "IND",
+	ID:                   "PCand01",
+	Party:                "IND",
+	DirectRecipientsAmts: instantiate(),
+	DirectRecipientsTxs:  instantiate(),
+	DirectSendersAmts:    instantiate(),
+	DirectSendersTxs:     instantiate(),
 }
 
 var Cand02 = donations.Candidate{
-	ID: "SCand02",
+	ID:                   "SCand02",
+	Party:                "REP",
+	DirectRecipientsAmts: instantiate(),
+	DirectRecipientsTxs:  instantiate(),
+	DirectSendersAmts:    instantiate(),
+	DirectSendersTxs:     instantiate(),
 }
 
 var Cand03 = donations.Candidate{
-	ID: "HCand03",
+	ID:                   "HCand03",
+	Party:                "DEM",
+	DirectRecipientsAmts: instantiate(),
+	DirectRecipientsTxs:  instantiate(),
+	DirectSendersAmts:    instantiate(),
+	DirectSendersTxs:     instantiate(),
 }
 
 // organization contributors/recipients
 var Org01 = donations.Organization{
-	ID: "org01",
+	ID:            "org01",
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
 }
 
 var Org02 = donations.Organization{
-	ID: "org02",
+	ID:            "org02",
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
 }
 
 var Org03 = donations.Organization{
-	ID: "org03",
+	ID:            "org03",
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
 }
 
 // individual contributors/recipients
 // Top 5 individuals: indv8: 300, indv14: 250, indv15: 220, indv12: 200, indv10: 175
 var indv4 = donations.Individual{
-	ID: "indv4",
-	// RecipientsAmt: map[string]float32{"cmte1": 50, "cmte00": 200, "cmte2": 100},
-	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 3, "cmte2": 2},
+	ID:            "indv4",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 var Indv8 = donations.Individual{
-	ID: "indv8",
-	// RecipientsAmt: map[string]float32{"cmte1": 50, "cmte00": 100, "cmte2": 100},
-	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte00": 1, "cmte2": 2},
+	ID:            "indv8",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 // total out = 175, total in = 175, bal = 0
 var Indv10 = donations.Individual{
-	ID: "indv10",
-	// RecipientsAmt: map[string]float32{"cmte1": 40, "cmte2": 200},
-	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
+	ID:            "indv10",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 var Indv11 = donations.Individual{
-	ID: "indv11",
-	// RecipientsAmt: map[string]float32{"cmte1": 60, "cmte2": 50},
-	// RecipientsTxs: map[string]float32{"cmte1": 1, "cmte2": 2},
+	ID:            "indv11",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 var Indv12 = donations.Individual{
-	ID: "indv12",
-	// RecipientsAmt: map[string]float32{"cmte2": 60, "cmte3": 50},
-	// RecipientsTxs: map[string]float32{"cmte2": 1, "cmte3": 2},
+	ID:            "indv12",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 var Indv13 = donations.Individual{
-	ID: "indv13",
-	// RecipientsAmt: make(map[string]float32),
-	// RecipientsTxs: make(map[string]float32),
+	ID:            "indv13",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 var Indv14 = donations.Individual{
-	ID: "indv14",
-	// RecipientsAmt: make(map[string]float32),
-	// RecipientsTxs: make(map[string]float32),
+	ID:            "indv14",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 var Indv15 = donations.Individual{
-	ID: "indv15",
-	// RecipientsAmt: make(map[string]float32),
-	// RecipientsTxs: make(map[string]float32),
+	ID:            "indv15",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 var Indv16 = donations.Individual{
-	ID: "indv16",
-	// RecipientsAmt: make(map[string]float32),
-	// RecipientsTxs: make(map[string]float32),
+	ID:            "indv16",
+	RecipientsAmt: instantiate(),
+	RecipientsTxs: instantiate(),
+	SendersAmt:    instantiate(),
+	SendersTxs:    instantiate(),
 }
 
 // Individual contributions
@@ -534,3 +624,8 @@ var tx33 = donations.Disbursement{
 }
 
 /* END TEST OBJECTS */
+
+func instantiate() map[string]float32 {
+	m := make(map[string]float32)
+	return m
+}

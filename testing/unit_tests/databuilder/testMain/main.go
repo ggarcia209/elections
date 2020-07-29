@@ -67,10 +67,17 @@ func main() {
 	if err != nil {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)
-	}  */
+	}
 
 	// part 10 - test updateTopOverall (SUCCESS)
 	err := testDB.TestUpdateTopOverall()
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	} */
+
+	// part 11 - test TransactionUpdate
+	err := testDB.TestTransactionUpdate()
 	if err != nil {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)

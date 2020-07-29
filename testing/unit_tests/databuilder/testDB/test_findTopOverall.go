@@ -328,8 +328,9 @@ func TestTopOverallInternalLogic() error {
 	return nil
 }
 
-// SUCESS
+// SUCESS - tentative
 func TestUpdateTopOverall() error {
+	// add linked Candidate - SUCCESS
 	year := "2018"
 
 	/* Top Overall Objects */
@@ -376,6 +377,23 @@ func TestUpdateTopOverall() error {
 	}
 
 	// Create test record in DbSim
+	category = "cmte_exp_all"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_exp_na"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
 	category = "cand_all"
 	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
 		Category:  category,
@@ -394,6 +412,23 @@ func TestUpdateTopOverall() error {
 
 	// Create test record in DbSim
 	category = "indv"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
+	category = "org_conts"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "org_recs"
 	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
 		Category:  category,
 		Amts:      make(map[string]float32),
@@ -589,6 +624,19 @@ func TestUpdateTopOverall() error {
 	fmt.Println("***** END TEST C *****")
 
 	return nil
+}
+
+func printOverallData(d donations.TopOverallData) {
+	fmt.Println("***** TOP OVERALL DATA *****")
+	fmt.Println("Category: ", d.Category)
+	fmt.Println("Size Limit: ", d.SizeLimit)
+	fmt.Println("Amounts: ", d.Amts)
+	fmt.Println("Threshold: ")
+	printODThreshold(d.Threshold)
+	fmt.Println()
+	fmt.Println("***** END TOP OVERALL DATA *****")
+	fmt.Println()
+	fmt.Println()
 }
 
 func printODThreshold(th []*donations.Entry) {

@@ -242,7 +242,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 			RefAmts:      receiver.TopIndvContributorsAmt,
 			RefTxs:       receiver.TopIndvContributorsTxs,
 			RefThreshold: receiver.TopIndvContributorThreshold,
-			CompID:       sender.(*donations.Organization).ID,
+			CompID:       sender.(*donations.Individual).ID,
 			CompAmts:     sender.(*donations.Individual).RecipientsAmt,
 			CompTxs:      sender.(*donations.Individual).RecipientsTxs,
 		}
@@ -257,7 +257,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 			RefAmts:      receiver.TopIndvContributorsAmt,
 			RefTxs:       receiver.TopIndvContributorsTxs,
 			RefThreshold: receiver.TopIndvContributorThreshold,
-			CompID:       sender.(*donations.Organization).ID,
+			CompID:       sender.(*donations.Candidate).ID,
 			CompAmts:     sender.(*donations.Candidate).DirectRecipientsAmts,
 			CompTxs:      sender.(*donations.Candidate).DirectRecipientsTxs,
 		}
@@ -321,7 +321,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (co
 			RefAmts:      sender.TopExpRecipientsAmt,
 			RefTxs:       sender.TopExpRecipientsTxs,
 			RefThreshold: sender.TopExpThreshold,
-			CompID:       receiver.(*donations.Individual).ID,
+			CompID:       receiver.(*donations.Candidate).ID,
 			CompAmts:     receiver.(*donations.Candidate).DirectSendersAmts,
 			CompTxs:      receiver.(*donations.Candidate).DirectSendersTxs,
 		}
@@ -336,7 +336,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (co
 			RefAmts:      sender.TopExpRecipientsAmt,
 			RefTxs:       sender.TopExpRecipientsTxs,
 			RefThreshold: sender.TopExpThreshold,
-			CompID:       receiver.(*donations.Individual).ID,
+			CompID:       receiver.(*donations.Organization).ID,
 			CompAmts:     receiver.(*donations.Organization).SendersAmt,
 			CompTxs:      receiver.(*donations.Organization).SendersTxs,
 		}

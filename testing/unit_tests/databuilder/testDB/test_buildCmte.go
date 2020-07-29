@@ -55,8 +55,296 @@ func TestDeriveTxTypes() {
 	fmt.Println(b, i, t, m)
 }
 
+// SUCCESS
+func TestTransactionUpdate() error {
+	year := "2018"
+
+	/* Top Overall Objects */
+	// Create test record in DbSim
+	category := "cmte_recs_all"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_recs_na"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_recs_r"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_recs_d"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
+	category = "cmte_donors_all"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_donors_na"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_donors_d"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
+	category = "cmte_exp_all"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_exp_na"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cmte_exp_d"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
+	category = "cand_all"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cand_na"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
+	category = "cand_exp_all"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "cand_exp_na"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
+	category = "indv"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	// Create test record in DbSim
+	category = "org_conts"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+	// Create test record in DbSim
+	category = "org_recs"
+	DbSim[year]["top_overall"][category] = &donations.TopOverallData{
+		Category:  category,
+		Amts:      make(map[string]float32),
+		Threshold: []*donations.Entry{},
+		SizeLimit: 3,
+	}
+
+	/* END TOP OVERALL OBJECTS */
+
+	// test 1 - contributions
+	fmt.Println("test 1: contributions")
+	err := TransactionUpdate(year, Conts)
+	if err != nil {
+		fmt.Println("TestTransactionUpdate failed: ", err)
+		return fmt.Errorf("TestTransactionUpdate failed: %v", err)
+	}
+	printCmteTxData(Filer)
+
+	// test 2 - disbursements
+	fmt.Println("test 2 - disbursements")
+	err = TransactionUpdate(year, Disbs)
+	if err != nil {
+		fmt.Println("TestTransactionUpdate failed: ", err)
+		return fmt.Errorf("TestTransactionUpdate failed: %v", err)
+	}
+
+	// check filing and other committee objects - SUCCESS
+	/* printCmteTxData(Filer)
+	printCmteTxData(Cmte01)
+
+	// check Top Overall Objects - SUCCESS
+	for _, v := range DbSim[year]["top_overall"] {
+		data := v.(*donations.TopOverallData)
+		if data.Category == "" {
+			continue
+		}
+		printOverallData(*data)
+	} */
+
+	// check Individual, Organization, & Candidate Objects - SUCCESS
+	printIndvData(Indv10)
+	printIndvData(Indv8)
+
+	printOrgData(Org01)
+	printOrgData(Org02)
+	printOrgData(Org03)
+
+	printCandData(Cand00)
+	printCandData(Cand01)
+	printCandData(Cand02)
+	printCandData(Cand03)
+
+	// verify data accuracy - SUCCESS
+
+	return nil
+}
+
+func printCmteTxData(c donations.CmteTxData) {
+	fmt.Println("***** COMMITTEE TRANSACTION DATA *****")
+	fmt.Println("CmteID: ", c.CmteID)
+	fmt.Println("CandID: ", c.CandID)
+	fmt.Println("Party: ", c.Party)
+	fmt.Println()
+	fmt.Printf("Contributions: %v / %v - Avg: %v\n", c.ContributionsInAmt, c.ContributionsInTxs, c.AvgContributionIn)
+	fmt.Printf("Other Receipts: %v / %v - Avg: %v\n", c.OtherReceiptsInAmt, c.OtherReceiptsInTxs, c.AvgOtherIn)
+	fmt.Printf("Total Incoming: %v / %v - Avg: %v\n", c.TotalIncomingAmt, c.TotalIncomingTxs, c.AvgIncoming)
+	fmt.Println()
+	fmt.Printf("Transfers: %v / %v - Avg: %v\n", c.TransfersAmt, c.TransfersTxs, c.AvgTransfer)
+	fmt.Printf("Expenditures: %v / %v - Avg: %v\n", c.ExpendituresAmt, c.ExpendituresTxs, c.AvgExpenditure)
+	fmt.Printf("Total Outgoing: %v / %v - Avg: %v\n", c.TotalOutgoingAmt, c.TotalOutgoingTxs, c.AvgOutgoing)
+	fmt.Println("Net Balance: ", c.NetBalance)
+	fmt.Println()
+	fmt.Println("Top Individual Contributors Amounts: ", c.TopIndvContributorsAmt)
+	fmt.Println("Top Individual Contributors Transactions: ", c.TopIndvContributorsTxs)
+	fmt.Println("Top Individuals Threshold: ")
+	printThreshold(c.TopIndvContributorThreshold)
+	fmt.Println()
+	fmt.Println("Top Committee/Organization Contributors Amounts: ", c.TopCmteOrgContributorsAmt)
+	fmt.Println("Top Committee/Organization Contributors Tranactions: ", c.TopCmteOrgContributorsTxs)
+	fmt.Println("Top Committee/Organization Contributors Threshold: ")
+	printThreshold(c.TopCmteOrgContributorThreshold)
+	fmt.Println()
+	fmt.Println("Transfers Recipients Amounts: ", c.TransferRecsAmt)
+	fmt.Println("Transfers Recipients Transactions: ", c.TransferRecsTxs)
+	fmt.Println()
+	fmt.Println("Top Expense Recipients Amounts: ", c.TopExpRecipientsAmt)
+	fmt.Println("Top Expense Recipients Transactions: ", c.TopExpRecipientsTxs)
+	fmt.Println("Top Expense Recipients Threshold: ", c.TopExpThreshold)
+	fmt.Println()
+	fmt.Println("***** END COMMITTEE TRANSACTION DATA *****")
+	fmt.Println()
+	fmt.Println()
+
+}
+
+func printIndvData(i donations.Individual) {
+	fmt.Println("***** INDIVIDUAL DATA *****")
+	fmt.Println("ID: ", i.ID)
+	fmt.Println("Transactions: ", i.Transactions)
+	fmt.Printf("TotalOut: %v / %v - Avg: %v\n", i.TotalOutAmt, i.TotalOutTxs, i.AvgTxOut)
+	fmt.Printf("TotalIn: %v / %v - Avg: %v\n", i.TotalInAmt, i.TotalInTxs, i.AvgTxIn)
+	fmt.Println("Net Balance: ", i.NetBalance)
+	fmt.Println()
+	fmt.Println("Recipients Amounts: ", i.RecipientsAmt)
+	fmt.Println("Recipients Transactions: ", i.RecipientsTxs)
+	fmt.Println("Senders Amounts: ", i.SendersAmt)
+	fmt.Println("Senders Transactions: ", i.SendersTxs)
+	fmt.Println("***** END INDIVIDUAL DATA *****")
+	fmt.Println()
+	fmt.Println()
+}
+
+func printOrgData(o donations.Organization) {
+	fmt.Println("***** ORGANIZATION DATA *****")
+	fmt.Println("ID: ", o.ID)
+	fmt.Println("Transactions: ", o.Transactions)
+	fmt.Printf("TotalOut: %v / %v - Avg: %v\n", o.TotalOutAmt, o.TotalOutTxs, o.AvgTxOut)
+	fmt.Printf("TotalIn: %v / %v - Avg: %v\n", o.TotalInAmt, o.TotalInTxs, o.AvgTxIn)
+	fmt.Println("Net Balance: ", o.NetBalance)
+	fmt.Println()
+	fmt.Println("Recipients Amounts: ", o.RecipientsAmt)
+	fmt.Println("Recipients Transactions: ", o.RecipientsTxs)
+	fmt.Println("Senders Amounts: ", o.SendersAmt)
+	fmt.Println("Senders Transactions: ", o.SendersTxs)
+	fmt.Println("***** END ORGANIZATION DATA *****")
+	fmt.Println()
+	fmt.Println()
+}
+
+func printCandData(c donations.Candidate) {
+	fmt.Println("***** CANDIDATE DATA *****")
+	fmt.Println("ID: ", c.ID)
+	fmt.Println("Other affiliates: ", c.OtherAffiliates)
+	fmt.Println()
+	fmt.Printf("Total Direct In: %v / %v - Avg: %v\n", c.TotalDirectInAmt, c.TotalDirectInTxs, c.AvgDirectIn)
+	fmt.Printf("Total Direct Out: %v / %v - Avg: %v\n", c.TotalDirectOutAmt, c.TotalDirectOutTxs, c.AvgDirectOut)
+	fmt.Println("Net Balance - Direct Transactions: ", c.NetBalanceDirectTx)
+	fmt.Println()
+	fmt.Println("Direct Recipients Amounts: ", c.DirectRecipientsAmts)
+	fmt.Println("Direct Recipients Transactions: ", c.DirectRecipientsTxs)
+	fmt.Println("Direct Senders Amounts: ", c.DirectSendersAmts)
+	fmt.Println("Direct Senders Transactions: ", c.DirectSendersTxs)
+	fmt.Println("***** END CANDIDATE DATA *****")
+	fmt.Println()
+	fmt.Println()
+}
+
 // TransactionUpdate updates each sender/receiver data for each transaction in a list of transactions.
-// 7/22/20 - Correct logic to incorporate "year" database key
+// 7/22/20 - Correct logic to incorporate "year" database key - DONE
 func TransactionUpdate(year string, txs interface{}) error {
 	_, cont := txs.([]*donations.Contribution)
 
@@ -78,7 +366,10 @@ func TransactionUpdate(year string, txs interface{}) error {
 
 // update data from Contribution transactiosn derived from contribution files
 func contributionUpdate(year string, conts []*donations.Contribution) error {
-	for _, cont := range conts {
+	for i, cont := range conts {
+		fmt.Printf("%d: filing cmte: %s\n", i, cont.CmteID)
+		fmt.Printf("%d: otherID: %s\n", i, cont.OtherID)
+		fmt.Println()
 		// get tx type info
 		bucket, incoming, transfer, memo := deriveTxTypes(cont)
 
@@ -187,11 +478,13 @@ func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
 	transferMap := map[string]bool{ // transfer tx codes
 		"15Z": true,
 		"16R": true,
+		"17R": true,
 		"18G": true,
 		"18J": true,
 		"18K": true,
 		"19J": true,
 		"22H": true,
+		"22Z": true,
 		"24G": true,
 		"24H": true,
 		"24K": true,
@@ -208,6 +501,9 @@ func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
 		"32K": true,
 		"32G": true,
 		"32F": true,
+		"40Z": true,
+		"41Z": true,
+		"42Z": true,
 	}
 	var bucket string
 
@@ -250,7 +546,7 @@ func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
 	All filers are committees only and *should* have corresponding transaction filed by sender/receiver.
 	if sender/receiver != committee: credit/debit accounts -- no corresponding tx.
 	Receiver's of transactions from operating expense files are always treated as organizations.
-		- individual recipients are treated as sole-propritor or single member llc business entities
+		- individual recipients are treated as sole-proprietor or single member llc business entities
 		  rendering services or other material contributions for which they are paid by committees.
 */
 
@@ -415,7 +711,7 @@ func disbursementTxUpdate(disb *donations.Disbursement, filer *donations.CmteTxD
 	Maps are updated for every transaction.
 	'transfer' variable determines which committee maps are updated.
 	Receiver's of transactions from operating expense files are always treated as organizations.
-		- individual recipients are treated as sole-propritor or single member llc business entities
+		- individual recipients are treated as sole-proprietor or single member llc business entities
 		  rendering services or other material contributions for which they are paid by committees.
 */
 
