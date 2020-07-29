@@ -17,7 +17,7 @@ type comparison struct {
 }
 
 // update contributor maps for incoming transactions posted by filing committee
-func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *donations.Contribution, transfer bool) (comparison, error) {
+func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *donations.Contribution) (comparison, error) {
 	comp := comparison{}
 	switch t := sender.(type) {
 	case *donations.Individual:
@@ -26,7 +26,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 			RefAmts:      receiver.TopIndvContributorsAmt,
 			RefTxs:       receiver.TopIndvContributorsTxs,
 			RefThreshold: receiver.TopIndvContributorThreshold,
-			CompID:       t.ID,
+			CompID:       sender.(*donations.Individual).ID,
 			CompAmts:     sender.(*donations.Individual).RecipientsAmt,
 			CompTxs:      sender.(*donations.Individual).RecipientsTxs,
 		}
@@ -41,7 +41,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 			RefAmts:      receiver.TopIndvContributorsAmt,
 			RefTxs:       receiver.TopIndvContributorsTxs,
 			RefThreshold: receiver.TopIndvContributorThreshold,
-			CompID:       t.ID,
+			CompID:       sender.(*donations.Candidate).ID,
 			CompAmts:     sender.(*donations.Candidate).DirectRecipientsAmts,
 			CompTxs:      sender.(*donations.Candidate).DirectRecipientsTxs,
 		}
@@ -56,7 +56,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 			RefAmts:      receiver.TopCmteOrgContributorsAmt,
 			RefTxs:       receiver.TopCmteOrgContributorsTxs,
 			RefThreshold: receiver.TopCmteOrgContributorThreshold,
-			CompID:       t.ID,
+			CompID:       sender.(*donations.Organization).ID,
 			CompAmts:     sender.(*donations.Organization).RecipientsAmt,
 			CompTxs:      sender.(*donations.Organization).RecipientsTxs,
 		}
@@ -67,20 +67,21 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 		}
 	case *donations.CmteTxData:
 		// Contribution || Other transfer
-		comp = cmteCompGen(receiver, sender.(*donations.CmteTxData), cont, transfer)
+		comp = cmteCompGen(receiver, sender.(*donations.CmteTxData), cont)
 		err := compare(&comp)
 		if err != nil {
 			fmt.Println("updateTopDonors failed: ", err)
 			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
 		}
 	default:
+		_ = t
 		return comparison{}, fmt.Errorf("updateTopDonors failed: wrong interface type")
 	}
 	return comp, nil
 }
 
 // update contributor maps for outgoing transactions posted by filing committee
-func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, cont *donations.Contribution, transfer bool) (comparison, error) {
+func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (comparison, error) {
 	comp := comparison{}
 	switch t := receiver.(type) {
 	case *donations.Individual:
@@ -89,7 +90,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, con
 			RefAmts:      sender.TopExpRecipientsAmt,
 			RefTxs:       sender.TopExpRecipientsTxs,
 			RefThreshold: sender.TopExpThreshold,
-			CompID:       t.ID,
+			CompID:       receiver.(*donations.Individual).ID,
 			CompAmts:     receiver.(*donations.Individual).SendersAmt,
 			CompTxs:      receiver.(*donations.Individual).SendersTxs,
 		}
@@ -104,7 +105,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, con
 			RefAmts:      sender.TopExpRecipientsAmt,
 			RefTxs:       sender.TopExpRecipientsTxs,
 			RefThreshold: sender.TopExpThreshold,
-			CompID:       t.ID,
+			CompID:       receiver.(*donations.Candidate).ID,
 			CompAmts:     receiver.(*donations.Candidate).DirectSendersAmts,
 			CompTxs:      receiver.(*donations.Candidate).DirectSendersTxs,
 		}
@@ -119,7 +120,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, con
 			RefAmts:      sender.TopExpRecipientsAmt,
 			RefTxs:       sender.TopExpRecipientsTxs,
 			RefThreshold: sender.TopExpThreshold,
-			CompID:       t.ID,
+			CompID:       receiver.(*donations.Organization).ID,
 			CompAmts:     receiver.(*donations.Organization).SendersAmt,
 			CompTxs:      receiver.(*donations.Organization).SendersTxs,
 		}
@@ -130,13 +131,9 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}, con
 		}
 	case *donations.CmteTxData:
 		// Contribution || Other transfer
-		comp = cmteCompGen(receiver.(*donations.CmteTxData), sender, cont, transfer)
-		err := compare(&comp)
-		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
-			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
-		}
+		return comparison{}, fmt.Errorf("type CmteTxData invalid - debit filer's TransferRecsAmt directly for outgoing transactions to other committee")
 	default:
+		_ = t
 		return comparison{}, fmt.Errorf("updateTopDonors failed: wrong interface type")
 	}
 	return comp, nil
@@ -161,50 +158,21 @@ func updateOpExpRecipients(sender *donations.CmteTxData, receiver *donations.Org
 }
 
 // generates comparison object corresponding to incoming/outoing transaction
-func cmteCompGen(filer, other *donations.CmteTxData, cont *donations.Contribution, transfer bool) comparison {
-	// determine tx type (incoming / outgoing / memo)
-	var comp comparison
-	if cont.TxType < "20" || (cont.TxType >= "30" && cont.TxType < "33") {
-		// incoming
-		comp = comparison{
-			// values determined by tx type
-			RefID:        filer.CmteID,
-			RefAmts:      filer.TopCmteOrgContributorsAmt,
-			RefTxs:       filer.TopCmteOrgContributorsTxs,
-			RefThreshold: filer.TopCmteOrgContributorThreshold,
-			CompID:       other.CmteID,
-			CompAmts:     other.TopExpRecipientsAmt,
-			CompTxs:      other.TopExpRecipientsTxs,
-		}
-		if transfer {
-			// marginal value added before call to updateTop functions
-			comp.CompAmts = other.TransferRecsAmt
-			comp.CompTxs = other.TransferRecsTxs
-		}
-		// add marginal value from new transaction
-		comp.CompAmts[comp.RefID] += cont.TxAmt
-		comp.CompTxs[comp.RefID]++
-	} else {
-		// outgoing
-		comp = comparison{
-			// values determined by tx type
-			RefID:        filer.CmteID,
-			RefAmts:      filer.TopExpRecipientsAmt,
-			RefTxs:       filer.TopExpRecipientsTxs,
-			RefThreshold: filer.TopExpThreshold,
-			CompID:       other.CmteID,
-			CompAmts:     other.TopCmteOrgContributorsAmt,
-			CompTxs:      other.TopCmteOrgContributorsTxs,
-		}
-
-		if transfer {
-			comp.CompAmts = other.TransferRecsAmt
-			comp.CompTxs = other.TransferRecsTxs
-		}
-		// add marginal value from new transaction
-		comp.CompAmts[comp.RefID] += cont.TxAmt
-		comp.CompTxs[comp.RefID]++
+func cmteCompGen(filer, other *donations.CmteTxData, cont *donations.Contribution) comparison {
+	comp := comparison{
+		RefID:        filer.CmteID,
+		RefAmts:      filer.TopCmteOrgContributorsAmt,
+		RefTxs:       filer.TopCmteOrgContributorsTxs,
+		RefThreshold: filer.TopCmteOrgContributorThreshold,
+		CompID:       other.CmteID,
+		CompAmts:     other.TransferRecsAmt,
+		CompTxs:      other.TransferRecsTxs,
 	}
+
+	// add marginal value from new transaction
+	comp.CompAmts[comp.RefID] += cont.TxAmt
+	comp.CompTxs[comp.RefID]++
+
 	return comp
 }
 
@@ -236,7 +204,8 @@ func compare(comp *comparison) error {
 		// create new threshold entry for sender & amount contributed by sender
 		new := newEntry(comp.CompID, comp.CompAmts[comp.RefID])
 		// reSort threshold list w/ new entry and retreive deletion key for obj below threshold
-		delID := reSortLeast(new, &least)
+		delID, newEntries := reSortLeast(new, least)
+		least = newEntries
 		// delete the records for obj below threshold
 		delete(comp.RefAmts, delID)
 		delete(comp.RefTxs, delID)
@@ -245,6 +214,12 @@ func compare(comp *comparison) error {
 		comp.RefTxs[comp.CompID] = comp.CompTxs[comp.RefID]
 	} else {
 		// sender/value does not qualify -- return and continue
+		// after updating object's threshold list
+		th := []interface{}{}
+		for _, entry := range least {
+			th = append(th, entry)
+		}
+		comp.RefThreshold = append(comp.RefThreshold[:0], th...)
 		return nil
 	}
 
@@ -259,196 +234,27 @@ func compare(comp *comparison) error {
 }
 
 // check to see if previous total of entry is in threshold range when updating existing entry
-func checkThreshold(newID string, newTotal float32, tr *[]interface{}) {
-
-}
-
-// DEPRECATED
-
-/*
-func updateTopCmteTotals(sen, rec *donations.Committee) error {
-	// set/reset least threshold list
-	var least Entries
-	var err error
-	if len(rec.TopCmteDonorThreshold) == 0 {
-		es := sortTopX(rec.TopCmteDonorsAmt)
-		least, err = SetThresholdLeast10(es)
+func checkThreshold(newID string, m map[string]float32, th []interface{}) ([]interface{}, error) {
+	inRange := false
+	check := map[string]bool{newID: true}
+	for _, e := range th {
+		if check[e.(*donations.Entry).ID] == true {
+			inRange = true
+		}
+	}
+	if inRange {
+		es := sortTopX(m)
+		newRange, err := setThresholdLeast10(es)
 		if err != nil {
-			fmt.Println("updateTopCmteTotals failed: ", err)
-			return fmt.Errorf("updateTopCmteTotals failed: %v", err)
+			fmt.Println("checkThreshold failed: ", err)
+			return []interface{}{}, fmt.Errorf("checkThreshold failed: %v", err)
 		}
-	} else {
-		for _, entry := range rec.TopCmteDonorThreshold {
-			least = append(least, entry.(*donations.Entry))
+		// update object's threshold list
+		newTh := []interface{}{}
+		for _, entry := range newRange {
+			newTh = append(newTh, entry)
 		}
+		return newTh, nil
 	}
-
-	// compare new sender's total to receiver's threshold value
-	threshold := least[len(least)-1].Total // last/smallest obj in least
-	if sen.AffiliatesAmt[rec.ID] > threshold {
-		new := newEntry(sen.ID, sen.AffiliatesAmt[rec.ID])
-		delID := reSortLeast(new, &least)
-		delete(rec.TopCmteDonorsAmt, delID)
-		delete(rec.TopCmteDonorsTxs, delID)
-		rec.TopCmteDonorsAmt[sen.ID] = sen.AffiliatesAmt[rec.ID]
-		rec.TopCmteDonorsTxs[sen.ID] = sen.AffiliatesTxs[rec.ID]
-	}
-
-	return nil
+	return th, nil
 }
-
-func updateTopIndvTotals(sen *donations.Individual, rec *donations.Committee) error {
-	// set/reset least threshold list
-	var least Entries
-	var err error
-	if len(rec.TopIndvDonorThreshold) == 0 {
-		es := sortTopX(rec.TopIndvDonorsAmt)
-		least, err = SetThresholdLeast10(es)
-		if err != nil {
-			fmt.Println("updateTopCmteTotals failed: ", err)
-			return fmt.Errorf("updateTopCmteTotals failed: %v", err)
-		}
-	} else {
-		for _, entry := range rec.TopIndvDonorThreshold {
-			least = append(least, entry.(*donations.Entry))
-		}
-	}
-
-	// compare new sender's total to receiver's threshold value
-	threshold := least[len(least)-1].Total // last/smallest obj in least
-	if sen.RecipientsAmt[rec.ID] > threshold {
-		new := newEntry(sen.ID, sen.RecipientsAmt[rec.ID])
-		delID := reSortLeast(new, &least)
-		delete(rec.TopIndvDonorsAmt, delID)
-		delete(rec.TopIndvDonorsTxs, delID)
-		rec.TopIndvDonorsAmt[sen.ID] = sen.RecipientsAmt[rec.ID]
-		rec.TopIndvDonorsTxs[sen.ID] = sen.RecipientsTxs[rec.ID]
-	}
-
-	return nil
-}
-
-func updateTopDisbRecTotals(sen *donations.Committee, rec *donations.DisbRecipient) error {
-	var least Entries
-	var err error
-
-	if len(sen.TopRecThreshold) == 0 {
-		es := sortTopX(sen.TopDisbRecipientsAmt)
-		least, err = SetThresholdLeast10(es)
-		if err != nil {
-			fmt.Println("updateTopDisbRecTotals failed: ", err)
-			return fmt.Errorf("updateTopDisbRecTotals failed: %v", err)
-		}
-	} else {
-		for _, entry := range sen.TopRecThreshold {
-			least = append(least, entry.(*donations.Entry))
-		}
-	}
-
-	// compare new sender's total to receiver's threshold value
-	threshold := least[len(least)-1].Total // last/smallest obj in least
-	if rec.SendersAmt[sen.ID] > threshold {
-		new := newEntry(rec.ID, rec.SendersAmt[sen.ID])
-		delID := reSortLeast(new, &least)
-		delete(sen.TopDisbRecipientsAmt, delID)
-		delete(sen.TopDisbRecipientsTxs, delID)
-		sen.TopDisbRecipientsAmt[rec.ID] = rec.SendersAmt[sen.ID]
-		sen.TopDisbRecipientsTxs[rec.ID] = rec.SendersTxs[sen.ID]
-	}
-
-	return nil
-}
-
-func updateCandTopCmteTotals(sen *donations.Committee, cand *donations.Candidate) error {
-	// set/reset least threshold list
-	var least Entries
-	var err error
-	if len(cand.TopCDThreshold) == 0 {
-		es := sortTopX(cand.TopCmteDonorsAmt)
-		least, err = SetThresholdLeast10(es)
-		if err != nil {
-			fmt.Println("updateTopCmteTotals failed: ", err)
-			return fmt.Errorf("updateTopCmteTotals failed: %v", err)
-		}
-	} else {
-		for _, entry := range cand.TopCDThreshold {
-			least = append(least, entry.(*donations.Entry))
-		}
-	}
-
-	// compare new sender's total to receiver's threshold value
-	threshold := least[len(least)-1].Total // last/smallest obj in least
-	if sen.AffiliatesAmt[cand.ID] > threshold {
-		new := newEntry(sen.ID, sen.AffiliatesAmt[cand.ID])
-		delID := reSortLeast(new, &least)
-		delete(cand.TopCmteDonorsAmt, delID)
-		delete(cand.TopCmteDonorsTxs, delID)
-		cand.TopCmteDonorsAmt[sen.ID] = sen.AffiliatesAmt[cand.ID]
-		cand.TopCmteDonorsTxs[sen.ID] = sen.AffiliatesTxs[cand.ID]
-	}
-
-	return nil
-}
-
-func updateCandTopIndvTotals(sen *donations.Individual, cand *donations.Candidate) error {
-	// set/reset least threshold list
-	var least Entries
-	var err error
-	if len(cand.TopIDThreshold) == 0 {
-		es := sortTopX(cand.TopIndvDonorsAmt)
-		least, err = SetThresholdLeast10(es)
-		if err != nil {
-			fmt.Println("updateTopCmteTotals failed: ", err)
-			return fmt.Errorf("updateTopCmteTotals failed: %v", err)
-		}
-	} else {
-		for _, entry := range cand.TopIDThreshold {
-			least = append(least, entry.(*donations.Entry))
-		}
-	}
-
-	// compare new sender's total to receiver's threshold value
-	threshold := least[len(least)-1].Total // last/smallest obj in least
-	if sen.RecipientsAmt[cand.ID] > threshold {
-		new := newEntry(sen.ID, sen.RecipientsAmt[cand.ID])
-		delID := reSortLeast(new, &least)
-		delete(cand.TopIndvDonorsAmt, delID)
-		delete(cand.TopIndvDonorsTxs, delID)
-		cand.TopIndvDonorsAmt[sen.ID] = sen.RecipientsAmt[cand.ID]
-		cand.TopIndvDonorsTxs[sen.ID] = sen.RecipientsTxs[cand.ID]
-	}
-
-	return nil
-}
-
-func updateCandTopDisbRecTotals(sen *donations.Candidate, rec *donations.DisbRecipient) error {
-	var least Entries
-	var err error
-
-	if len(sen.TopDRThreshold) == 0 {
-		es := sortTopX(sen.TopDisbRecsAmt)
-		least, err = SetThresholdLeast10(es)
-		if err != nil {
-			fmt.Println("updateTopDisbRecTotals failed: ", err)
-			return fmt.Errorf("updateTopDisbRecTotals failed: %v", err)
-		}
-	} else {
-		for _, entry := range sen.TopDRThreshold {
-			least = append(least, entry.(*donations.Entry))
-		}
-	}
-
-	// compare new sender's total to receiver's threshold value
-	threshold := least[len(least)-1].Total // last/smallest obj in least
-	if rec.SendersAmt[sen.ID] > threshold {
-		new := newEntry(rec.ID, rec.SendersAmt[sen.ID])
-		delID := reSortLeast(new, &least)
-		delete(sen.TopDisbRecsAmt, delID)
-		delete(sen.TopDisbRecsTxs, delID)
-		sen.TopDisbRecsAmt[rec.ID] = rec.SendersAmt[sen.ID]
-		sen.TopDisbRecsTxs[rec.ID] = rec.SendersTxs[sen.ID]
-	}
-
-	return nil
-}
-*/
