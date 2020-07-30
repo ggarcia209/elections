@@ -212,7 +212,7 @@ func TestTransactionUpdate() error {
 		fmt.Println("TestTransactionUpdate failed: ", err)
 		return fmt.Errorf("TestTransactionUpdate failed: %v", err)
 	}
-	printCmteTxData(Filer)
+	// printCmteTxData(Filer)
 
 	// test 2 - disbursements
 	fmt.Println("test 2 - disbursements")
@@ -223,8 +223,8 @@ func TestTransactionUpdate() error {
 	}
 
 	// check filing and other committee objects - SUCCESS
-	/* printCmteTxData(Filer)
-	printCmteTxData(Cmte01)
+	printCmteTxData(Filer)
+	/* printCmteTxData(Cmte01)
 
 	// check Top Overall Objects - SUCCESS
 	for _, v := range DbSim[year]["top_overall"] {
@@ -233,7 +233,7 @@ func TestTransactionUpdate() error {
 			continue
 		}
 		printOverallData(*data)
-	} */
+	}
 
 	// check Individual, Organization, & Candidate Objects - SUCCESS
 	printIndvData(Indv10)
@@ -246,7 +246,7 @@ func TestTransactionUpdate() error {
 	printCandData(Cand00)
 	printCandData(Cand01)
 	printCandData(Cand02)
-	printCandData(Cand03)
+	printCandData(Cand03) */
 
 	// verify data accuracy - SUCCESS
 

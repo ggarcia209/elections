@@ -118,6 +118,20 @@ func TestCompareUnits() error {
 	return nil
 }
 
+// TEST ONLY
+func printThreshold(th []interface{}) {
+	for _, e := range th {
+		fmt.Printf("\tID: %v\tTotal: %v\n", e.(*donations.Entry).ID, e.(*donations.Entry).Total)
+	}
+}
+
+func printEntries(es Entries) {
+	for _, e := range es {
+		fmt.Printf("%s: %v\t", e.ID, e.Total)
+	}
+	fmt.Println()
+}
+
 /* Working Code */
 
 // Entries is a list of entries to be sorted.
@@ -201,18 +215,4 @@ func setThresholdLeast10(es Entries) (Entries, error) {
 // newEntry creats an entry struct from Top X Amt key/value pair
 func newEntry(k string, v float32) *donations.Entry {
 	return &donations.Entry{ID: k, Total: v}
-}
-
-// TEST ONLY
-func printThreshold(th []interface{}) {
-	for _, e := range th {
-		fmt.Printf("\tID: %v\tTotal: %v\n", e.(*donations.Entry).ID, e.(*donations.Entry).Total)
-	}
-}
-
-func printEntries(es Entries) {
-	for _, e := range es {
-		fmt.Printf("%s: %v\t", e.ID, e.Total)
-	}
-	fmt.Println()
 }

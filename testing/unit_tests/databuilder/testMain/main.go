@@ -82,4 +82,11 @@ func main() {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)
 	}
+
+	// part 12 - test MergeData
+	err = testDB.TestMergeData()
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	}
 }
