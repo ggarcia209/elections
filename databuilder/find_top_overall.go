@@ -88,8 +88,13 @@ func updateTopOverall(filer *donations.CmteTxData, other interface{}, incoming, 
 				return fmt.Errorf("updateTopOverall failed: %v", err)
 			}
 		} else {
-			// update Top Committes by expenses only - individuals not ranked by funds received
+			// update Top Individuals by funds received and Top Committees by funds expensed
 			err := updateTopCmteExp(filer, cache["top_overall"])
+			if err != nil {
+				fmt.Println("updateTopOverall failed: ", err)
+				return fmt.Errorf("updateTopOverall failed: %v", err)
+			}
+			err = updateTopIndvRecipients(other.(*donations.Individual), cache["top_overall"])
 			if err != nil {
 				fmt.Println("updateTopOverall failed: ", err)
 				return fmt.Errorf("updateTopOverall failed: %v", err)
@@ -387,6 +392,20 @@ func updateTopIndividuals(indv *donations.Individual, cache map[string]interface
 	entry := &donations.Entry{ID: indv.ID, Total: indv.TotalOutAmt}
 
 	category := "indv"
+	err := updateAndSave(category, entry, cache)
+	if err != nil {
+		fmt.Println("updateTopIndv failed: ", err)
+		return fmt.Errorf("updateTopIndv failed: %v", err)
+	}
+
+	return nil
+}
+
+// Top Individual objects by total funds received
+func updateTopIndvRecipients(indv *donations.Individual, cache map[string]interface{}) error {
+	entry := &donations.Entry{ID: indv.ID, Total: indv.TotalInAmt}
+
+	category := "indv_rec"
 	err := updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopIndv failed: ", err)
