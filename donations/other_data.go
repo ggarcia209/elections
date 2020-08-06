@@ -47,13 +47,13 @@ type TopOverallData struct {
 
 // InitTopOverallDataObjs creates a TopOverallData object for each
 // category and returns the objects in a list
-func InitTopOverallDataObjs(limit int) []*TopOverallData {
-	od := []*TopOverallData{}
+func InitTopOverallDataObjs(limit int) []interface{} {
+	od := []interface{}{}
 	// indv & disb_rec
 	indv := &TopOverallData{"indv", make(map[string]float32), nil, limit}
 	od = append(od, indv)
-	disb := &TopOverallData{"disb_rec", make(map[string]float32), nil, limit}
-	od = append(od, disb)
+	indvRec := &TopOverallData{"indv_rec", make(map[string]float32), nil, limit}
+	od = append(od, indvRec)
 
 	// cmte_donors
 	cmteAll := &TopOverallData{"cmte_donors_all", make(map[string]float32), nil, limit}

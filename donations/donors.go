@@ -25,30 +25,6 @@ type Individual struct {
 	SendersAmt    map[string]float32 // $ Value returned from each committee
 }
 
-// Organization represents an organization that is not registered with the FEC.
-// Organizations can be businesses, Native American tribes, and other unregistered entities.
-type Organization struct {
-	ID            string
-	Name          string
-	City          string
-	State         string
-	Zip           string
-	Occupation    string
-	Employer      string
-	Transactions  []string           // List of all incoming/outgoing transactions
-	TotalOutTxs   float32            // Total # of Contributions/Loans To/etc
-	TotalOutAmt   float32            // Total $ Vale of Outgoing Transactions
-	AvgTxOut      float32            // Average value of outgoing transactions
-	TotalInAmt    float32            // Total Amount of Incoming Transactions
-	TotalInTxs    float32            // Total # of Refunds/Repayments/etc
-	AvgTxIn       float32            // Average value of incoming transactions
-	NetBalance    float32            // TotalInAmt - TotalOutAmt (negative balance indicates funds out > funds in)
-	SendersTxs    map[string]float32 // # of Txs from each committee
-	SendersAmt    map[string]float32 // $ Value returned from each committee
-	RecipientsAmt map[string]float32 // # of Txs to each committee
-	RecipientsTxs map[string]float32 // $ Value contributed to each committee
-}
-
 // Committee represents a committee
 // Commitee objects both receive and send donations
 type Committee struct {
