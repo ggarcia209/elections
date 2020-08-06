@@ -1,6 +1,8 @@
 // Package persist contains functions to persist data stored in memory to the local disk
 package persist
 
+// Refactored 8/3/20 - removed Organization cases and references
+
 import (
 	"fmt"
 	"os"
@@ -30,14 +32,37 @@ func Init(year string) error {
 	return nil
 }
 
+// 8/3/20 - REFACTOR - Use boltDB Batch Write function (tx rollback/atomicity)
 // StoreObjects persists a list of objects to the on-disk database
 func StoreObjects(year string, objs []interface{}) error {
-	for _, obj := range objs {
-		err := PutObject(year, obj)
-		if err != nil {
-			fmt.Println("StoreObjects failed: ", err)
-			return fmt.Errorf("StoreObjects failed: %v", err)
+	// open/create bucket in db/offline_db.db
+	// put protobuf item and use donor.ID as key
+	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println("StoreObjects failed: ", err)
+		return fmt.Errorf("StoreObjects failed: %v", err)
+	}
+
+	// tx
+	if err := db.Update(func(tx *bolt.Tx) error {
+		for _, obj := range objs {
+			// encode object
+			bucket, key, data, err := encodeToProto(obj)
+			if err != nil {
+				fmt.Println("StoreObjects failed: ", err)
+				return fmt.Errorf("StoreObjects failed: %v", err)
+			}
+
+			b := tx.Bucket([]byte(year)).Bucket([]byte(bucket))
+			if err := b.Put([]byte(key), data); err != nil { // serialize k,v
+				return fmt.Errorf("StoreObjects failed: %v", err)
+			}
 		}
+		return nil
+	}); err != nil {
+		fmt.Println("StoreObjects failed: ", err)
+		return fmt.Errorf("StoreObjecs failed: %v", err)
 	}
 	return nil
 }
@@ -64,7 +89,6 @@ func PutObject(year string, object interface{}) error {
 	if err := db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(year)).Bucket([]byte(bucket))
 		if err := b.Put([]byte(key), data); err != nil { // serialize k,v
-			fmt.Printf("PutObject failed: failed to store object: %s\n", key)
 			return fmt.Errorf("PutObject failed: %v", err)
 		}
 		return nil
@@ -101,7 +125,47 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
 
-	return &obj, nil
+	return obj, nil
+}
+
+// GetTopOverall retreives the TopOverall objects from disk to store in memory
+func GetTopOverall(year string) ([]interface{}, error) {
+	objs := []interface{}{}
+
+	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println("GetObject failed: ", err)
+		return nil, fmt.Errorf("GetObject failed: %v", err)
+	}
+
+	var data [][]byte
+
+	db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte(year)).Bucket([]byte("top_overall"))
+
+		c := b.Cursor()
+
+		i := 0
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			data = append(data, v)
+			i++
+		}
+
+		return nil
+	})
+
+	for _, bs := range data {
+		obj, err := decodeFromProto("top_overall", bs)
+		if err != nil {
+			fmt.Println("GetTopOverall failed: ", err)
+			return nil, fmt.Errorf("GetTopOverall failed: %v", err)
+		}
+		objs = append(objs, obj)
+	}
+
+	return objs, nil
 }
 
 // encodeToProto encodes an object interface to protobuf
@@ -113,15 +177,6 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		bucket := "individuals"
 		key := obj.(*donations.Individual).ID
 		data, err := encodeIndv(*obj.(*donations.Individual))
-		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
-			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
-		}
-		return bucket, key, data, nil
-	case *donations.Organization:
-		bucket := "organizations"
-		key := obj.(*donations.Organization).ID
-		data, err := encodeOrg(*obj.(*donations.Organization))
 		if err != nil {
 			fmt.Println("encodeToProto failed: ", err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
@@ -173,48 +228,41 @@ func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 	switch bucket {
 	case "":
 		return nil, fmt.Errorf("decodeFromProto failed: nil bucket")
-	case "indviduals":
+	case "individuals":
 		data, err := decodeIndv(data)
 		if err != nil {
 			fmt.Println("decodeFromProto failed: ", err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
-		return data, nil
-	case "organizations":
-		data, err := decodeOrg(data)
-		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
-			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
-		}
-		return data, nil
+		return &data, nil
 	case "committees":
 		data, err := decodeCmte(data)
 		if err != nil {
 			fmt.Println("decodeFromProto failed: ", err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
-		return data, nil
+		return &data, nil
 	case "candidates":
 		data, err := decodeCand(data)
 		if err != nil {
 			fmt.Println("decodeFromProto failed: ", err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
-		return data, nil
+		return &data, nil
 	case "cmte_tx_data":
 		data, err := decodeCmteTxData(data)
 		if err != nil {
 			fmt.Println("decodeFromProto failed: ", err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
-		return data, nil
+		return &data, nil
 	case "top_overall":
 		data, err := decodeOverallData(data)
 		if err != nil {
 			fmt.Println("decodeFromProto failed: ", err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
-		return data, nil
+		return &data, nil
 	default:
 		return nil, fmt.Errorf("decodeFromProto failed: invalid bucket")
 	}
@@ -230,7 +278,7 @@ func createDB() {
 }
 
 func createObjBuckets(year string) error {
-	buckets := []string{"individuals", "organizations", "committees", "candidates", "cmte_tx_data", "top_overall"}
+	buckets := []string{"individuals", "committees", "candidates", "cmte_tx_data", "top_overall"}
 	for _, bucket := range buckets {
 		err := createBucket(year, bucket)
 		if err != nil {
@@ -269,190 +317,3 @@ func createBucket(year, name string) error {
 
 	return nil
 }
-
-// DEPRECATED
-
-/*
-
-// CacheAndPersistIndvDonor persists a list of of Individual donor objects to the on-disk cache
-func CacheAndPersistIndvDonor(year string, objs []*donations.Individual, start bool) error {
-	if start {
-		err := createBucket(year, "indv_donors")
-		if err != nil {
-			fmt.Println("CacheAndPersistDonor failed: ", err)
-			return fmt.Errorf("CacheAndPersistDonor failed: %v", err)
-		}
-	}
-
-	// for each obj
-	for _, obj := range objs {
-		err := PutIndvDonor(year, obj)
-		if err != nil {
-			fmt.Println("CacheAndPersistIndvDonor failed: ", err)
-			return fmt.Errorf("CacheAndPersistIndvDonor failed: %v", err)
-		}
-	}
-	return nil
-}
-
-// PutIndvDonor puts an Individual object belonging to the specified year to the database
-func PutIndvDonor(year string, donor *donations.Individual) error {
-	// get name & job
-	name, job := donor.Name, fmt.Sprintf("%s - %s", donor.Employer, donor.Occupation)
-
-	// convert obj to protobuf
-	data, err := encodeIndv(*donor)
-	if err != nil {
-		fmt.Println("PutIndvDonor failed: ", err)
-		return fmt.Errorf("petIndvDonor failed: %v", err)
-	}
-	// open/create bucket in db/offline_db.db
-	// put protobuf item and use donor.ID as key
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
-	defer db.Close()
-	if err != nil {
-		fmt.Println("FATAL: PutIndvDonor failed: 'offline_db.db' failed to open")
-		return fmt.Errorf("PutIndvDonor failed: 'offline_db.db' failed to open: %v", err)
-	}
-
-	// tx
-	if err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(year)).Bucket([]byte("indv_donors"))
-		if err := b.Put([]byte(donor.ID), data); err != nil { // serialize k,v
-			fmt.Printf("PutIndvDonor failed: offline_db.db': failed to store donor: %s\n", donor.ID)
-			return fmt.Errorf("PutIndvDonor failed: could not update:\n%v", err)
-		}
-		return nil
-	}); err != nil {
-		fmt.Println("FATAL: PutIndvDonor failed: 'offline_db.db': 'indv_donors' bucket failed to open")
-		return fmt.Errorf("PutIndvDonor failed: 'offline_db.db': 'indv_donors' bucket failed to open: %v", err)
-	}
-
-	err = RecordIDByJob(name, job, donor.ID)
-	if err != nil {
-		fmt.Println("PutIndvDonor failed: RecordIDByJob failed")
-		return fmt.Errorf("PutIndvDonor failed: %v", err)
-	}
-
-	return nil
-}
-
-// GetIndvDonor returns a pointer to an Indvidual donor obj stored on disk
-func GetIndvDonor(year, id string) (*donations.Individual, error) {
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
-	defer db.Close()
-	if err != nil {
-		fmt.Println("FATAL: GetIndvDonor failed: 'offline_db.db' failed to open")
-		return nil, fmt.Errorf("GetIndvDonor failed: 'offline_db.db' failed to open: %v", err)
-	}
-
-	var data []byte
-
-	// tx
-	if err := db.View(func(tx *bolt.Tx) error {
-		data = tx.Bucket([]byte(year)).Bucket([]byte("indv_donors")).Get([]byte(id))
-		return nil
-	}); err != nil {
-		fmt.Println("FATAL: GetIndvDonor failed: 'offline_db.db': 'indv_donors' bucket failed to open")
-		return nil, fmt.Errorf("GetIndvDonor failed: 'offline_db.db': 'indv_donors' bucket failed to open: %v", err)
-	}
-
-	indv, err := decodeIndv(data)
-	if err != nil {
-		fmt.Println("GetIndvDonor failed: convProtoToIndv failed: ", err)
-		return nil, fmt.Errorf("GetIndvDonor failed: convProtoToIndv failed: %v", err)
-	}
-
-	return &indv, nil
-}
-
-
-func deriveID(s string) int32 {
-	conv := strings.Split(s, "")
-	var ID []string
-	for i, n := range conv {
-		if i > 1 && n != "0" {
-			ID = conv[i:]
-			break
-		}
-	}
-	donorIDint, _ := strconv.Atoi(strings.Join(ID, ""))
-	donorID := int32(donorIDint)
-
-	return donorID
-}
-
- func updateIndvDonor(new *donations.Individual) error {
-	// get old value
-	old, err := GetIndvDonor(new.ID)
-	if err != nil {
-		fmt.Println("updateIndvDonor failed: ", err)
-		return fmt.Errorf("updateIndvDonor failed: %v", err)
-	}
-
-	// Add old values to new struct
-	for _, donation := range old.Donations {
-		new.Donations = append(new.Donations, donation)
-	}
-	fmt.Printf("%s TotalDonations: %d + %d = %d\n", new.ID, old.TotalDonations, new.TotalDonations, old.TotalDonations+new.TotalDonations)
-	fmt.Printf("%s TotalDonated: %d + %d = %d\n", new.ID, old.TotalDonated, new.TotalDonated, old.TotalDonated+new.TotalDonated)
-	fmt.Println()
-	new.TotalDonations += old.TotalDonations
-	new.TotalDonated += old.TotalDonated
-	// replace/overwrite old value
-	err = PutIndvDonor(new)
-	if err != nil {
-		fmt.Println("updateIndvDonor failed: PutIndvDonor failed: ", err)
-		return fmt.Errorf("updateIndvDonor failed: PutIndvDonor failed: %v", err)
-	}
-	return nil
-} */
-
-// CacheAndPersistIndvDonor persists a list of of Individual donor objects to the on-disk cache
-/* func cacheAndPersistIndvDonorOld(objs []*donations.Individual, seen map[string]bool) error {
-	if len(seen) == 0 {
-		err := createBucket("indv_donors")
-		if err != nil {
-			fmt.Println("CacheAndPersistDonor failed: ", err)
-			return fmt.Errorf("CacheAndPersistDonor failed: %v", err)
-		}
-	}
-
-	// for each obj
-	for _, obj := range objs {
-		// check if seen
-		// check in memory cache map
-		if !seen[obj.ID] {
-			// if not seen, open View Tx
-			item, err := GetIndvDonor(obj.ID)
-			if err != nil {
-				fmt.Println("CacheAndPersistDonor failed: GetIndvDonor failed: ", err)
-				return fmt.Errorf("CacheAndPersistDonor failed: GetIndvDonor failed: %v", err)
-			}
-			if item == nil { // confirm item has not already been saved
-				// if db[key] == nil, put item, update cache
-				err := PutIndvDonor(obj)
-				if err != nil {
-					fmt.Println("CacheAndPersist failed: PutIndvDonor failed: ", err)
-					return fmt.Errorf("CacheAndPersist failed: PutIndvDonor failed: %v", err)
-				}
-			} else { // item has been saved but does not appear in memory
-				// else, update item
-				err := updateIndvDonor(obj)
-				if err != nil {
-					fmt.Println("CacheAndPersistDonor failed: updateIndvDonor failed: ", err)
-					return fmt.Errorf("CacheAndPersistDonor failed: updateIndvDonor failed: %v", err)
-				}
-			}
-			seen[obj.ID] = true
-		} else { // seen[obj.ID] == true
-			err := updateIndvDonor(obj)
-			if err != nil {
-				fmt.Println("CacheAndPersistDonor failed: updateIndvDonor failed: ", err)
-				return fmt.Errorf("CacheAndPersistDonor failed: updateIndvDonor failed: %v", err)
-			}
-
-		}
-	}
-	return nil
-} */
