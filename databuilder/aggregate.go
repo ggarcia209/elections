@@ -11,6 +11,7 @@ import (
 // panics if year does not contain corresponding data (nil interface)
 // refactor to implement DynamoDB API calls to retreive objects
 // re-do unit tests w/ edge cases
+// removed org references
 
 // MergeData merges multi-year data sets into one interface object
 func MergeData(years []string, ID, bucket string) (interface{}, error) {
@@ -47,35 +48,6 @@ func MergeData(years []string, ID, bucket string) (interface{}, error) {
 		}
 
 		merged = mergedIndv
-	case bucket == "organizations":
-		set, err := createMergeSet(years, bucket, ID)
-		if err != nil {
-			fmt.Println("MergeData failed: ", err)
-			return nil, fmt.Errorf("MergeData failed: %v", err)
-		}
-
-		mergedOrg := *set[years[0]].(*donations.Organization)
-		for year, obj := range set {
-			if year == years[0] {
-				continue
-			}
-			if obj == nil {
-				continue
-			}
-			compOrg := *obj.(*donations.Organization)
-			orgTotalsMerge(&mergedOrg, &compOrg)
-			orgMapMerge(&mergedOrg, &compOrg)
-		}
-
-		// Filter Top 100 entOrg
-		if len(mergedOrg.RecipientsAmt) > 100 {
-			mergedOrg.RecipientsAmt, mergedOrg.RecipientsTxs = sort100(mergedOrg.RecipientsAmt, mergedOrg.RecipientsTxs)
-		}
-		if len(mergedOrg.SendersAmt) > 100 {
-			mergedOrg.SendersAmt, mergedOrg.SendersTxs = sort100(mergedOrg.SendersAmt, mergedOrg.SendersTxs)
-		}
-
-		merged = mergedOrg
 	case bucket == "cmte_tx_data":
 		set, err := createMergeSet(years, bucket, ID)
 		if err != nil {
@@ -150,7 +122,8 @@ func createMergeSet(years []string, bucket, ID string) (map[string]interface{}, 
 	set := make(map[string]interface{})
 	for _, year := range years {
 		// OBJECT MUST BE RETREIVED FROM DynamoDB API CALL
-		obj := DbSim[year][bucket][ID] // test only
+		// obj := DbSim[year][bucket][ID] // test only
+		obj := &donations.Individual{} // test only
 		// verify obj != nil before adding to set
 		set[year] = obj
 	}
@@ -191,24 +164,6 @@ func indvMapMerge(merge, indv *donations.Individual) {
 	merge.RecipientsTxs = mapMerge(merge.RecipientsTxs, indv.RecipientsTxs)
 	merge.SendersAmt = mapMerge(merge.SendersAmt, indv.SendersAmt)
 	merge.SendersTxs = mapMerge(merge.SendersTxs, indv.SendersTxs)
-}
-
-func orgTotalsMerge(merge, org *donations.Organization) {
-	merge.Transactions = append(merge.Transactions, org.Transactions...)
-	merge.TotalOutAmt += org.TotalOutAmt
-	merge.TotalOutTxs += org.TotalOutTxs
-	merge.AvgTxOut = merge.TotalOutAmt / merge.TotalOutTxs
-	merge.TotalInAmt += org.TotalInAmt
-	merge.TotalInTxs += org.TotalInTxs
-	merge.AvgTxIn = merge.TotalInAmt / merge.TotalInTxs
-	merge.NetBalance = merge.TotalInAmt - merge.TotalOutAmt
-}
-
-func orgMapMerge(merge, org *donations.Organization) {
-	merge.RecipientsAmt = mapMerge(merge.RecipientsAmt, org.RecipientsAmt)
-	merge.RecipientsTxs = mapMerge(merge.RecipientsTxs, org.RecipientsTxs)
-	merge.SendersAmt = mapMerge(merge.SendersAmt, org.SendersAmt)
-	merge.SendersTxs = mapMerge(merge.SendersTxs, org.SendersTxs)
 }
 
 func cmteTxTotalsMerge(merge, cmte *donations.CmteTxData) {
