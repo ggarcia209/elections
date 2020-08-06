@@ -74,6 +74,11 @@ func StoreIDByZip(zip, name string, entry *IndexEntry) error {
 
 // LookupIDByZip finds a Committee/Candidates ID by name.
 func LookupIDByZip(zip, name string) (*IndexEntry, error) {
+	// edge case - anonymous donor
+	if name == "" {
+		name = "anonymous"
+	}
+
 	db, err := bolt.Open("db/id_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
@@ -84,8 +89,16 @@ func LookupIDByZip(zip, name string) (*IndexEntry, error) {
 	var data []byte
 
 	// tx
-	if err := db.View(func(tx *bolt.Tx) error {
-		data = tx.Bucket([]byte("name_lookup")).Bucket([]byte(name)).Get([]byte(zip))
+	if err := db.Update(func(tx *bolt.Tx) error {
+		root, err := tx.CreateBucketIfNotExists([]byte("name_lookup"))
+		if err != nil {
+			return err
+		}
+		bucket, err := root.CreateBucketIfNotExists([]byte(name))
+		if err != nil {
+			return err
+		}
+		data = bucket.Get([]byte(zip))
 		return nil
 	}); err != nil {
 		fmt.Println("LookupIDByZip failed: ", err)
@@ -124,14 +137,12 @@ func StoreIDByJob(name, employer, occupation string, entry *IndexEntry) error {
 		// main bucket
 		b, err := tx.CreateBucketIfNotExists([]byte("job_lookup"))
 		if err != nil {
-			fmt.Println("StoreIDByJob failed: ", err)
-			return fmt.Errorf("StoreIDByJob failed: %v", err)
+			return err
 		}
 		// nested bucket corresponding to name
 		nb, err := b.CreateBucketIfNotExists([]byte(name))
 		if err != nil {
-			fmt.Println("StoreIDByJob failed: ", err)
-			return fmt.Errorf("StoreIDByJob failed: %v", err)
+			return err
 		}
 		if err := nb.Put([]byte(job), []byte(data)); err != nil { // serialize k,v
 			fmt.Printf("StoreIDByJob failed: failed to store object: %s\n", name)
@@ -147,6 +158,11 @@ func StoreIDByJob(name, employer, occupation string, entry *IndexEntry) error {
 
 // LookupIDByJob finds a Committee/Candidates ID by name.
 func LookupIDByJob(name, employer, occupation string) (*IndexEntry, error) {
+	// edge case - anonymous donors
+	if name == "" {
+		name = "anonymous"
+	}
+
 	job := employer + " - " + occupation
 	db, err := bolt.Open("db/id_index.db", 0644, nil)
 	defer db.Close()
@@ -158,8 +174,16 @@ func LookupIDByJob(name, employer, occupation string) (*IndexEntry, error) {
 	var data []byte
 
 	// tx
-	if err := db.View(func(tx *bolt.Tx) error {
-		data = tx.Bucket([]byte("name_lookup")).Bucket([]byte(name)).Get([]byte(job))
+	if err := db.Update(func(tx *bolt.Tx) error {
+		root, err := tx.CreateBucketIfNotExists([]byte("name_lookup"))
+		if err != nil {
+			return err
+		}
+		bucket, err := root.CreateBucketIfNotExists([]byte(name))
+		if err != nil {
+			return err
+		}
+		data = bucket.Get([]byte(job))
 		return nil
 	}); err != nil {
 		fmt.Println("LookupIDByJob failed: ", err)
