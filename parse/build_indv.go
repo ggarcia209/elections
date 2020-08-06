@@ -5,6 +5,8 @@
 // 8/3/20 - Removed Organization cases and references
 package parse
 
+/* DEPRECATED
+
 import (
 	"fmt"
 	"time"
@@ -164,7 +166,7 @@ func findOrgFromContribution(year string, cont *donations.Contribution, orgs map
 	fmt.Println("zip: ", cont.Zip)
 	fmt.Println("ID Entry: ", idEntry.ID)
 	fmt.Println("OrgID: ", org.(*donations.Individual).ID)
-	fmt.Println("TxID: ", cont.TxID) */
+	fmt.Println("TxID: ", cont.TxID)
 
 	return org.(*donations.Individual), nil
 }
@@ -227,4 +229,4 @@ func findOrgFromDisbursement(year string, disb *donations.Disbursement, orgs map
 	}
 
 	return org.(*donations.Individual), nil
-}
+}  */
