@@ -1,25 +1,26 @@
 package databuilder
 
+// Refactored 8/3/20 - removed Organization cases and references
+
 import (
 	"fmt"
 	"strings"
 
 	"github.com/elections/donations"
-	"github.com/elections/persist"
 )
 
 // TransactionUpdate updates each sender/receiver data for each transaction in a list of transactions.
-func TransactionUpdate(year string, txs interface{}) error {
+func TransactionUpdate(year string, txs interface{}, cache map[string]map[string]interface{}) error {
 	_, cont := txs.([]*donations.Contribution)
 
 	if cont { // tx type is standard contribution/disbursement type
-		err := contributionUpdate(year, txs.([]*donations.Contribution))
+		err := contributionUpdate(year, txs.([]*donations.Contribution), cache)
 		if err != nil {
 			fmt.Println("TransactionUpdate failed: ", err)
 			return fmt.Errorf("TransactionUpdate failed: %v", err)
 		}
 	} else { // tx type is operating expense disbursement
-		err := opExpensesUpdate(year, txs.([]*donations.Disbursement))
+		err := opExpensesUpdate(year, txs.([]*donations.Disbursement), cache)
 		if err != nil {
 			fmt.Println("TransactionUpdate failed: ", err)
 			return fmt.Errorf("TransactionUpdate failed: %v", err)
@@ -29,24 +30,18 @@ func TransactionUpdate(year string, txs interface{}) error {
 }
 
 // update data from Contribution transactiosn derived from contribution files
-func contributionUpdate(year string, conts []*donations.Contribution) error {
+func contributionUpdate(year string, conts []*donations.Contribution, cache map[string]map[string]interface{}) error {
 	for _, cont := range conts {
 		// get tx type info
 		bucket, incoming, transfer, memo := deriveTxTypes(cont)
 
 		// get filer object
-		filer, err := persist.GetObject(year, "cmte_tx_data", cont.CmteID)
-		if err != nil {
-			fmt.Println("contributionUpdate failed: ", err)
-			return fmt.Errorf("contributionUpdate failed: %v", err)
-		}
+		filer := cache["cmte_tx_data"][cont.CmteID]
 
 		// get sender/receiver objects
-		other, err := persist.GetObject(year, bucket, cont.OtherID)
-		if err != nil {
-			fmt.Println("contributionUpdate failed: ", err)
-			return fmt.Errorf("contributionUpdate failed: %v", err)
-		}
+		other := cache[bucket][cont.OtherID]
+
+		// start := time.Now()
 
 		// update incoming/outgoing tx data
 		if incoming {
@@ -66,24 +61,11 @@ func contributionUpdate(year string, conts []*donations.Contribution) error {
 		// update TopOverall rankings if not memo transaction
 		if !memo {
 			// update top individuals, organizations and committees
-			err := updateTopOverall(year, filer.(*donations.CmteTxData), other, incoming, transfer)
+			err := updateTopOverall(filer.(*donations.CmteTxData), other, incoming, transfer, cache)
 			if err != nil {
 				fmt.Println("contributionUpdate failed: ", err)
 				return fmt.Errorf("contributionUpdate failed: %v", err)
 			}
-		}
-
-		// persist objects
-		err = persist.PutObject(year, filer)
-		if err != nil {
-			fmt.Println("contributionUpdate failed: ", err)
-			return fmt.Errorf("contributionUpdate failed: %v", err)
-		}
-
-		err = persist.PutObject(year, other)
-		if err != nil {
-			fmt.Println("contributionUpdate failed: ", err)
-			return fmt.Errorf("contributionUpdate failed: %v", err)
 		}
 	}
 
@@ -91,24 +73,17 @@ func contributionUpdate(year string, conts []*donations.Contribution) error {
 }
 
 // update data from Disbursement transactions derived from operating expenses files
-func opExpensesUpdate(year string, disbs []*donations.Disbursement) error {
+func opExpensesUpdate(year string, disbs []*donations.Disbursement, cache map[string]map[string]interface{}) error {
 	for _, disb := range disbs {
 		// get filing committee
-		filer, err := persist.GetObject(year, "cmte_tx_data", disb.CmteID)
-		if err != nil {
-			fmt.Println("opExpensesUpdate failed: ", err)
-			return fmt.Errorf("opExpensesUpdate failed: %v", err)
-		}
+		// get filer object
+		filer := cache["cmte_tx_data"][disb.CmteID]
 
-		// get receiving organization
-		receiver, err := persist.GetObject(year, "organizations", disb.RecID)
-		if err != nil {
-			fmt.Println("opExpensesUpdate failed: ", err)
-			return fmt.Errorf("opExpensesUpdate failed: %v", err)
-		}
+		// get sender/receiver objects
+		receiver := cache["individuals"][disb.RecID]
 
 		// update object account totals
-		err = disbursementTxUpdate(disb, filer.(*donations.CmteTxData), receiver.(*donations.Organization))
+		err := disbursementTxUpdate(disb, filer.(*donations.CmteTxData), receiver.(*donations.Individual))
 		if err != nil {
 			fmt.Println("opExpensesUpdate failed: ", err)
 			return fmt.Errorf("opExpensesUpdate failed: %v", err)
@@ -116,20 +91,7 @@ func opExpensesUpdate(year string, disbs []*donations.Disbursement) error {
 
 		// update TopOverall rankings
 		// update top individuals, organizations and committees
-		err = updateTopOverall(year, filer.(*donations.CmteTxData), receiver, false, false)
-		if err != nil {
-			fmt.Println("opExpensesUpdate failed: ", err)
-			return fmt.Errorf("opExpensesUpdate failed: %v", err)
-		}
-
-		// persist objects
-		err = persist.PutObject(year, filer)
-		if err != nil {
-			fmt.Println("opExpensesUpdate failed: ", err)
-			return fmt.Errorf("opExpensesUpdate failed: %v", err)
-		}
-
-		err = persist.PutObject(year, receiver)
+		err = updateTopOverall(filer.(*donations.CmteTxData), receiver, false, false, cache)
 		if err != nil {
 			fmt.Println("opExpensesUpdate failed: ", err)
 			return fmt.Errorf("opExpensesUpdate failed: %v", err)
@@ -201,11 +163,7 @@ func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
 	case idCode == "H" || idCode == "S" || idCode == "P":
 		bucket = "candidates"
 	default:
-		if cont.Occupation == "" {
-			bucket = "organizations"
-		} else {
-			bucket = "individuals"
-		}
+		bucket = "individuals"
 	}
 	return bucket, incoming, transfer, memo
 }
@@ -252,15 +210,11 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	// debit sender account
 	switch t := sender.(type) {
 	case *donations.Individual:
+		sender.(*donations.Individual).Transactions = append(sender.(*donations.Individual).Transactions, cont.TxID)
 		sender.(*donations.Individual).TotalOutAmt += cont.TxAmt
 		sender.(*donations.Individual).TotalOutTxs++
 		sender.(*donations.Individual).AvgTxOut = sender.(*donations.Individual).TotalOutAmt / sender.(*donations.Individual).TotalOutTxs
 		sender.(*donations.Individual).NetBalance = sender.(*donations.Individual).TotalInAmt - sender.(*donations.Individual).TotalOutAmt
-	case *donations.Organization:
-		sender.(*donations.Organization).TotalOutAmt += cont.TxAmt
-		sender.(*donations.Organization).TotalOutTxs++
-		sender.(*donations.Organization).AvgTxOut = sender.(*donations.Organization).TotalOutAmt / sender.(*donations.Organization).TotalOutTxs
-		sender.(*donations.Organization).NetBalance = sender.(*donations.Organization).TotalInAmt - sender.(*donations.Organization).TotalOutAmt
 	case *donations.Candidate:
 		sender.(*donations.Candidate).TotalDirectOutAmt += cont.TxAmt
 		sender.(*donations.Candidate).TotalDirectOutTxs++
@@ -268,6 +222,8 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		sender.(*donations.Candidate).NetBalanceDirectTx = sender.(*donations.Candidate).TotalDirectInAmt - sender.(*donations.Candidate).TotalDirectOutAmt
 	case *donations.CmteTxData:
 		// do nothing -- accounted for by sender's corresponding outgoing transaction
+	case nil:
+		return fmt.Errorf("incomingTxUpdate failed: nil interface")
 	default:
 		_ = t // discard unused variable
 		return fmt.Errorf("incomingTxUpdate failed: wrong interface type")
@@ -279,6 +235,7 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		fmt.Println("incomingTxUpdate failed: ", err)
 		return fmt.Errorf("incomingTxUpdate failed: %v", err)
 	}
+
 	return nil
 }
 
@@ -318,11 +275,6 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		receiver.(*donations.Individual).TotalInTxs++
 		receiver.(*donations.Individual).AvgTxIn = receiver.(*donations.Individual).TotalInAmt / receiver.(*donations.Individual).TotalInTxs
 		receiver.(*donations.Individual).NetBalance = receiver.(*donations.Individual).TotalInAmt - receiver.(*donations.Individual).TotalOutAmt
-	case *donations.Organization:
-		receiver.(*donations.Organization).TotalInAmt += cont.TxAmt
-		receiver.(*donations.Organization).TotalInTxs++
-		receiver.(*donations.Organization).AvgTxIn = receiver.(*donations.Organization).TotalInAmt / receiver.(*donations.Organization).TotalInTxs
-		receiver.(*donations.Organization).NetBalance = receiver.(*donations.Organization).TotalInAmt - receiver.(*donations.Organization).TotalOutAmt
 	case *donations.Candidate:
 		receiver.(*donations.Candidate).TotalDirectInAmt += cont.TxAmt
 		receiver.(*donations.Candidate).TotalDirectInTxs++
@@ -351,7 +303,7 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	return nil
 }
 
-func disbursementTxUpdate(disb *donations.Disbursement, filer *donations.CmteTxData, receiver *donations.Organization) error {
+func disbursementTxUpdate(disb *donations.Disbursement, filer *donations.CmteTxData, receiver *donations.Individual) error {
 	// debit filer's expense account
 	filer.ExpendituresAmt += disb.TxAmt
 	filer.ExpendituresTxs++
@@ -404,16 +356,19 @@ func mapUpdateIncoming(cont *donations.Contribution, filerData *donations.CmteTx
 		sender.(*donations.Individual).RecipientsTxs[filerData.CmteID]++
 
 		// update filing committee's Top Contributors maps
-		if len(filerData.TopIndvContributorsAmt) < 5 || filerData.TopIndvContributorsAmt[sender.(*donations.Individual).ID] != 0 {
+		if len(filerData.TopIndvContributorsAmt) < 100 || filerData.TopIndvContributorsAmt[sender.(*donations.Individual).ID] != 0 {
 			// add new entry directly or update existing entry
 			filerData.TopIndvContributorsAmt[sender.(*donations.Individual).ID] += cont.TxAmt
 			filerData.TopIndvContributorsTxs[sender.(*donations.Individual).ID]++
-			th, err := checkThreshold(sender.(*donations.Individual).ID, filerData.TopIndvContributorsAmt, filerData.TopIndvContributorThreshold)
-			if err != nil {
-				fmt.Println("mapUpdateIncoming failed: ", err)
-				return fmt.Errorf("mapUpdateIncoming failed: %v", err)
+
+			if len(filerData.TopIndvContributorsAmt) >= 100 {
+				th, err := checkThreshold(sender.(*donations.Individual).ID, filerData.TopIndvContributorsAmt, filerData.TopIndvContributorThreshold)
+				if err != nil {
+					fmt.Println("mapUpdateIncoming failed: ", err)
+					return fmt.Errorf("mapUpdateIncoming failed: %v", err)
+				}
+				filerData.TopIndvContributorThreshold = th
 			}
-			filerData.TopIndvContributorThreshold = th
 		} else {
 			// update filer's top contributors maps by comparison
 			comp, err := updateTopDonors(filerData, sender, cont)
@@ -424,43 +379,6 @@ func mapUpdateIncoming(cont *donations.Contribution, filerData *donations.CmteTx
 			filerData.TopIndvContributorsAmt = comp.RefAmts
 			filerData.TopIndvContributorsTxs = comp.RefTxs
 			filerData.TopIndvContributorThreshold = comp.RefThreshold
-		}
-	case *donations.Organization:
-		// re-initialize maps if nil
-		if len(filerData.TopCmteOrgContributorsAmt) == 0 {
-			filerData.TopCmteOrgContributorsAmt = make(map[string]float32)
-			filerData.TopCmteOrgContributorsTxs = make(map[string]float32)
-		}
-		if len(sender.(*donations.Organization).RecipientsAmt) == 0 {
-			sender.(*donations.Organization).RecipientsAmt = make(map[string]float32)
-			sender.(*donations.Organization).RecipientsTxs = make(map[string]float32)
-		}
-
-		// update sender's Recipients maps
-		sender.(*donations.Organization).RecipientsAmt[filerData.CmteID] += cont.TxAmt
-		sender.(*donations.Organization).RecipientsTxs[filerData.CmteID]++
-
-		// update filing committee's Top Contributors maps
-		if len(filerData.TopCmteOrgContributorsAmt) < 5 || filerData.TopCmteOrgContributorsAmt[sender.(*donations.Organization).ID] != 0 {
-			// add new entry directly or update existing entry
-			filerData.TopCmteOrgContributorsAmt[sender.(*donations.Organization).ID] += cont.TxAmt
-			filerData.TopCmteOrgContributorsTxs[sender.(*donations.Organization).ID]++
-			th, err := checkThreshold(sender.(*donations.Organization).ID, filerData.TopCmteOrgContributorsAmt, filerData.TopCmteOrgContributorThreshold)
-			if err != nil {
-				fmt.Println("mapUpdateIncoming failed: ", err)
-				return fmt.Errorf("mapUpdateIncoming failed: %v", err)
-			}
-			filerData.TopCmteOrgContributorThreshold = th
-		} else {
-			// update by comparison
-			comp, err := updateTopDonors(filerData, sender, cont)
-			if err != nil {
-				fmt.Println("mapUpdate failed: ", err)
-				return fmt.Errorf("mapUpdate failed: %v", err)
-			}
-			filerData.TopCmteOrgContributorsAmt = comp.RefAmts
-			filerData.TopCmteOrgContributorsTxs = comp.RefTxs
-			filerData.TopCmteOrgContributorThreshold = comp.RefThreshold
 		}
 	case *donations.CmteTxData:
 		// re-initialize maps if nil
@@ -474,16 +392,19 @@ func mapUpdateIncoming(cont *donations.Contribution, filerData *donations.CmteTx
 		}
 
 		// update filing committee's Top Contributors maps only --  sending committee's maps updated in corresponding tx
-		if len(filerData.TopCmteOrgContributorsAmt) < 5 || filerData.TopCmteOrgContributorsAmt[sender.(*donations.CmteTxData).CmteID] != 0 {
+		if len(filerData.TopCmteOrgContributorsAmt) < 100 || filerData.TopCmteOrgContributorsAmt[sender.(*donations.CmteTxData).CmteID] != 0 {
 			// add new entry directly or update existing entry
 			filerData.TopCmteOrgContributorsAmt[sender.(*donations.CmteTxData).CmteID] += cont.TxAmt
 			filerData.TopCmteOrgContributorsTxs[sender.(*donations.CmteTxData).CmteID]++
-			th, err := checkThreshold(sender.(*donations.CmteTxData).CmteID, filerData.TopCmteOrgContributorsAmt, filerData.TopCmteOrgContributorThreshold)
-			if err != nil {
-				fmt.Println("mapUpdateIncoming failed: ", err)
-				return fmt.Errorf("mapUpdateIncoming failed: %v", err)
+
+			if len(filerData.TopCmteOrgContributorsAmt) >= 100 {
+				th, err := checkThreshold(sender.(*donations.CmteTxData).CmteID, filerData.TopCmteOrgContributorsAmt, filerData.TopCmteOrgContributorThreshold)
+				if err != nil {
+					fmt.Println("mapUpdateIncoming failed: ", err)
+					return fmt.Errorf("mapUpdateIncoming failed: %v", err)
+				}
+				filerData.TopCmteOrgContributorThreshold = th
 			}
-			filerData.TopCmteOrgContributorThreshold = th
 		} else {
 			// update by comparison
 			comp, err := updateTopDonors(filerData, sender, cont)
@@ -511,16 +432,18 @@ func mapUpdateIncoming(cont *donations.Contribution, filerData *donations.CmteTx
 		sender.(*donations.Candidate).DirectRecipientsTxs[filerData.CmteID]++
 
 		// update filing committee's Top Contributors maps
-		if len(filerData.TopIndvContributorsAmt) < 5 || filerData.TopIndvContributorsAmt[sender.(*donations.Candidate).ID] != 0 {
+		if len(filerData.TopIndvContributorsAmt) < 100 || filerData.TopIndvContributorsAmt[sender.(*donations.Candidate).ID] != 0 {
 			// add new entry directly or update existing entry
 			filerData.TopIndvContributorsAmt[sender.(*donations.Candidate).ID] += cont.TxAmt
 			filerData.TopIndvContributorsTxs[sender.(*donations.Candidate).ID]++
-			th, err := checkThreshold(sender.(*donations.Candidate).ID, filerData.TopIndvContributorsAmt, filerData.TopIndvContributorThreshold)
-			if err != nil {
-				fmt.Println("mapUpdateIncoming failed: ", err)
-				return fmt.Errorf("mapUpdateIncoming failed: %v", err)
+			if len(filerData.TopIndvContributorsAmt) >= 100 {
+				th, err := checkThreshold(sender.(*donations.Candidate).ID, filerData.TopIndvContributorsAmt, filerData.TopIndvContributorThreshold)
+				if err != nil {
+					fmt.Println("mapUpdateIncoming failed: ", err)
+					return fmt.Errorf("mapUpdateIncoming failed: %v", err)
+				}
+				filerData.TopIndvContributorThreshold = th
 			}
-			filerData.TopIndvContributorThreshold = th
 		} else {
 			// update by comparison
 			comp, err := updateTopDonors(filerData, sender, cont)
@@ -559,53 +482,19 @@ func mapUpdateOutgoing(cont *donations.Contribution, filerData *donations.CmteTx
 		receiver.(*donations.Individual).SendersTxs[filerData.CmteID]++
 
 		// update filing committee's Top Expense Recipients maps
-		if len(filerData.TopExpRecipientsAmt) < 5 || filerData.TopExpRecipientsAmt[receiver.(*donations.Individual).ID] != 0 {
+		if len(filerData.TopExpRecipientsAmt) < 100 || filerData.TopExpRecipientsAmt[receiver.(*donations.Individual).ID] != 0 {
 			// add new entry directly or update existing entry
 			filerData.TopExpRecipientsAmt[receiver.(*donations.Individual).ID] += cont.TxAmt
 			filerData.TopExpRecipientsTxs[receiver.(*donations.Individual).ID]++
-			th, err := checkThreshold(receiver.(*donations.Individual).ID, filerData.TopExpRecipientsAmt, filerData.TopExpThreshold)
-			if err != nil {
-				fmt.Println("mapUpdateOutgoing failed: ", err)
-				return fmt.Errorf("mapUpdateOutgoing failed: %v", err)
-			}
-			filerData.TopExpThreshold = th
-		} else {
-			// update by comparison
-			comp, err := updateTopRecipients(filerData, receiver)
-			if err != nil {
-				fmt.Println("mapUpdate failed: ", err)
-				return fmt.Errorf("mapUpdate failed: %v", err)
-			}
-			filerData.TopExpRecipientsAmt = comp.RefAmts
-			filerData.TopExpRecipientsTxs = comp.RefTxs
-			filerData.TopExpThreshold = comp.RefThreshold
-		}
-	case *donations.Organization:
-		// re-initialize maps if nil
-		if len(filerData.TopExpRecipientsAmt) == 0 {
-			filerData.TopExpRecipientsAmt = make(map[string]float32)
-			filerData.TopExpRecipientsTxs = make(map[string]float32)
-		}
-		if len(receiver.(*donations.Organization).SendersAmt) == 0 {
-			receiver.(*donations.Organization).SendersAmt = make(map[string]float32)
-			receiver.(*donations.Organization).SendersTxs = make(map[string]float32)
-		}
 
-		// update sender's Recipients maps
-		receiver.(*donations.Organization).SendersAmt[filerData.CmteID] += cont.TxAmt
-		receiver.(*donations.Organization).SendersTxs[filerData.CmteID]++
-
-		// update filing committee's Top Contributors maps
-		if len(filerData.TopExpRecipientsAmt) < 5 || filerData.TopExpRecipientsAmt[receiver.(*donations.Organization).ID] != 0 {
-			// add new entry directly or update existing entry
-			filerData.TopExpRecipientsAmt[receiver.(*donations.Organization).ID] += cont.TxAmt
-			filerData.TopExpRecipientsTxs[receiver.(*donations.Organization).ID]++
-			th, err := checkThreshold(receiver.(*donations.Organization).ID, filerData.TopExpRecipientsAmt, filerData.TopExpThreshold)
-			if err != nil {
-				fmt.Println("mapUpdateOutgoing failed: ", err)
-				return fmt.Errorf("mapUpdateOutgoing failed: %v", err)
+			if len(filerData.TopExpRecipientsAmt) >= 100 {
+				th, err := checkThreshold(receiver.(*donations.Individual).ID, filerData.TopExpRecipientsAmt, filerData.TopExpThreshold)
+				if err != nil {
+					fmt.Println("mapUpdateOutgoing failed: ", err)
+					return fmt.Errorf("mapUpdateOutgoing failed: %v", err)
+				}
+				filerData.TopExpThreshold = th
 			}
-			filerData.TopExpThreshold = th
 		} else {
 			// update by comparison
 			comp, err := updateTopRecipients(filerData, receiver)
@@ -656,16 +545,18 @@ func mapUpdateOutgoing(cont *donations.Contribution, filerData *donations.CmteTx
 			filerData.TransferRecsAmt[receiver.(*donations.Candidate).ID] += cont.TxAmt
 			filerData.TransferRecsTxs[receiver.(*donations.Candidate).ID]++
 		} else {
-			if len(filerData.TopExpRecipientsAmt) < 5 || filerData.TopExpRecipientsAmt[receiver.(*donations.Candidate).ID] != 0 {
+			if len(filerData.TopExpRecipientsAmt) < 100 || filerData.TopExpRecipientsAmt[receiver.(*donations.Candidate).ID] != 0 {
 				// add new entry directly or update existing entry
 				filerData.TopExpRecipientsAmt[receiver.(*donations.Candidate).ID] += cont.TxAmt
 				filerData.TopExpRecipientsTxs[receiver.(*donations.Candidate).ID]++
-				th, err := checkThreshold(receiver.(*donations.Candidate).ID, filerData.TopExpRecipientsAmt, filerData.TopExpThreshold)
-				if err != nil {
-					fmt.Println("mapUpdateOutgoing failed: ", err)
-					return fmt.Errorf("mapUpdateOutgoing failed: %v", err)
+				if len(filerData.TopExpRecipientsAmt) >= 100 {
+					th, err := checkThreshold(receiver.(*donations.Candidate).ID, filerData.TopExpRecipientsAmt, filerData.TopExpThreshold)
+					if err != nil {
+						fmt.Println("mapUpdateOutgoing failed: ", err)
+						return fmt.Errorf("mapUpdateOutgoing failed: %v", err)
+					}
+					filerData.TopExpThreshold = th
 				}
-				filerData.TopExpThreshold = th
 			} else {
 				// update by comparison
 				comp, err := updateTopRecipients(filerData, receiver)
@@ -686,7 +577,7 @@ func mapUpdateOutgoing(cont *donations.Contribution, filerData *donations.CmteTx
 }
 
 // update maps for expenditures listed in operating expenses files
-func mapUpdateOpExp(disb *donations.Disbursement, filer *donations.CmteTxData, receiver *donations.Organization) error {
+func mapUpdateOpExp(disb *donations.Disbursement, filer *donations.CmteTxData, receiver *donations.Individual) error {
 	// re-initialize maps if nil
 	if len(filer.TopExpRecipientsAmt) == 0 {
 		filer.TopExpRecipientsAmt = make(map[string]float32)
@@ -702,16 +593,19 @@ func mapUpdateOpExp(disb *donations.Disbursement, filer *donations.CmteTxData, r
 	receiver.SendersTxs[filer.CmteID]++
 
 	// update filer's top expenditure recipient maps
-	if len(filer.TopExpRecipientsAmt) < 5 || filer.TopExpRecipientsAmt[receiver.ID] != 0 {
+	if len(filer.TopExpRecipientsAmt) < 100 || filer.TopExpRecipientsAmt[receiver.ID] != 0 {
 		// update by direct add
 		filer.TopExpRecipientsAmt[receiver.ID] += disb.TxAmt
 		filer.TopExpRecipientsTxs[receiver.ID]++
-		th, err := checkThreshold(receiver.ID, filer.TopExpRecipientsAmt, filer.TopExpThreshold)
-		if err != nil {
-			fmt.Println("mapUpdateOpExp failed: ", err)
-			return fmt.Errorf("mapUpdateOpExp failed: %v", err)
+
+		if len(filer.TopExpRecipientsAmt) >= 100 {
+			th, err := checkThreshold(receiver.ID, filer.TopExpRecipientsAmt, filer.TopExpThreshold)
+			if err != nil {
+				fmt.Println("mapUpdateOpExp failed: ", err)
+				return fmt.Errorf("mapUpdateOpExp failed: %v", err)
+			}
+			filer.TopExpThreshold = th
 		}
-		filer.TopExpThreshold = th
 	} else {
 		// update by comparison
 		comp, err := updateOpExpRecipients(filer, receiver)

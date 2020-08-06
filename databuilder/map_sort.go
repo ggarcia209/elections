@@ -61,6 +61,9 @@ func sortTopX(m map[string]float32) Entries {
 // setThresholdLeast10 sets a threshold with the smallest 10 values in the Top x
 func setThresholdLeast10(es Entries) (Entries, error) {
 	if len(es) < 10 {
+		for i, e := range es {
+			fmt.Printf("%d) ID: %s\tTotal: %v\n", i, e.ID, e.Total)
+		}
 		return nil, fmt.Errorf("setThresholdLeast10 failed: not enough elements in list")
 	}
 

@@ -1,5 +1,7 @@
 package databuilder
 
+// Refactored 8/3/20 - removed Organization cases and references
+
 import (
 	"fmt"
 
@@ -44,21 +46,6 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 			CompID:       sender.(*donations.Candidate).ID,
 			CompAmts:     sender.(*donations.Candidate).DirectRecipientsAmts,
 			CompTxs:      sender.(*donations.Candidate).DirectRecipientsTxs,
-		}
-		err := compare(&comp)
-		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
-			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
-		}
-	case *donations.Organization:
-		comp = comparison{
-			RefID:        receiver.CmteID,
-			RefAmts:      receiver.TopCmteOrgContributorsAmt,
-			RefTxs:       receiver.TopCmteOrgContributorsTxs,
-			RefThreshold: receiver.TopCmteOrgContributorThreshold,
-			CompID:       sender.(*donations.Organization).ID,
-			CompAmts:     sender.(*donations.Organization).RecipientsAmt,
-			CompTxs:      sender.(*donations.Organization).RecipientsTxs,
 		}
 		err := compare(&comp)
 		if err != nil {
@@ -114,21 +101,6 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (co
 			fmt.Println("updateTopDonors failed: ", err)
 			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
 		}
-	case *donations.Organization:
-		comp = comparison{
-			RefID:        sender.CmteID,
-			RefAmts:      sender.TopExpRecipientsAmt,
-			RefTxs:       sender.TopExpRecipientsTxs,
-			RefThreshold: sender.TopExpThreshold,
-			CompID:       receiver.(*donations.Organization).ID,
-			CompAmts:     receiver.(*donations.Organization).SendersAmt,
-			CompTxs:      receiver.(*donations.Organization).SendersTxs,
-		}
-		err := compare(&comp)
-		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
-			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
-		}
 	case *donations.CmteTxData:
 		// Contribution || Other transfer
 		return comparison{}, fmt.Errorf("type CmteTxData invalid - debit filer's TransferRecsAmt directly for outgoing transactions to other committee")
@@ -139,7 +111,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (co
 	return comp, nil
 }
 
-func updateOpExpRecipients(sender *donations.CmteTxData, receiver *donations.Organization) (comparison, error) {
+func updateOpExpRecipients(sender *donations.CmteTxData, receiver *donations.Individual) (comparison, error) {
 	comp := comparison{
 		RefID:        sender.CmteID,
 		RefAmts:      sender.TopExpRecipientsAmt,

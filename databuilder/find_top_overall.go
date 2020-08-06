@@ -1,10 +1,11 @@
 package databuilder
 
+// Refactored 8/3/20 - removed Organization functions, cases, and references
+
 import (
 	"fmt"
 
 	"github.com/elections/donations"
-	"github.com/elections/persist"
 )
 
 // compare obj to top overall threshold
@@ -71,50 +72,24 @@ func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 	return nil
 }
 
-func updateTopOverall(year string, filer *donations.CmteTxData, other interface{}, incoming, transfer bool) error {
+func updateTopOverall(filer *donations.CmteTxData, other interface{}, incoming, transfer bool, cache map[string]map[string]interface{}) error {
 	switch t := other.(type) {
 	case *donations.Individual:
 		if incoming {
 			// update Top Individuals by funds contributed and Top Committees by funds received
-			err := updateTopIndividuals(year, other.(*donations.Individual))
+			err := updateTopIndividuals(other.(*donations.Individual), cache["top_overall"])
 			if err != nil {
 				fmt.Println("updateTopOverall failed: ", err)
 				return fmt.Errorf("updateTopOverall failed: %v", err)
 			}
-			err = updateTopCmteRecs(year, filer)
+			err = updateTopCmteRecs(filer, cache["top_overall"])
 			if err != nil {
 				fmt.Println("updateTopOverall failed: ", err)
 				return fmt.Errorf("updateTopOverall failed: %v", err)
 			}
 		} else {
 			// update Top Committes by expenses only - individuals not ranked by funds received
-			err := updateTopCmteExp(year, filer)
-			if err != nil {
-				fmt.Println("updateTopOverall failed: ", err)
-				return fmt.Errorf("updateTopOverall failed: %v", err)
-			}
-		}
-	case *donations.Organization:
-		if incoming {
-			// update top orgs by contributions and top committees by funds received
-			err := updateTopOrgsByContributions(year, other.(*donations.Organization))
-			if err != nil {
-				fmt.Println("updateTopOverall failed: ", err)
-				return fmt.Errorf("updateTopOverall failed: %v", err)
-			}
-			err = updateTopCmteRecs(year, filer)
-			if err != nil {
-				fmt.Println("updateTopOverall failed: ", err)
-				return fmt.Errorf("updateTopOverall failed: %v", err)
-			}
-		} else {
-			// update top orgs by funds received and top committees by expenses
-			err := updateTopOrgsByReceipts(year, other.(*donations.Organization))
-			if err != nil {
-				fmt.Println("updateTopOverall failed: ", err)
-				return fmt.Errorf("updateTopOverall failed: %v", err)
-			}
-			err = updateTopCmteExp(year, filer)
+			err := updateTopCmteExp(filer, cache["top_overall"])
 			if err != nil {
 				fmt.Println("updateTopOverall failed: ", err)
 				return fmt.Errorf("updateTopOverall failed: %v", err)
@@ -124,7 +99,7 @@ func updateTopOverall(year string, filer *donations.CmteTxData, other interface{
 		// update Top Candidates by total funds received in separate function
 		if incoming {
 			// update top committees by funds received
-			err := updateTopCmteRecs(year, filer)
+			err := updateTopCmteRecs(filer, cache["top_overall"])
 			if err != nil {
 				fmt.Println("updateTopOverall failed: ", err)
 				return fmt.Errorf("updateTopOverall failed: %v", err)
@@ -132,14 +107,14 @@ func updateTopOverall(year string, filer *donations.CmteTxData, other interface{
 		} else {
 			if transfer {
 				// update top committees by funds contributed
-				err := updateTopCmteDonors(year, filer)
+				err := updateTopCmteDonors(filer, cache["top_overall"])
 				if err != nil {
 					fmt.Println("updateTopOverall failed: ", err)
 					return fmt.Errorf("updateTopOverall failed: %v", err)
 				}
 			} else {
 				// update top committees by expenses
-				err := updateTopCmteExp(year, filer)
+				err := updateTopCmteExp(filer, cache["top_overall"])
 				if err != nil {
 					fmt.Println("updateTopOverall failed: ", err)
 					return fmt.Errorf("updateTopOverall failed: %v", err)
@@ -150,21 +125,21 @@ func updateTopOverall(year string, filer *donations.CmteTxData, other interface{
 		// 7/26/20 - may need to refactor/remove transfer cases - all transactions between committees treated as transactions by default
 		if incoming {
 			// update top committees by funds received (filer)
-			err := updateTopCmteRecs(year, filer)
+			err := updateTopCmteRecs(filer, cache["top_overall"])
 			if err != nil {
 				fmt.Println("updateTopOverall failed: ", err)
 				return fmt.Errorf("updateTopOverall failed: %v", err)
 			}
 			if transfer {
 				// update top committees by funds contributed (sender)
-				err := updateTopCmteDonors(year, other.(*donations.CmteTxData))
+				err := updateTopCmteDonors(other.(*donations.CmteTxData), cache["top_overall"])
 				if err != nil {
 					fmt.Println("updateTopOverall failed: ", err)
 					return fmt.Errorf("updateTopOverall failed: %v", err)
 				}
 			} else {
 				// update top committees by expenses (sender)
-				err := updateTopCmteExp(year, other.(*donations.CmteTxData))
+				err := updateTopCmteExp(other.(*donations.CmteTxData), cache["top_overall"])
 				if err != nil {
 					fmt.Println("updateTopOverall failed: ", err)
 					return fmt.Errorf("updateTopOverall failed: %v", err)
@@ -173,21 +148,21 @@ func updateTopOverall(year string, filer *donations.CmteTxData, other interface{
 		} else {
 			if transfer {
 				// update top committees by funds contributed (filer)
-				err := updateTopCmteDonors(year, filer)
+				err := updateTopCmteDonors(filer, cache["top_overall"])
 				if err != nil {
 					fmt.Println("updateTopOverall failed: ", err)
 					return fmt.Errorf("updateTopOverall failed: %v", err)
 				}
 			} else {
 				// update top committees by expenses (filer)
-				err := updateTopCmteExp(year, filer)
+				err := updateTopCmteExp(filer, cache["top_overall"])
 				if err != nil {
 					fmt.Println("updateTopOverall failed: ", err)
 					return fmt.Errorf("updateTopOverall failed: %v", err)
 				}
 			}
 			// update top committees by funds received (receiver)
-			err := updateTopCmteRecs(year, other.(*donations.CmteTxData))
+			err := updateTopCmteRecs(other.(*donations.CmteTxData), cache["top_overall"])
 			if err != nil {
 				fmt.Println("updateTopOverall failed: ", err)
 				return fmt.Errorf("updateTopOverall failed: %v", err)
@@ -201,10 +176,10 @@ func updateTopOverall(year string, filer *donations.CmteTxData, other interface{
 	// update top candidates by funds received/transferred if candidate linked to filing committee
 	if filer.CandID != "" {
 		// get linked candidate
-		cand, err := persist.GetObject(year, "candidates", filer.CandID) // DbSim[year]["candidates"][filer.CandID]
+		cand := cache["candidates"][filer.CandID] // DbSim[year]["candidates"][filer.CandID]
 
 		// update top candidates by total funds incoming/outgoing
-		err = updateTopCandidates(year, cand.(*donations.Candidate), filer, incoming)
+		err := updateTopCandidates(cand.(*donations.Candidate), filer, incoming, cache["top_overall"])
 		if err != nil {
 			fmt.Println("ContributionUpdate failed: ", err)
 			return fmt.Errorf("ContributionUpdate failed: %v", err)
@@ -214,15 +189,15 @@ func updateTopOverall(year string, filer *donations.CmteTxData, other interface{
 	return nil
 }
 
-func updateTopCandidates(year string, cand *donations.Candidate, pcc *donations.CmteTxData, incoming bool) error {
+func updateTopCandidates(cand *donations.Candidate, pcc *donations.CmteTxData, incoming bool, cache map[string]interface{}) error {
 	if incoming {
-		err := updateTopCandsByIncoming(year, cand, pcc)
+		err := updateTopCandsByIncoming(cand, pcc, cache)
 		if err != nil {
 			fmt.Println("updateTopCandidates failed: ", err)
 			return fmt.Errorf("updateTopCandidates failed: %v", err)
 		}
 	} else {
-		err := updateTopCandsByOutgoing(year, cand, pcc)
+		err := updateTopCandsByOutgoing(cand, pcc, cache)
 		if err != nil {
 			fmt.Println("updateTopCandidates failed: ", err)
 			return fmt.Errorf("updateTopCandidates failed: %v", err)
@@ -232,12 +207,12 @@ func updateTopCandidates(year string, cand *donations.Candidate, pcc *donations.
 }
 
 // top committees by contributions received
-func updateTopCmteRecs(year string, cmte *donations.CmteTxData) error {
+func updateTopCmteRecs(cmte *donations.CmteTxData, cache map[string]interface{}) error {
 	entry := &donations.Entry{ID: cmte.CmteID, Total: cmte.TotalIncomingAmt}
 
 	// all committees
 	category := "cmte_recs_all"
-	err := updateAndSave(year, category, entry)
+	err := updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCmteRecs failed: ", err)
 		return fmt.Errorf("updateTopCmteRecs failed: %v", err)
@@ -259,7 +234,7 @@ func updateTopCmteRecs(year string, cmte *donations.CmteTxData) error {
 		category = "cmte_recs_misc"
 	}
 
-	err = updateAndSave(year, category, entry)
+	err = updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCmteRecs failed: ", err)
 		return fmt.Errorf("updateTopCmteRecs failed: %v", err)
@@ -267,12 +242,12 @@ func updateTopCmteRecs(year string, cmte *donations.CmteTxData) error {
 	return nil
 }
 
-func updateTopCmteDonors(year string, cmte *donations.CmteTxData) error {
+func updateTopCmteDonors(cmte *donations.CmteTxData, cache map[string]interface{}) error {
 	entry := &donations.Entry{ID: cmte.CmteID, Total: cmte.TransfersAmt}
 
 	// all committees
 	category := "cmte_donors_all"
-	err := updateAndSave(year, category, entry)
+	err := updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCmteDonors failed: ", err)
 		return fmt.Errorf("updateTopCmteDonors failed: %v", err)
@@ -294,7 +269,7 @@ func updateTopCmteDonors(year string, cmte *donations.CmteTxData) error {
 		category = "cmte_donors_misc"
 	}
 
-	err = updateAndSave(year, category, entry)
+	err = updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCmteDonors failed: ", err)
 		return fmt.Errorf("updateTopCmteDonors failed: %v", err)
@@ -303,12 +278,12 @@ func updateTopCmteDonors(year string, cmte *donations.CmteTxData) error {
 	return nil
 }
 
-func updateTopCmteExp(year string, cmte *donations.CmteTxData) error {
+func updateTopCmteExp(cmte *donations.CmteTxData, cache map[string]interface{}) error {
 	entry := &donations.Entry{ID: cmte.CmteID, Total: cmte.ExpendituresAmt}
 
 	// all committees
 	category := "cmte_exp_all"
-	err := updateAndSave(year, category, entry)
+	err := updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCmteExp failed: ", err)
 		return fmt.Errorf("updateTopCmteExp failed: %v", err)
@@ -330,7 +305,7 @@ func updateTopCmteExp(year string, cmte *donations.CmteTxData) error {
 		category = "cmte_exp_misc"
 	}
 
-	err = updateAndSave(year, category, entry)
+	err = updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCmteExp failed: ", err)
 		return fmt.Errorf("updateTopCmteExp failed: %v", err)
@@ -340,12 +315,12 @@ func updateTopCmteExp(year string, cmte *donations.CmteTxData) error {
 }
 
 // Top Candidates by total funds received
-func updateTopCandsByIncoming(year string, cand *donations.Candidate, pcc *donations.CmteTxData) error {
+func updateTopCandsByIncoming(cand *donations.Candidate, pcc *donations.CmteTxData, cache map[string]interface{}) error {
 	entry := &donations.Entry{ID: cand.ID, Total: cand.TotalDirectInAmt + pcc.TotalIncomingAmt}
 
 	// all
 	category := "cand_all"
-	err := updateAndSave(year, category, entry)
+	err := updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCandidates failed: ", err)
 		return fmt.Errorf("updateTopCandidates failed: %v", err)
@@ -367,7 +342,7 @@ func updateTopCandsByIncoming(year string, cand *donations.Candidate, pcc *donat
 		category = "cand_misc"
 	}
 
-	err = updateAndSave(year, category, entry)
+	err = updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCandidates failed: ", err)
 		return fmt.Errorf("updateTopCandidates failed: %v", err)
@@ -376,12 +351,12 @@ func updateTopCandsByIncoming(year string, cand *donations.Candidate, pcc *donat
 }
 
 // Top Candidates by total funds disbursed
-func updateTopCandsByOutgoing(year string, cand *donations.Candidate, pcc *donations.CmteTxData) error {
+func updateTopCandsByOutgoing(cand *donations.Candidate, pcc *donations.CmteTxData, cache map[string]interface{}) error {
 	entry := &donations.Entry{ID: cand.ID, Total: cand.TotalDirectOutAmt + pcc.TotalOutgoingAmt}
 
 	// all
 	category := "cand_exp_all"
-	err := updateAndSave(year, category, entry)
+	err := updateAndSave(category, entry, cache)
 
 	// party specific
 	switch {
@@ -399,7 +374,7 @@ func updateTopCandsByOutgoing(year string, cand *donations.Candidate, pcc *donat
 		category = "cand_exp_misc"
 	}
 
-	err = updateAndSave(year, category, entry)
+	err = updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopCandExp failed: ", err)
 		return fmt.Errorf("updateTopCandExp failed: %v", err)
@@ -408,11 +383,11 @@ func updateTopCandsByOutgoing(year string, cand *donations.Candidate, pcc *donat
 }
 
 // Top Individual donors by total funds contributed
-func updateTopIndividuals(year string, indv *donations.Individual) error {
+func updateTopIndividuals(indv *donations.Individual, cache map[string]interface{}) error {
 	entry := &donations.Entry{ID: indv.ID, Total: indv.TotalOutAmt}
 
 	category := "indv"
-	err := updateAndSave(year, category, entry)
+	err := updateAndSave(category, entry, cache)
 	if err != nil {
 		fmt.Println("updateTopIndv failed: ", err)
 		return fmt.Errorf("updateTopIndv failed: %v", err)
@@ -421,50 +396,13 @@ func updateTopIndividuals(year string, indv *donations.Individual) error {
 	return nil
 }
 
-// Top Organizations by funds contributed
-func updateTopOrgsByContributions(year string, org *donations.Organization) error {
-	entry := &donations.Entry{ID: org.ID, Total: org.TotalOutAmt}
-
-	category := "org_conts"
-	err := updateAndSave(year, category, entry)
-	if err != nil {
-		fmt.Println("updateTopOrganizations failed: ", err)
-		return fmt.Errorf("updateTopOrganizations failed: %v", err)
-	}
-
-	return nil
-}
-
-// Top Organizations by funds received
-func updateTopOrgsByReceipts(year string, org *donations.Organization) error {
-	entry := &donations.Entry{ID: org.ID, Total: org.TotalInAmt}
-
-	category := "org_recs"
-	err := updateAndSave(year, category, entry)
-	if err != nil {
-		fmt.Println("updateTopOrganizations failed: ", err)
-		return fmt.Errorf("updateTopOrganizations failed: %v", err)
-	}
-
-	return nil
-}
-
 // get TopOverallData obj per year/category, update, & save
-func updateAndSave(year, category string, entry *donations.Entry) error {
+func updateAndSave(category string, entry *donations.Entry, cache map[string]interface{}) error {
 	// "top_overall" objects are initialzed before first call to function
 	// and are never returned as nil objects
-	od, err := persist.GetObject(year, "top_overall", category)
-	if err != nil {
-		fmt.Println("updateAndSave failed: ", err)
-		return fmt.Errorf("updateAndSave failed: %v", err)
-	}
-	err = compareTopOverall(entry, od.(*donations.TopOverallData))
-	if err != nil {
-		fmt.Println("updateAndSave failed: ", err)
-		return fmt.Errorf("updateAndSave failed: %v", err)
-	}
+	od := cache[category]
 
-	err = persist.PutObject(year, od)
+	err := compareTopOverall(entry, od.(*donations.TopOverallData))
 	if err != nil {
 		fmt.Println("updateAndSave failed: ", err)
 		return fmt.Errorf("updateAndSave failed: %v", err)
