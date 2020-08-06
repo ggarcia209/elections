@@ -1,5 +1,4 @@
-// update: moved GetOffset and LogOffset outside of Parse logic, added offset as input to functions
-//	offsets not logged until returned data is successfully persisted
+// Package parse contains operations for scanning the bulk data files and returning a list of objects derived from each file.
 package parse
 
 import (
@@ -15,24 +14,18 @@ import (
 
 type mapOfFields map[int]string
 
-// Parse25Contributions parses 25 rows of an individual contributions records file
-// or 25 rows of a committee contribuutions file and creates a list of 25 Contribution
-// objects to be processed, and a list of
-// and a list of Individual (Donor) items to be stored (25 at most)
-
-// check returned donors against donors saved to disk, update id_lookup
-func Parse25Contributions(year string, file io.ReadSeeker, start int64) ([]*donations.Contribution, []interface{}, int64, error) {
+// ScanContributions scans 500 lines of a contributions file
+// and returns 500 Contribution objects per call
+func ScanContributions(year string, file io.ReadSeeker, start int64) ([]*donations.Contribution, int64, error) {
 	// seek to starting byte offset
 	offset := int64(start)
 	if _, err := file.Seek((offset), 0); err != nil {
-		return nil, nil, start, err
+		return nil, start, err
 	}
 
 	scanner := bufio.NewScanner(file)
 	fieldMap := make(mapOfFields)
-	IcQueue := []*donations.Contribution{}
-	ObjQueue := []interface{}{}
-	donors := make(map[string]map[string]interface{})
+	icQueue := []*donations.Contribution{}
 
 	// scanLines records the byte offset in order to recover from a failure
 	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -43,21 +36,18 @@ func Parse25Contributions(year string, file io.ReadSeeker, start int64) ([]*dona
 	scanner.Split(scanLines)
 
 	for scanner.Scan() {
+
 		row := scanner.Text()
 
 		// scan row and map field values
 		fieldMap = scanRow(row, fieldMap)
 
-		// skip if MemoCode == "X" (not included in itemization totals)
-		if fieldMap[18] == "X" {
-			continue
-		}
-
 		// convert non-string values from original strings
 		txDateFmt := "01/02/2006"
 		txDate, err := time.Parse(txDateFmt, fmtDateStr(fieldMap[13]))
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("ParseContributions failed: ", err)
+			return nil, start, fmt.Errorf("ParseContributions failed: %v", err)
 		}
 		txAmt, _ := strconv.ParseFloat(fieldMap[14], 32)
 		fileNum, _ := strconv.Atoi(fieldMap[17])
@@ -88,60 +78,20 @@ func Parse25Contributions(year string, file io.ReadSeeker, start int64) ([]*dona
 			SubID:      subID,
 		}
 
-		// if donor is an Organization
-		if donation.Occupation == "" {
-			org, err := findOrg(year, donation, donors)
-			if err != nil {
-				fmt.Println("Parse25IndvCont failed: findPerson failed: ", err)
-				return nil, nil, start, fmt.Errorf("Parse25IndvCont failed: findPerson failed: %v", err)
-			}
-			donation.OtherID = org.ID // set DonorID field after retreiving/creating donor
-
-			// * temporary cache *
-			if donors[donation.Name][donation.Zip] == nil { // new/not seen in current call
-				// add new entry to map
-				// DQueue = append(DQueue, donor)
-				donors[donation.Name][donation.Zip] = org
-			}
-		} else { // donor is an Individual
-			donor, err := findPerson(year, donation, donors)
-			if err != nil {
-				fmt.Println("Parse25IndvCont failed: findPerson failed: ", err)
-				return nil, nil, start, fmt.Errorf("Parse25IndvCont failed: findPerson failed: %v", err)
-			}
-			donation.OtherID = donor.ID // set DonorID field after retreiving/creating donor
-
-			// * temporary cache *
-			job := donation.Employer + " - " + donation.Occupation
-			if donors[donation.Name][job] == nil { // new/not seen in current call
-				// add new entry to map
-				// DQueue = append(DQueue, donor)
-				donors[donation.Name][job] = donor
-			}
-		}
-
 		// add donation to queue of items, stop at 25 items
-		IcQueue = append(IcQueue, donation)
-		if len(IcQueue) == 25 {
+		icQueue = append(icQueue, donation)
+		if len(icQueue) == 1000 {
 			break
 		}
 		fieldMap = make(mapOfFields)
 	}
 
-	for _, jobMap := range donors {
-		for _, donor := range jobMap {
-			if len(donor.(*donations.Organization).Transactions) == 0 || len(donor.(*donations.Individual).Transactions) == 0 { // new donor
-				ObjQueue = append(ObjQueue, donor)
-			}
-		}
-	}
-
-	return IcQueue, ObjQueue, offset, nil
+	return icQueue, offset, nil
 }
 
-// Parse25Candidate parses 25 rows of a candidate records file
-// and creates a list of 25 items to be stored in the database
-func Parse25Candidate(file io.ReadSeeker, start int64) ([]*donations.Candidate, int64, error) {
+// ScanCandidates scans 100 lines of a candidates file
+// and returns 100 Candidate objects per call
+func ScanCandidates(file io.ReadSeeker, start int64) ([]interface{}, int64, error) {
 	offset := int64(start)
 	// seek to starting byte offset
 	if _, err := file.Seek(offset, 0); err != nil {
@@ -150,7 +100,7 @@ func Parse25Candidate(file io.ReadSeeker, start int64) ([]*donations.Candidate, 
 
 	scanner := bufio.NewScanner(file)
 	fieldMap := make(mapOfFields)
-	queue := []*donations.Candidate{}
+	queue := []interface{}{}
 
 	// scanLines records the byte offset in order to recover from a failure
 	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -181,7 +131,7 @@ func Parse25Candidate(file io.ReadSeeker, start int64) ([]*donations.Candidate, 
 
 		// add donation to queue of items, stop at 25 items
 		queue = append(queue, cand)
-		if len(queue) == 25 {
+		if len(queue) == 100 {
 			break
 		}
 		fieldMap = make(mapOfFields)
@@ -190,69 +140,19 @@ func Parse25Candidate(file io.ReadSeeker, start int64) ([]*donations.Candidate, 
 	return queue, offset, nil
 }
 
-// Parse25CmteLink parses 25 rows of a candidate-committee links records file
-// and creates a list of 25 items to be stored in the database
-func Parse25CmteLink(file io.ReadSeeker, start int64) ([]*donations.CmteLink, int64, error) {
+// ScanCommittees scans 100 lines of a committees file
+// and returns 100 Committee & corresponding CmteTxData objects per call
+func ScanCommittees(file io.ReadSeeker, start int64) ([]interface{}, []interface{}, int64, error) {
 	offset := int64(start)
 	// seek to starting byte offset
 	if _, err := file.Seek(offset, 0); err != nil {
-		return nil, start, err
+		return nil, nil, start, err
 	}
 
 	scanner := bufio.NewScanner(file)
 	fieldMap := make(mapOfFields)
-	queue := []*donations.CmteLink{}
-
-	// scanLines records the byte offset in order to recover from a failure
-	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		advance, token, err = bufio.ScanLines(data, atEOF)
-		offset += int64(advance)
-		return
-	}
-	scanner.Split(scanLines)
-
-	for scanner.Scan() {
-		row := scanner.Text()
-
-		// scan row and map field values
-		fieldMap = scanRow(row, fieldMap)
-
-		// convert values from string
-		ey, _ := strconv.Atoi(fieldMap[1])
-
-		// create object to be stored in database
-		link := &donations.CmteLink{
-			CandID:   fieldMap[0],
-			ElectnYr: ey,
-			CmteID:   fieldMap[3],
-			CmteType: fieldMap[4],
-			CmteDsgn: fieldMap[5],
-			LinkID:   fieldMap[6],
-		}
-
-		// add donation to queue of items, stop at 25 items
-		queue = append(queue, link)
-		if len(queue) == 25 {
-			break
-		}
-		fieldMap = make(mapOfFields)
-	}
-
-	return queue, offset, nil
-}
-
-// Parse25Committee parses 25 rows of a committee records file
-// and creates a list of 25 items to be stored in the database
-func Parse25Committee(file io.ReadSeeker, start int64) ([]*donations.Committee, int64, error) {
-	offset := int64(start)
-	// seek to starting byte offset
-	if _, err := file.Seek(offset, 0); err != nil {
-		return nil, start, err
-	}
-
-	scanner := bufio.NewScanner(file)
-	fieldMap := make(mapOfFields)
-	queue := []*donations.Committee{}
+	queue := []interface{}{}
+	dataQueue := []interface{}{}
 
 	// scanLines records the byte offset in order to recover from a failure
 	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -285,35 +185,38 @@ func Parse25Committee(file io.ReadSeeker, start int64) ([]*donations.Committee, 
 			CandID:       fieldMap[14],
 		}
 
+		// initialize corresponding CmteTxData object
+		txData := &donations.CmteTxData{
+			CmteID: fieldMap[0],
+			CandID: fieldMap[14],
+			Party:  fieldMap[10],
+		}
+
 		// add donation to queue of items, stop at 25 items
 		queue = append(queue, cmte)
-		if len(queue) == 25 {
+		dataQueue = append(dataQueue, txData)
+		if len(queue) == 100 {
 			break
 		}
+
 		fieldMap = make(mapOfFields)
 	}
 
-	return queue, offset, nil
+	return queue, dataQueue, offset, nil
 }
 
-// Parse25Disbursements parses 25 rows of a disbursements records file,
-// creates a list of 25 Disbursement items to be stored in the database,
-// and a list of DisbRecipient items to be stored (25 at most)
-
-// increment recID by len(DQueue) after each call
-// check returned recipients against recipients saved to disk, update id_lookup
-func Parse25Disbursements(year string, file io.ReadSeeker, start int64) ([]*donations.Disbursement, []*donations.Organization, int64, error) {
+// ScanDisbursements scans 500 lines of a disbursements file
+// and returns 500 Disbursement objects per call
+func ScanDisbursements(year string, file io.ReadSeeker, start int64) ([]*donations.Disbursement, int64, error) {
 	// seek to starting byte offset
 	offset := int64(start)
 	if _, err := file.Seek((offset), 0); err != nil {
-		return nil, nil, start, err
+		return nil, start, err
 	}
 
 	scanner := bufio.NewScanner(file)
 	fieldMap := make(mapOfFields)
-	DQueue := []*donations.Disbursement{}
-	RQueue := []*donations.Organization{}
-	recs := make(map[string]map[string]interface{})
+	dQueue := []*donations.Disbursement{}
 
 	// scanLines records the byte offset in order to recover from a failure
 	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -360,46 +263,20 @@ func Parse25Disbursements(year string, file io.ReadSeeker, start int64) ([]*dona
 			BackRefTxID:  fieldMap[24],
 		}
 
-		rec, err := findOrg(year, disb, recs)
-		// fmt.Println(donors)
-		if err != nil {
-			fmt.Println("Parse25Disbursements failed: findPerson failed: ", err)
-			return nil, nil, start, fmt.Errorf("Parse25Disbursements failed: findPerson failed: %v", err)
-		}
-
-		disb.RecID = rec.ID // set RecID field after retreiving recipientt
-
-		// * temporary cache *
-		name := disb.Name
-		zip := fmt.Sprintf("%s", disb.Zip)
-		if recs[name][zip] == nil { // new
-			// add new entry to map
-			// RQueue = append(RQueue, rec)
-			recs[name][zip] = rec
-		}
-
 		// add donation to queue of items, stop at 25 items
-		DQueue = append(DQueue, disb)
-		if len(DQueue) == 25 {
+		dQueue = append(dQueue, disb)
+		if len(dQueue) == 1000 {
 			break
 		}
 		fieldMap = make(mapOfFields)
 	}
 
-	for _, zipMap := range recs {
-		for _, rec := range zipMap {
-			if len(rec.(*donations.Organization).Transactions) == 0 { // new Organization
-				RQueue = append(RQueue, rec.(*donations.Organization))
-			}
-		}
-	}
-
-	return DQueue, RQueue, offset, nil
+	return dQueue, offset, nil
 }
 
-// Parse25CmteFin parses 25 rows of a committee financial records file
-// and creates a list of 25 items to be stored in the database
-func Parse25CmteFin(file io.ReadSeeker, start int64) ([]*donations.CmteFinancials, int64, error) {
+// ScanCmteFin scans 100 lines of a committee financials file
+// and returns 100 CmteFinancials objects per call
+func ScanCmteFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) {
 	// seek to starting byte offset
 	if _, err := file.Seek(start, 0); err != nil {
 		return nil, start, err
@@ -407,7 +284,7 @@ func Parse25CmteFin(file io.ReadSeeker, start int64) ([]*donations.CmteFinancial
 
 	scanner := bufio.NewScanner(file)
 	fieldMap := make(mapOfFields)
-	queue := []*donations.CmteFinancials{}
+	queue := []interface{}{}
 
 	// scanLines records the byte offset in order to recover from a failure
 	offset := start
@@ -536,11 +413,62 @@ func Parse25CmteFin(file io.ReadSeeker, start int64) ([]*donations.CmteFinancial
 
 		// add donation to queue of items, stop at 25 items
 		queue = append(queue, fin)
+		if len(queue) == 100 {
+			break
+		}
+		fieldMap = make(mapOfFields)
+	}
+	return queue, offset, nil
+}
+
+// Scan25CmteLink parses 25 rows of a candidate-committee links records file
+// and creates a list of 25 items to be stored in the database
+func Scan25CmteLink(file io.ReadSeeker, start int64) ([]*donations.CmteLink, int64, error) {
+	offset := int64(start)
+	// seek to starting byte offset
+	if _, err := file.Seek(offset, 0); err != nil {
+		return nil, start, err
+	}
+
+	scanner := bufio.NewScanner(file)
+	fieldMap := make(mapOfFields)
+	queue := []*donations.CmteLink{}
+
+	// scanLines records the byte offset in order to recover from a failure
+	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		advance, token, err = bufio.ScanLines(data, atEOF)
+		offset += int64(advance)
+		return
+	}
+	scanner.Split(scanLines)
+
+	for scanner.Scan() {
+		row := scanner.Text()
+
+		// scan row and map field values
+		fieldMap = scanRow(row, fieldMap)
+
+		// convert values from string
+		ey, _ := strconv.Atoi(fieldMap[1])
+
+		// create object to be stored in database
+		link := &donations.CmteLink{
+			CandID:   fieldMap[0],
+			ElectnYr: ey,
+			CmteID:   fieldMap[3],
+			CmteType: fieldMap[4],
+			CmteDsgn: fieldMap[5],
+			LinkID:   fieldMap[6],
+		}
+
+		// add donation to queue of items, stop at 25 items
+		queue = append(queue, link)
 		if len(queue) == 25 {
 			break
 		}
 		fieldMap = make(mapOfFields)
 	}
+
 	return queue, offset, nil
 }
 
@@ -586,79 +514,3 @@ func fmtDateStr(date string) string {
 	}
 	return newFmt
 }
-
-// DEPRECATED
-/*
-
-// Parse25CmteCont parses 25 rows of a committee contributions records file
-// and creates a list of 25 items to be stored in the database
-func Parse25CmteCont(file io.ReadSeeker, start int64) ([]*donations.CmteContribution, int64, error) {
-	// seek to starting byte offset
-	offset := int64(start)
-	if _, err := file.Seek(offset, 0); err != nil {
-		return nil, start, err
-	}
-
-	scanner := bufio.NewScanner(file)
-	fieldMap := make(mapOfFields)
-	queue := []*donations.CmteContribution{}
-
-	// scanLines records the byte offset in order to recover from a failure
-	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		advance, token, err = bufio.ScanLines(data, atEOF)
-		offset += int64(advance)
-		return
-	}
-	scanner.Split(scanLines)
-
-	for scanner.Scan() {
-		row := scanner.Text()
-
-		// scan row and map field values
-		fieldMap = scanRow(row, fieldMap)
-
-		// convert non-string values from original strings
-		txDateFmt := "01/02/2006"
-		txDate, err := time.Parse(txDateFmt, fmtDateStr(fieldMap[13]))
-		if err != nil {
-			fmt.Println(err)
-		}
-		txAmt, _ := strconv.ParseFloat(fieldMap[14], 32)
-		fileNum, _ := strconv.Atoi(fieldMap[17])
-		subID, _ := strconv.Atoi(fieldMap[20])
-
-		// create object to be stored in database
-		donation := &donations.CmteContribution{
-			CmteID:     fieldMap[0],
-			AmndtInd:   fieldMap[1],
-			ReportType: fieldMap[2],
-			TxPGI:      fieldMap[3],
-			TxType:     fieldMap[5],
-			EntityType: fieldMap[6],
-			Name:       fieldMap[7],
-			City:       fieldMap[8],
-			State:      fieldMap[9],
-			Zip:        fieldMap[10],
-			Employer:   fieldMap[11],
-			Occupation: fieldMap[12],
-			TxDate:     txDate,
-			TxAmt:      float32(txAmt),
-			OtherID:    fieldMap[15],
-			TxID:       fieldMap[16],
-			FileNum:    fileNum,
-			MemoCode:   fieldMap[18],
-			MemoText:   fieldMap[19],
-			SubID:      subID,
-		}
-
-		// add donation to queue of items, stop at 25 items
-		queue = append(queue, donation)
-		if len(queue) == 25 {
-			break
-		}
-		fieldMap = make(mapOfFields)
-	}
-
-	return queue, offset, nil
-}
-*/
