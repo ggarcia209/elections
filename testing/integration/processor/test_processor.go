@@ -1,5 +1,13 @@
 package main
 
+/* TEST NOTES */
+// Refactor dontations.CmteTxData object - add maps & split Org / Cmte contributors
+// Refactored persist.GetObject & persist.encodeToProto to return pointer to donations obj type, not pointer to interface
+// PutObject fails in transactions stage if Other cmte in transaction is not saved to database prior
+//   - implement createCmte function? - verify if missing committees exist in complete bulk data records
+// Individual derived from individual contributions file returned as Organziation objects
+//  -
+
 import (
 	"fmt"
 	"os"
@@ -11,6 +19,20 @@ import (
 )
 
 func main() {
+	year := "2018" // derived from flag inputs
+
+	// runProcessorTest(year)
+
+	err := viewTopOverall(year)
+	if err != nil {
+		fmt.Println("main failed: ", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("MAIN DONE")
+}
+
+func runProcessorTest(year string) {
 	// input file paths
 	candPath := "../../test_data/test_cands.txt"
 	cmtePath := "../../test_data/test_cmtes.txt"
@@ -18,12 +40,10 @@ func main() {
 	ccPath := "../../test_data/test_ccs.txt"
 	disbPath := "../../test_data/test_disbs.txt"
 
-	year := "2018" // derived from flag inputs
-
 	// initialize database and TopOverallData objects
-	persist.Init()
-	topOverallList := donations.InitTopOverallDataObjs(50)
-	err := persist.CacheTopOverall(year, topOverallList)
+	persist.Init(year)
+	topOverallList := donations.InitTopOverallDataObjs(100)
+	err := persist.StoreObjects(year, topOverallList)
 	if err != nil {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)
@@ -60,7 +80,8 @@ func main() {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)
 	}
-	fmt.Println("MAIN DONE")
+
+	fmt.Println("PROCESSOR TEST DONE")
 }
 
 func indvContTest(year, filepath string) error {
@@ -69,7 +90,7 @@ func indvContTest(year, filepath string) error {
 	// open file
 	file, err := os.Open(filepath)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("indvContTest faield: ", err)
 		os.Exit(1)
 	}
 	defer file.Close()
@@ -77,47 +98,42 @@ func indvContTest(year, filepath string) error {
 	// get starting offset value; 0 if none
 	start, err := persist.GetOffset("indv")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("indvContTest faield: ", err)
 		return err
 	}
-
-	// get current donorID value; 1 if none
-	donorID, err := persist.GetDonorID()
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	cacheStart := true
 
 	// parse file
 	for {
-		// parse 25 records per iteration
-		ICQueue, DQueue, offset, err := parse.Parse25IndvCont(year, file, start, int32(donorID))
+		// parse records
+		txQueue, offset, err := parse.ScanContributions(year, file, start)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("indvContTest faield: ", err)
 			return err
 		}
 
-		// update & store donorID after ojbects returned
-		donorID += len(DQueue)
-		err = persist.StoreDonorID(donorID)
+		// create cache from record IDs
+		cache, err := databuilder.CreateCache(year, txQueue)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("indvContTest faield: ", err)
 			return err
 		}
 
-		// save objects to disk
-		if start > 0 {
-			cacheStart = false
+		// break if finsished
+		if len(cache) == 0 {
+			fmt.Println("indvContTest DONE - no cache")
+			return nil
 		}
-		err = persist.CacheAndPersistIndvDonor(year, DQueue, cacheStart)
+
+		// update object data for each transaction
+		err = databuilder.TransactionUpdate(year, txQueue, cache)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("indvContTest faield: ", err)
 			return err
 		}
 
-		// update Indvidual Donors and receiving committees
-		err = databuilder.IndvContUpdate(year, ICQueue)
+		// persist objects in cache
+		ser := databuilder.SerializeCache(cache)
+		err = persist.StoreObjects(year, ser)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -130,15 +146,15 @@ func indvContTest(year, filepath string) error {
 			return err
 		}
 		start = offset
-		cacheStart = false
 
 		// break if at end of file
-		if len(ICQueue) < 25 {
+		if len(txQueue) < 1000 {
 			break
 		}
 	}
 
-	fmt.Println("indvContTest DONE")
+	fmt.Println("Individual Contributions -  DONE")
+
 	return nil
 }
 
@@ -160,43 +176,35 @@ func disbTest(year, filepath string) error {
 		return err
 	}
 
-	// get current recID value; 1 if none
-	recID, err := persist.GetRecID()
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	cacheStart := true
-
-	// parse file
 	for {
-		// parse 25 records per iteration
-		DQueue, RQueue, offset, err := parse.Parse25Disbursements(year, file, start, int32(recID))
+		// parse records
+		txQueue, offset, err := parse.ScanDisbursements(year, file, start)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 
-		// update & store recID after ojbects returned
-		recID += len(DQueue)
-		err = persist.StoreRecID(recID)
+		// create cache from
+		cache, err := databuilder.CreateCache(year, txQueue)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 
-		// save objects to disk
-		if start > 0 {
-			cacheStart = false
-		}
-		err = persist.CacheAndPersistDisbRecipient(year, RQueue, cacheStart)
-		if err != nil {
-			fmt.Println(err)
-			return err
+		if len(cache) == 0 {
+			fmt.Println("disbTest DONE - no cache")
+			return nil
 		}
 
 		// update Indvidual Donors and receiving committees
-		err = databuilder.CmteDisbUpdate(year, DQueue)
+		err = databuilder.TransactionUpdate(year, txQueue, cache)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+
+		ser := databuilder.SerializeCache(cache)
+		err = persist.StoreObjects(year, ser)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -209,15 +217,15 @@ func disbTest(year, filepath string) error {
 			return err
 		}
 		start = offset
-		cacheStart = false
 
 		// break if at end of file
-		if len(DQueue) < 25 {
+		if len(txQueue) < 1000 {
 			break
 		}
 	}
 
-	fmt.Println("disbTest DONE")
+	fmt.Println("Disbursements -  DONE")
+
 	return nil
 }
 
@@ -242,14 +250,32 @@ func cmteContTest(year, filepath string) error {
 	// parse file
 	for {
 		// parse 25 records per iteration
-		objQueue, offset, err := parse.Parse25CmteCont(file, start)
+		txQueue, offset, err := parse.ScanContributions(year, file, start)
+		if err != nil {
+			fmt.Println("cmteContTest failed: ", err)
+			return err
+		}
+
+		cache, err := databuilder.CreateCache(year, txQueue)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 
-		// update sending and receiving committee values
-		err = databuilder.CmteContUpdate(year, objQueue)
+		if len(cache) == 0 {
+			fmt.Println("cmteContTest DONE - no cache")
+			return nil
+		}
+
+		// update Indvidual Donors and receiving committees
+		err = databuilder.TransactionUpdate(year, txQueue, cache)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+
+		ser := databuilder.SerializeCache(cache)
+		err = persist.StoreObjects(year, ser)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -264,12 +290,13 @@ func cmteContTest(year, filepath string) error {
 		start = offset
 
 		// break if at end of file
-		if len(objQueue) < 25 {
+		if len(txQueue) < 1000 {
 			break
 		}
 	}
 
-	fmt.Println("cmteContTest DONE")
+	fmt.Println("Committee Contributions -  DONE")
+
 	return nil
 }
 
@@ -290,22 +317,18 @@ func candTest(year, filePath string) error {
 		fmt.Println(err)
 		return err
 	}
-	cacheStart := true
 
 	// parse file
 	for {
 		// parse 25 records per iteration
-		objQueue, offset, err := parse.Parse25Candidate(file, start)
+		objQueue, offset, err := parse.ScanCandidates(file, start)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 
 		// save objects to disk
-		if start > 0 {
-			cacheStart = false
-		}
-		err = persist.InitialCacheCand(year, objQueue, cacheStart)
+		err = persist.StoreObjects(year, objQueue)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -318,15 +341,15 @@ func candTest(year, filePath string) error {
 			return err
 		}
 		start = offset
-		cacheStart = false
 
 		// break if at end of file
-		if len(objQueue) < 25 {
+		if len(objQueue) < 100 {
 			break
 		}
 	}
 
-	fmt.Println("candTest DONE")
+	fmt.Println("Candidates - DONE")
+
 	return nil
 }
 
@@ -347,22 +370,23 @@ func cmteTest(year, filePath string) error {
 		fmt.Println(err)
 		return err
 	}
-	cacheStart := true
 
 	// parse file
 	for {
 		// parse 25 records per iteration
-		objQueue, offset, err := parse.Parse25Committee(file, start)
+		objQueue, txDataQueue, offset, err := parse.ScanCommittees(file, start)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 
 		// save objects to disk
-		if start > 0 {
-			cacheStart = false
+		err = persist.StoreObjects(year, objQueue)
+		if err != nil {
+			fmt.Println(err)
+			return err
 		}
-		err = persist.InitialCacheCmte(year, objQueue, cacheStart)
+		err = persist.StoreObjects(year, txDataQueue)
 		if err != nil {
 			fmt.Println(err)
 			return err
@@ -375,14 +399,55 @@ func cmteTest(year, filePath string) error {
 			return err
 		}
 		start = offset
-		cacheStart = false
 
 		// break if at end of file
-		if len(objQueue) < 25 {
+		if len(objQueue) < 100 {
 			break
 		}
 	}
 
-	fmt.Println("cmteTest DONE")
+	fmt.Println("Committees - DONE")
+	return nil
+}
+
+func viewTopOverall(year string) error {
+	testCmte, err := persist.GetObject(year, "cmte_tx_data", "C00343871") // C00401224
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	odIndv, err := persist.GetObject(year, "top_overall", "indv")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	odCmte, err := persist.GetObject(year, "top_overall", "cmte_recs_all")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	testIndv, err := persist.GetObject(year, "individuals", "01489ace1a99994034ef8df6455bb6de")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Println("*** TEST COMMITTEES ***")
+	fmt.Println(testCmte)
+	fmt.Println()
+	fmt.Println("*** TEST INDIVIDUAL ***")
+	fmt.Println(testIndv)
+	fmt.Println()
+
+	fmt.Println("*** TOP COMMITTEES ***")
+	fmt.Println(odCmte)
+	fmt.Println()
+	fmt.Println("*** TOP INDIVIDUALS ***")
+	fmt.Println(odIndv)
+	fmt.Println()
+
 	return nil
 }

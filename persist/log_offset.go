@@ -11,7 +11,7 @@ import (
 
 var mu = &sync.Mutex{}
 
-// logOffset records the byte offset value in the database
+// LogOffset records the byte offset value in the database
 func LogOffset(year, key string, offset int64) error {
 	mu.Lock()
 	defer mu.Unlock()
