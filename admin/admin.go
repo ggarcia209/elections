@@ -1,13 +1,5 @@
 package admin
 
-/* TEST NOTES */
-// Refactor dontations.CmteTxData object - add maps & split Org / Cmte contributors
-// Refactored persist.GetObject & persist.encodeToProto to return pointer to donations obj type, not pointer to interface
-// PutObject fails in transactions stage if Other cmte in transaction is not saved to database prior
-//   - implement createCmte function? - verify if missing committees exist in complete bulk data records
-// Individual derived from individual contributions file returned as Organziation objects
-//  -
-
 import (
 	"fmt"
 	"os"
@@ -104,11 +96,6 @@ func ProcessNewRecords(year string) error {
 	fmt.Println()
 
 	return nil
-}
-
-// UploadToDynamoDB updloads the boltDB database on disk to AWS DynamoDB instance.
-func UploadToDynamoDB(year string) {
-
 }
 
 func processCandidates(year, filePath string) error {

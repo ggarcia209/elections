@@ -104,7 +104,7 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 	db, err := bolt.Open("db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
-		fmt.Println("GetObject failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
 
@@ -115,17 +115,62 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 		data = tx.Bucket([]byte(year)).Bucket([]byte(bucket)).Get([]byte(key))
 		return nil
 	}); err != nil {
-		fmt.Println("PutObject failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
 
 	obj, err := decodeFromProto(bucket, data) // change to decode
 	if err != nil {
-		fmt.Println("GetObject failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
 
 	return obj, nil
+}
+
+// BatchGetSequential retrieves a sequential list of n objects from the database starting at the given key.
+func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, string, error) {
+	objs := []interface{}{}
+	currKey := startKey
+
+	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
+	}
+
+	if err := db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte(year)).Bucket([]byte(bucket))
+
+		c := b.Cursor()
+
+		if startKey == "" {
+			skBytes, _ := c.First()
+			startKey = string(skBytes)
+		}
+
+		for k, v := c.Seek([]byte(startKey)); k != nil; k, v = c.Next() {
+			obj, err := decodeFromProto(bucket, v)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("tx failed: %v", err)
+			}
+			objs = append(objs, obj)
+			ckBytes, _ := c.Next()
+			currKey = string(ckBytes)
+			if len(objs) == n {
+				break
+			}
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
+	}
+
+	return objs, currKey, nil
 }
 
 // GetTopOverall retreives the TopOverall objects from disk to store in memory

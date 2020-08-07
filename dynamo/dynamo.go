@@ -97,8 +97,8 @@ func CreateTable(svc *dynamodb.DynamoDB, table *Table) error {
 			},
 		},
 		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(5),
-			WriteCapacityUnits: aws.Int64(5),
+			ReadCapacityUnits:  aws.Int64(25), // free tier limit = 25
+			WriteCapacityUnits: aws.Int64(25), // free tier limit = 25
 		},
 		TableName: aws.String(table.TableName),
 	}
