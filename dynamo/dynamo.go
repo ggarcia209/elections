@@ -13,13 +13,23 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-// InitSesh initializes a new DynamoDB session
-func InitSesh(config *aws.Config) *dynamodb.DynamoDB {
+// InitSesh initializes a new session with default config/credentials
+func InitSesh() *dynamodb.DynamoDB {
 	// Initialize a session that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials
-	sesh := session.Must(session.NewSession(config))
+	sesh := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+
+	fmt.Println("session intialized")
+	fmt.Println("region: ", aws.StringValue(sesh.Config.Region))
+
 	// Create DynamoDB client
 	svc := dynamodb.New(sesh)
+
+	fmt.Println("DynamoDB client initialized")
+	fmt.Println()
+
 	return svc
 }
 
@@ -153,13 +163,13 @@ func GetItem(svc *dynamodb.DynamoDB, q *Query, t *Table, item interface{}) (inte
 // Query object with the UpdateValue defined in the Query
 func UpdateItem(svc *dynamodb.DynamoDB, q *Query, t *Table) error {
 	exprMap := make(map[string]*dynamodb.AttributeValue)
-	exprMap[q.UpdateFieldName] = createAV(q.UpdateValue)
+	exprMap[":u"] = createAV(q.UpdateValue)
 	input := &dynamodb.UpdateItemInput{
 		ExpressionAttributeValues: exprMap,
 		TableName:                 aws.String(t.TableName),
 		Key:                       keyMaker(q, t),
 		ReturnValues:              aws.String("UPDATED_NEW"),
-		UpdateExpression:          aws.String(fmt.Sprintf("updated %s: %s", q.UpdateFieldName, q.UpdateValue)),
+		UpdateExpression:          aws.String(fmt.Sprintf("set %s = :u", q.UpdateFieldName)),
 	}
 
 	_, err := svc.UpdateItem(input)
@@ -168,7 +178,7 @@ func UpdateItem(svc *dynamodb.DynamoDB, q *Query, t *Table) error {
 		return fmt.Errorf("UpdateItem failed: %v", err)
 	}
 
-	fmt.Printf("Updated %s: %s\n", q.UpdateFieldName, q.UpdateValue)
+	fmt.Printf("Updated %v: %v: %s = %v\n", q.PrimaryValue, q.SortValue, q.UpdateFieldName, q.UpdateValue)
 	return nil
 }
 
@@ -249,20 +259,19 @@ func BatchWriteCreate(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 			}
 		}
 
-		if result.UnprocessedItems == nil {
+		if len(result.UnprocessedItems) == 0 {
 			fc.Reset() // reset configuration after loop
 			break
 		}
 
 	}
 
-	fmt.Println(result)
 	return nil
 }
 
 // BatchWriteDelete writes a list of items to the database
-func BatchWriteDelete(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []interface{}) error {
-	if len(items) > 25 {
+func BatchWriteDelete(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query) error {
+	if len(queries) > 25 {
 		return fmt.Errorf("too many items to process")
 	}
 
@@ -271,18 +280,13 @@ func BatchWriteDelete(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 	wrs := []*dynamodb.WriteRequest{}
 
 	// create PutRequests for each item
-	for _, item := range items {
-		if item == nil {
+	for _, q := range queries {
+		if q == nil {
 			continue
 		}
 
-		// marshal each item
-		item, err := dynamodbattribute.MarshalMap(item)
-		if err != nil {
-			return fmt.Errorf("BatchWriteDelete failed: %v", err)
-		}
 		// create put request, reformat as write request, and add to list
-		dr := &dynamodb.DeleteRequest{Key: item}
+		dr := &dynamodb.DeleteRequest{Key: keyMaker(q, t)}
 		wr := &dynamodb.WriteRequest{DeleteRequest: dr}
 		wrs = append(wrs, wr)
 	}
@@ -319,39 +323,42 @@ func BatchWriteDelete(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 			}
 		}
 
-		if result.UnprocessedItems == nil {
+		if len(result.UnprocessedItems) == 0 {
 			fc.Reset() // reset configuration after loop
 			break
 		}
 
 	}
 
-	fmt.Println(result)
 	return nil
 }
 
 // BatchGet retrieves a list of items from the database
-func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []interface{}) error {
-	if len(items) > 100 {
-		return fmt.Errorf("too many items to process")
+// refObjs must be non-nil pointers of the same type,
+// 1 for each query/object returned.
+//   returns err if len(queries) != len(refObjs)
+func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query, refObjs []interface{}) ([]interface{}, error) {
+	if len(queries) > 25 {
+		return nil, fmt.Errorf("too many items to process")
 	}
+
+	if len(queries) != len(refObjs) {
+		return nil, fmt.Errorf("number of queries does not match number of reference objects")
+	}
+
+	items := []interface{}{}
 
 	// create map of RequestItems
 	reqItems := make(map[string]*dynamodb.KeysAndAttributes)
 	keys := []map[string]*dynamodb.AttributeValue{}
 
-	// create PutRequests for each item
-	for _, item := range items {
-		if item == nil {
+	// create Get requests for each query
+	for _, q := range queries {
+		if q == nil {
 			continue
 		}
 
-		// marshal each item
-		item, err := dynamodbattribute.MarshalMap(item)
-		if err != nil {
-			return fmt.Errorf("BatchWriteCreate failed: %v", err)
-		}
-		// create put request, reformat as write request, and add to list
+		item := keyMaker(q, t)
 		keys = append(keys, item)
 	}
 	// populate reqItems map
@@ -372,7 +379,7 @@ func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []interfac
 			// if not HTTP 5xx error
 			if err.(awserr.Error).Code() != dynamodb.ErrCodeInternalServerError {
 				fmt.Printf("unprocessed items: \n%v\n", result.UnprocessedKeys)
-				return fmt.Errorf("BatchWriteCreate failed: %v", err)
+				return nil, fmt.Errorf("BatchWriteCreate failed: %v", err)
 			}
 
 			// Retry with exponential backoff algorithm
@@ -383,20 +390,29 @@ func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []interfac
 				}
 				fc.ExponentialBackoff() // waits
 				if fc.MaxRetriesReached == true {
-					return fmt.Errorf("BatchWriteCreate failed: Max retries exceeded: %v", err)
+					return nil, fmt.Errorf("BatchWriteCreate failed: Max retries exceeded: %v", err)
 				}
 			}
 		}
 
-		if result.UnprocessedKeys == nil {
+		for i, r := range result.Responses[t.TableName] {
+			ref := refObjs[i]
+			err = dynamodbattribute.UnmarshalMap(r, &ref)
+			if err != nil {
+				fmt.Printf("Failed to unmarshal record, %v\n", err)
+				return nil, fmt.Errorf("GetItem failed: Failed to unmarshal record, %v", err)
+			}
+			items = append(items, ref)
+		}
+
+		if len(result.UnprocessedKeys) == 0 {
 			fc.Reset() // reset configuration after loop
 			break
 		}
 
 	}
 
-	fmt.Println(result)
-	return nil
+	return items, nil
 }
 
 func batchWriteUtil(svc *dynamodb.DynamoDB, input *dynamodb.BatchWriteItemInput) (*dynamodb.BatchWriteItemOutput, error) {

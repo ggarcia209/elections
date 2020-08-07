@@ -37,6 +37,7 @@ func (d *DbInfo) SetFailConfig(fc *FailConfig) {
 }
 
 // AddTable adds a new Table obj to the Tables field of the DbInfo obj
+// TableName field is used for map key
 func (d *DbInfo) AddTable(t *Table) {
 	d.Tables[t.TableName] = t
 }
@@ -51,21 +52,21 @@ func InitDbInfo() *DbInfo {
 type Query struct {
 	PrimaryValue    interface{}
 	SortValue       interface{}
-	UpdateValue     interface{}
 	UpdateFieldName string
+	UpdateValue     interface{}
 }
 
 // New creates a new query by setting the Partition Key and Sort Key values
 func (q *Query) New(pv, sv interface{}) { q.PrimaryValue, q.SortValue = pv, sv }
 
 // UpdateCurrent sets the update fields for the current item
-func (q *Query) UpdateCurrent(uv interface{}, name string) {
-	q.UpdateValue, q.UpdateFieldName = uv, name
+func (q *Query) UpdateCurrent(fieldName string, value interface{}) {
+	q.UpdateFieldName, q.UpdateValue = fieldName, value
 }
 
 // UpdateNew selects a new item for an update
-func (q *Query) UpdateNew(pv, sv, uv interface{}, name string) {
-	q.PrimaryValue, q.SortValue, q.UpdateValue, q.UpdateFieldName = pv, sv, uv, name
+func (q *Query) UpdateNew(pv, sv, fieldName string, value interface{}) {
+	q.PrimaryValue, q.SortValue, q.UpdateValue, q.UpdateFieldName = pv, sv, value, fieldName
 }
 
 // Reset clears all fields
@@ -166,28 +167,6 @@ func createAV(val interface{}) *dynamodb.AttributeValue {
 	}
 	return nil
 }
-
-// setType sets the the type of an AttributeValue object
-/* func CreateAV(key interface{}, keyType string) *dynamodb.AttributeValue {
-	av := *dynamodb.AttributeValue
-
-	typeMap := map[string]func(key interface{}){
-		"B":    func(key interface{}) { av.SetB(key.([]byte)) },
-		"BOOL": func(key interface{}) { av.SetBOOL(key.(bool)) },
-		"BS":   func(key interface{}) { av.SetBS(key.([][]byte)) },
-		"L":    func(key interface{}) { av.SetL(key.([]*dynamodb.AttributeValue)) },
-		"M":    func(key interface{}) { av.SetM(key.(map[string]*dynamodb.AttributeValue)) },
-		"N":    func(key interface{}) { av.SetN(key.(string)) },
-		"NS":   func(key interface{}) { av.SetNS(key.([]*string)) },
-		"NULL": func(key interface{}) { av.SetNULL(key.(bool)) },
-		"S":    func(key interface{}) { av.SetS(key.(string)) },
-		"SS":   func(key interface{}) { av.SetSS(key.([]*string)) },
-	}
-
-	typeMap[keyType](key)
-
-	return av
-} */
 
 // KeyMaker creates a map of Partition and Sort Keys
 func keyMaker(q *Query, t *Table) map[string]*dynamodb.AttributeValue {
