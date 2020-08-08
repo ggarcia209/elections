@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package protobuf;
+
+
+message Lookup {
+	map<string, string> donorID = 1;
+}
+
+// REFACTOR: map<string, int32> -> map<string, string> (md5 hash)

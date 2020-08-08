@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package protobuf;
+
+message Entry {
+    string ID = 1;
+    float Total = 2;
+}
+
+message TopOverallData {
+    string Category = 1;
+    map<string, float> Amts = 2;
+    repeated Entry Threshold = 3;
+    int32 SizeLimit = 4;
+}
+

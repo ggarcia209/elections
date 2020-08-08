@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package network;
+
+message NodeProto {
+    message InnerMap {
+        map<string, float> Weights = 1;
+    }
+    string ID = 1;
+    string Name = 2;
+    string Type = 3;
+    map<string, InnerMap> WeightedEdges = 5;
+}

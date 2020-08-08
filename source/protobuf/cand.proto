@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package protobuf;
+
+message CandEntry {
+    string ID = 1;
+    float Total = 2;
+}
+
+message Candidate {
+	string ID = 1;     
+	string Name = 2; 
+	string Party = 3;
+	int32 ElectnYr = 4;   
+	string OfficeState = 5; 
+	string Office = 6;     
+	string PCC = 7;    
+	string City = 8;       
+	string State = 9; 
+	string Zip = 10;    
+	repeated string OtherAffiliates = 11;
+	float TotalDirectInAmt = 12;
+	float TotalDirectInTxs = 13;
+	float AvgDirectIn = 14;
+	float TotalDirectOutAmt = 15;
+	float TotalDirectOutTxs = 16;
+	float AvgDirectOut = 17;
+	float NetBalanceDirectTx = 18;
+	map<string, float> DirectRecipientsAmts = 19;
+	map<string, float> DirectRecipientsTxs = 20;
+	map<string, float> DirectSendersAmts = 21;
+	map<string, float> DirectSendersTxs = 22;
+
+}

@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package protobuf;
+
+message CmteEntry {
+    string ID = 1;
+    float Total = 2;
+}
+
+message CmteTxData {
+	string CmteID = 1;
+	string CandID  = 2;
+	string Party = 3; 
+	float ContributionsInAmt = 4;
+	float ContributionsInTxs = 5;
+	float AvgContributionIn = 6;
+	float OtherReceiptsInAmt = 7;
+	float OtherReceiptsInTxs = 8;
+	float AvgOtherIn = 9;
+	float TotalIncomingAmt = 10;
+	float TotalIncomingTxs = 11; 
+	float AvgIncoming = 12;
+	float TransfersAmt = 13;
+	float TransfersTxs = 14;
+	float AvgTransfer = 15;
+	float ExpendituresAmt = 16;
+	float ExpendituresTxs = 17;
+	float AvgExpenditure = 18;
+	float TotalOutgoingAmt = 19;
+	float TotalOutgoingTxs = 20;
+	float AvgOutgoing = 21;
+	float NetBalance = 22;
+	map<string, float> TopIndvContributorsAmt = 23;
+	map<string, float> TopIndvContributorsTxs = 24;
+	repeated CmteEntry TopIndvContributorThreshold = 25;
+	map<string, float> TopCmteOrgContributorsAmt = 26;
+	map<string, float> TopCmteOrgContributorsTxs = 27;
+	repeated CmteEntry TopCmteOrgContributorThreshold = 28;
+	map<string, float> TransferRecsAmt = 29; 
+	map<string, float> TransferRecsTxs = 30;
+	map<string, float> TopExpRecipientsAmt = 31;
+	map<string, float> TopExpRecipientsTxs = 32;
+	repeated CmteEntry TopExpThreshold = 33;
+}

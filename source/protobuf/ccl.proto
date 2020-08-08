@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package protobuf;
+
+message CmteLink {
+	string CandID = 1;
+	int32 ElectnYr = 2;
+	string CmteID = 3;
+	string CmteType = 4;
+	string CmteDsgn = 5; // Committee Designation
+	string LinkID = 6; 
+}
