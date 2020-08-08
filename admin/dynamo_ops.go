@@ -8,11 +8,23 @@ import (
 )
 
 // InitDynamoDbDefault initializes a dynamo.DbInfo object with default DynamoDB session settings
-func InitDynamoDbDefault() *dynamo.DbInfo {
+func InitDynamoDbDefault(year string) (*dynamo.DbInfo, error) {
+	// init DbInfo object and session
 	db := dynamo.InitDbInfo()
 	db.SetSvc(dynamo.InitSesh())
 	db.SetFailConfig(dynamo.DefaultFailConfig)
-	return db
+
+	// create Table objects
+	initTableObjs(db, year)
+
+	// list tables currently in DB
+	err := dynamo.ListTables(db.Svc)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("InitDynamoDbDefault failed: %v", err)
+	}
+
+	return db, nil
 }
 
 // InitDynamoTables initializes Tables for each object category for the given year
@@ -23,106 +35,16 @@ func InitDynamoDbDefault() *dynamo.DbInfo {
 //                   "[ecf] %s: cmte_tx_data", year
 //                   "[ecf] %s: cmte_financials", year
 //                   "[ecf] %s: top_ovearll", year
-func InitDynamoTables(db *dynamo.DbInfo, year string) error {
-	indv := fmt.Sprintf("[ecf] %s: individuals", year)        // pk = State
-	cand := fmt.Sprintf("[ecf] %s: candidates", year)         // pk = State
-	cmte := fmt.Sprintf("[ecf] %s: committees", year)         // pk = State
-	cmteData := fmt.Sprintf("[ecf] %s: cmte_tx_data", year)   // pk = Name
-	cmteFin := fmt.Sprintf("[ecf] %s: cmte_financials", year) // pk = Name
-	topOverall := fmt.Sprintf("[ecf] %s: top_overall", year)  // pk = SizeLimit
-
-	// create object tables
-	t := dynamo.CreateNewTableObj(indv, "State", "string", "ID", "string")
-	err := dynamo.CreateTable(db.Svc, t)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("InitDynamoTables failed: %v", err)
+func InitDynamoTables(db *dynamo.DbInfo) error {
+	for _, t := range db.Tables {
+		err := dynamo.CreateTable(db.Svc, t)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("InitDynamoTables failed: %v", err)
+		}
 	}
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cand, "State", "string", "ID", "string")
-	err = dynamo.CreateTable(db.Svc, t)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("InitDynamoTables failed: %v", err)
-	}
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cmte, "State", "string", "ID", "string")
-	err = dynamo.CreateTable(db.Svc, t)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("InitDynamoTables failed: %v", err)
-	}
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cmteData, "Name", "string", "ID", "string")
-	err = dynamo.CreateTable(db.Svc, t)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("InitDynamoTables failed: %v", err)
-	}
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cmteFin, "Name", "string", "ID", "string")
-	err = dynamo.CreateTable(db.Svc, t)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("InitDynamoTables failed: %v", err)
-	}
-	db.AddTable(t)
-
-	// create TopOverall table
-	t = dynamo.CreateNewTableObj(topOverall, "SizeLimit", "int", "Category", "string")
-	err = dynamo.CreateTable(db.Svc, t)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("InitDynamoTables failed: %v", err)
-	}
-	db.AddTable(t)
 
 	return nil
-}
-
-// InitTableObjsOnly creates dynamo.Table objects for given year in memory only and
-// adds them to the db.Tables field. See InitDynamoTables description for TableName format.
-func InitTableObjsOnly(db *dynamo.DbInfo, year string) {
-	indv := fmt.Sprintf("[ecf] %s: individuals", year)        // pk = State
-	cand := fmt.Sprintf("[ecf] %s: candidates", year)         // pk = State
-	cmte := fmt.Sprintf("[ecf] %s: committees", year)         // pk = State
-	cmteData := fmt.Sprintf("[ecf] %s: cmte_tx_data", year)   // pk = Name
-	cmteFin := fmt.Sprintf("[ecf] %s: cmte_financials", year) // pk = Name
-	topOverall := fmt.Sprintf("[ecf] %s: top_overall", year)  // pk = SizeLimit
-
-	// create object tables
-	t := dynamo.CreateNewTableObj(indv, "State", "string", "ID", "string")
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cand, "State", "string", "ID", "string")
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cmte, "State", "string", "ID", "string")
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cmteData, "Name", "string", "ID", "string")
-	db.AddTable(t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cmteFin, "Name", "string", "ID", "string")
-	db.AddTable(t)
-
-	// create TopOverall table
-	t = dynamo.CreateNewTableObj(topOverall, "SizeLimit", "int", "Category", "string")
-	db.AddTable(t)
-
-	return
 }
 
 // UploadFromDisk intitializes the batch upload process to DynamoDB for the specified year: bucket
@@ -198,4 +120,41 @@ func UploadFromDisk(db *dynamo.DbInfo, year, bucket string, n int) error {
 	fmt.Println()
 
 	return nil
+}
+
+// initTableObjs creates dynamo.Table objects for given year in memory only and
+// adds them to the db.Tables field. See InitDynamoTables description for TableName format.
+func initTableObjs(db *dynamo.DbInfo, year string) {
+	indv := fmt.Sprintf("[ecf] %s: individuals", year)        // pk = State
+	cand := fmt.Sprintf("[ecf] %s: candidates", year)         // pk = State
+	cmte := fmt.Sprintf("[ecf] %s: committees", year)         // pk = State
+	cmteData := fmt.Sprintf("[ecf] %s: cmte_tx_data", year)   // pk = Name
+	cmteFin := fmt.Sprintf("[ecf] %s: cmte_financials", year) // pk = Name
+	topOverall := fmt.Sprintf("[ecf] %s: top_overall", year)  // pk = SizeLimit
+
+	// create object tables
+	t := dynamo.CreateNewTableObj(indv, "State", "string", "ID", "string")
+	db.AddTable(t)
+
+	// create object tables
+	t = dynamo.CreateNewTableObj(cand, "State", "string", "ID", "string")
+	db.AddTable(t)
+
+	// create object tables
+	t = dynamo.CreateNewTableObj(cmte, "State", "string", "ID", "string")
+	db.AddTable(t)
+
+	// create object tables
+	t = dynamo.CreateNewTableObj(cmteData, "Name", "string", "ID", "string")
+	db.AddTable(t)
+
+	// create object tables
+	t = dynamo.CreateNewTableObj(cmteFin, "Name", "string", "ID", "string")
+	db.AddTable(t)
+
+	// create TopOverall table
+	t = dynamo.CreateNewTableObj(topOverall, "SizeLimit", "int", "Category", "string")
+	db.AddTable(t)
+
+	return
 }
