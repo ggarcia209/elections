@@ -10,6 +10,8 @@ import (
 	"github.com/elections/persist"
 )
 
+/* DB CREATE OPERATIONS */
+
 // ProcessNewRecords processes the FEC bulk data files for the given year.
 // All directories must have the following files:
 //   /[year]/cands.txt
