@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/elections/source/cache"
 	"github.com/elections/source/databuilder"
 	"github.com/elections/source/donations"
 	"github.com/elections/source/parse"
@@ -293,27 +294,27 @@ func processCmteContributions(year, filepath string) error {
 		}
 
 		// create cache from record IDs
-		cache, err := databuilder.CreateCache(year, txQueue)
+		c, err := cache.CreateCache(year, txQueue)
 		if err != nil {
 			fmt.Println("processCmteContributions failed: ", err)
 			return fmt.Errorf("processCmteContributions failed: %v", err)
 		}
 
 		// break if finished
-		if len(cache) == 0 {
+		if len(c) == 0 {
 			fmt.Println("cmteContTest DONE - no cache")
 			return nil
 		}
 
 		// update cached objects for each transaction
-		err = databuilder.TransactionUpdate(year, txQueue, cache)
+		err = databuilder.TransactionUpdate(year, txQueue, c)
 		if err != nil {
 			fmt.Println("processCmteContributions failed: ", err)
 			return fmt.Errorf("processCmteContributions failed: %v", err)
 		}
 
 		// persist items in cache
-		ser := databuilder.SerializeCache(cache)
+		ser := cache.SerializeCache(c)
 		err = persist.StoreObjects(year, ser)
 		if err != nil {
 			fmt.Println("processCmteContributions failed: ", err)
@@ -367,27 +368,27 @@ func processIndvContributions(year, filepath string) error {
 		}
 
 		// create cache from record IDs
-		cache, err := databuilder.CreateCache(year, txQueue)
+		c, err := cache.CreateCache(year, txQueue)
 		if err != nil {
 			fmt.Println("processIndvContributions faield: ", err)
 			return err
 		}
 
 		// break if finsished
-		if len(cache) == 0 {
+		if len(c) == 0 {
 			fmt.Println("processIndvContributions DONE - no cache")
 			return nil
 		}
 
 		// update object data for each transaction
-		err = databuilder.TransactionUpdate(year, txQueue, cache)
+		err = databuilder.TransactionUpdate(year, txQueue, c)
 		if err != nil {
 			fmt.Println("processIndvContributions faield: ", err)
 			return err
 		}
 
 		// persist objects in cache
-		ser := databuilder.SerializeCache(cache)
+		ser := cache.SerializeCache(c)
 		err = persist.StoreObjects(year, ser)
 		if err != nil {
 			fmt.Println(err)
@@ -440,27 +441,27 @@ func processDisbursements(year, filepath string) error {
 		}
 
 		// create cache from
-		cache, err := databuilder.CreateCache(year, txQueue)
+		c, err := cache.CreateCache(year, txQueue)
 		if err != nil {
 			fmt.Println("processDisbursements failed: ", err)
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 
 		// break if finished
-		if len(cache) == 0 {
+		if len(c) == 0 {
 			fmt.Println("disbTest DONE - no cache")
 			return nil
 		}
 
 		// update object data
-		err = databuilder.TransactionUpdate(year, txQueue, cache)
+		err = databuilder.TransactionUpdate(year, txQueue, c)
 		if err != nil {
 			fmt.Println("processDisbursements failed: ", err)
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 
 		// persist objects in cache
-		ser := databuilder.SerializeCache(cache)
+		ser := cache.SerializeCache(c)
 		err = persist.StoreObjects(year, ser)
 		if err != nil {
 			fmt.Println("processDisbursements failed: ", err)
