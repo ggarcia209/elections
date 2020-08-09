@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package protobuf;
-
-message IndexEntry {
-    string ID = 1;
-    repeated string Years = 2;
-}
