@@ -1,11 +1,16 @@
 package main
 
+/* TEST NOTES */
+// CreateTable call for existing table returns error
+// Calling CreateTable(t) and PutItem(t) in same routine returns resource not found error
+//
+
 import (
 	"fmt"
 	"os"
 
-	"github.com/elections/donations"
-	"github.com/elections/dynamo"
+	"github.com/elections/source/donations"
+	"github.com/elections/source/dynamo"
 )
 
 var item0 = &donations.Individual{
@@ -41,26 +46,27 @@ func main() {
 	db := dynamo.InitDbInfo()
 	db.SetSvc(dynamo.InitSesh())
 	db.AddTable(dynamo.CreateNewTableObj("test_table_2", "State", "string", "ID", "string"))
+	db.AddTable(dynamo.CreateNewTableObj("test_table_3", "SizeLimit", "int", "Category", "string")) // topOverall obj schema
 	db.SetFailConfig(dynamo.DefaultFailConfig)
 
-	q0 := dynamo.CreateNewQueryObj(item0.State, item0.ID)
+	/* q0 := dynamo.CreateNewQueryObj(item0.State, item0.ID)
 	q1 := dynamo.CreateNewQueryObj(item1.State, item1.ID)
 	q2 := dynamo.CreateNewQueryObj(item2.State, item2.ID)
-	queries := []*dynamo.Query{q0, q1, q2}
+	queries := []*dynamo.Query{q0, q1, q2} */
 
-	err := testBatchWriteCreate(db, itemList)
+	item := &donations.TopOverallData{
+		Category:  "indv",
+		SizeLimit: 5,
+	}
+
+	/* err := testCreateItem(db, item)
 	if err != nil {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)
-	}
+	} */
 
-	err = testGetItem(db, q2)
-	if err != nil {
-		fmt.Println("main failed: ", err)
-		os.Exit(1)
-	}
-
-	err = testBatchGet(db, queries)
+	q := dynamo.CreateNewQueryObj(item.SizeLimit, item.Category)
+	err := testGetItem(db, q)
 	if err != nil {
 		fmt.Println("main failed: ", err)
 		os.Exit(1)
@@ -85,7 +91,13 @@ func testInit() error {
 }
 
 func testCreateTable(db *dynamo.DbInfo) error {
-	err := dynamo.CreateTable(db.Svc, db.Tables["test_table_2"])
+	/* err := dynamo.CreateTable(db.Svc, db.Tables["test_table_2"])
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("testCreateTable failed: %v", err)
+	} */
+
+	err := dynamo.CreateTable(db.Svc, db.Tables["test_table_3"])
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("testCreateTable failed: %v", err)
@@ -103,7 +115,7 @@ func testCreateTable(db *dynamo.DbInfo) error {
 }
 
 func testCreateItem(db *dynamo.DbInfo, item interface{}) error {
-	err := dynamo.CreateItem(db.Svc, item, db.Tables["test_table_2"])
+	err := dynamo.CreateItem(db.Svc, item, db.Tables["test_table_3"])
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("TestInit failed: %v", err)
@@ -117,16 +129,16 @@ func testCreateItem(db *dynamo.DbInfo, item interface{}) error {
 
 func testGetItem(db *dynamo.DbInfo, q *dynamo.Query) error {
 	// q := dynamo.CreateNewQueryObj("New York", "indv01")
-	obj := &donations.Individual{}
+	obj := &donations.TopOverallData{}
 
-	item, err := dynamo.GetItem(db.Svc, q, db.Tables["test_table_2"], obj)
+	item, err := dynamo.GetItem(db.Svc, q, db.Tables["test_table_3"], obj)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("testGetItem failed: %v", err)
 	}
 
 	fmt.Println("item: ", item)
-	fmt.Println("name: ", item.(*donations.Individual).Name)
+	// fmt.Println("name: ", item.(*donations.Individual).Name)
 	fmt.Println("testGetItem done")
 	fmt.Println()
 
