@@ -50,9 +50,9 @@ type TopOverallData struct {
 func InitTopOverallDataObjs(limit int) []interface{} {
 	od := []interface{}{}
 	// indv & disb_rec
-	indv := &TopOverallData{"indv", make(map[string]float32), nil, limit}
+	indv := &TopOverallData{"indv", make(map[string]float32), nil, 100000}
 	od = append(od, indv)
-	indvRec := &TopOverallData{"indv_rec", make(map[string]float32), nil, limit}
+	indvRec := &TopOverallData{"indv_rec", make(map[string]float32), nil, 100000}
 	od = append(od, indvRec)
 
 	// cmte_donors

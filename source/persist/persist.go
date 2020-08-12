@@ -30,12 +30,11 @@ func Init(year string) error {
 	return nil
 }
 
-// 8/3/20 - REFACTOR - Use boltDB Batch Write function (tx rollback/atomicity)
 // StoreObjects persists a list of objects to the on-disk database
 func StoreObjects(year string, objs []interface{}) error {
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("StoreObjects failed: ", err)
@@ -76,7 +75,7 @@ func PutObject(year string, object interface{}) error {
 
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("PutObject failed: ", err)
@@ -99,7 +98,7 @@ func PutObject(year string, object interface{}) error {
 
 // GetObject gets an object by year:bucket:key and returns it as an interface
 func GetObject(year, bucket, key string) (interface{}, error) {
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -131,7 +130,7 @@ func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, st
 	objs := []interface{}{}
 	currKey := startKey
 
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -177,7 +176,7 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 	objs := []interface{}{}
 	nilIDs := []string{}
 
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -214,7 +213,7 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 func GetTopOverall(year string) ([]interface{}, error) {
 	objs := []interface{}{}
 
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("GetObject failed: ", err)
@@ -353,8 +352,8 @@ func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 // CreateDB creates the database directory. CreateDB must be called
 // before any other function in 'parse' package is called.
 func createDB() {
-	if _, err := os.Stat("db"); os.IsNotExist(err) {
-		os.Mkdir("db", 0744)
+	if _, err := os.Stat("../../db"); os.IsNotExist(err) {
+		os.Mkdir("../../db", 0744)
 		fmt.Println("CreateDB successful: 'db' directory created")
 	}
 }
@@ -373,7 +372,7 @@ func createObjBuckets(year string) error {
 
 // createLookupBucket initializes the 'id_lookup' bucket in disk_cache.db
 func createLookupBuckets() error {
-	db, err := bolt.Open("db/disk_cache.db", 0644, nil)
+	db, err := bolt.Open("../../db/disk_cache.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("createLookupBucket failed: ", err)
@@ -410,7 +409,7 @@ func createLookupBuckets() error {
 }
 
 func createBucket(year, name string) error {
-	db, err := bolt.Open("db/offline_db.db", 0644, nil)
+	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("createBucket failed: ", err)
