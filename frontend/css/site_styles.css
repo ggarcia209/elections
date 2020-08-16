@@ -132,6 +132,18 @@
 	overflow: hidden;
 	white-space: nowrap;
 }
+
+.rank-link {
+	color: #565656;
+}
+
+.rank-link:hover {
+	color: #1A60E6;
+}
+.rank-link:focus {
+	color: #D2E0FA;
+}
+
 .title-rankings {
 	text-align: center;
 	font-size: 2em;
