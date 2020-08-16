@@ -24,6 +24,11 @@
   background-color: #000000 !important;
 }
 
+.nav-logo {
+	height: auto;
+	max-width: 10%;
+}
+
 .navbar-dark .navbar-nav .nav-link {
   color: #fff;
 }
@@ -63,7 +68,7 @@
 
 /* Welcome div */
 .welcome-div {
-	height: 33%;
+	height: 20%;
 }
 .header-welcome {
 	padding-top: 8%;
@@ -90,6 +95,11 @@
 
 .bg-light-blue {
   background-color: #D2E0FA !important;
+}
+
+.rankings-content {
+	height: 33%;
+	padding-bottom: 4%;
 }
 
 .header-rankings {
@@ -221,6 +231,18 @@
 	filter: brightness(120%)
 }
 
+.footer {
+	height: 4%;
+	background-color: #fff;
+	margin-top: 8%;
+}
+
+.footer-text {
+	padding-top: 2%;
+	color: rgba(0,0,0,0.5);
+	margin-left: 2%;
+}
+
 @media (min-width: 576px) {
 	.view-more-div {
 		max-width: 33%;
@@ -231,6 +253,11 @@
 }
 
 @media (min-width: 768px) {
+	.nav-logo {
+		height: auto;
+		max-width: 5%;
+		margin-right: 2%;
+	}
 	.row {
 		flex-direction: row;
 	}

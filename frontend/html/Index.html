@@ -12,7 +12,7 @@
 <body class="body-main" style="padding-top: 70px">
 <!-- body code goes here --> 
 <!-- The fixed navbar will overlay your other content, unless you add padding to the bottom of the <body>. Tip: By default, the navbar is 50px high.  -->
-<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark"> <a class="navbar-brand" href="#">Navbar</a>
+<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark"> <img class="nav-logo" src="img/cf-logo.png">
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent1" aria-controls="navbarSupportedContent1" aria-expanded="false" aria-label="Toggle navigation"> <span class="navbar-toggler-icon"></span> </button>
   <div class="collapse navbar-collapse" id="navbarSupportedContent1">
     <ul class="navbar-nav mr-auto">
@@ -40,6 +40,7 @@
 	
 </div>
 <div class="content-main bg-light-blue">
+  <div class="rankings-content">
   <h1 class="header-rankings">Top Rankings</h1>
   <div class="row">
     <div class="col-md-6 rankings-column">
@@ -72,13 +73,14 @@
         <li class="rank-item">Content for li Goes Here</li>
       </ul>
     </div>
-  </div>
-  <div class="view-more-div">
+		</div>
+	  <div class="view-more-div">
 	  <a class="view-more-link" href="#"><button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View More</button>
 </a>
 	</div>
-  <div class="spacer"></div>
-  <footer></footer>
+  </div>
+  
+
 </div>
 <div class="content-main">
 <h1 class="header-rankings">Search</h1>
@@ -90,8 +92,12 @@
       <input type="text" class="search-bar-main" id="myInput" placeholder="Search.." onkeyup="filterFunction()">
     </div>
 	  <button class="btn btn-outline-success my-2 my-sm-0 search-btn" type="submit">Search</button>
+	</form>
   </div>
-</form>
+
+<footer class="footer">
+	<p class="footer-text">&#169; Gilberto Garcia</p>
+</footer>
 <script src="js/scripts.js"></script>
 <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
 <script src="js/jquery-3.4.1.min.js"></script>
