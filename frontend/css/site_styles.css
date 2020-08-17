@@ -9,6 +9,10 @@
 	width: auto;
 }
 
+.rankings-page {
+	height: auto !important;
+}
+
 .spacer {
 	height: 10%;
 	margin-top: 5%;
@@ -65,7 +69,7 @@
   border-color: #248A37;
 }
 
-
+/* ***** WELCOME PAGE ***** */
 /* Welcome div */
 .welcome-div {
 	height: 20%;
@@ -120,11 +124,12 @@
 	padding-bottom: 4%;
 	margin: auto;
 	list-style-type: none;
+	border-radius: 9px;
 }
 
 .rank-item {
 	line-height: 2;
-	font-size: 1.4em;
+	font-size: 1.1em;
 	margin-top: 2.5%;
 	margin-bottom: 2.5%;
 	height: auto;
@@ -144,9 +149,15 @@
 	color: #D2E0FA;
 }
 
+.title-div {
+	height: 12vh;
+	padding: 2%;
+	margin-bottom: 2%;
+}
+
 .title-rankings {
 	text-align: center;
-	font-size: 2em;
+	font-size: 1.8em;
 }
 .rankings-column {
 	display: flex;
@@ -255,12 +266,167 @@
 	margin-left: 2%;
 }
 
+/* ***** END WELCOME PAGE ***** */
+
+/* ***** RANKINGS PAGE ***** */
+.selector {
+	margin-right: 4%;
+	margint-left: 2;
+	width: auto;
+}
+
+.rankings-selectors {
+    display: flex;
+    flex-direction: column;
+    width: 84%;
+    margin: auto;
+	margin-bottom: 4%;
+}
+
+.selectors-header {
+	font-size: 1.7em;
+	max-width: 100%;
+	color: #1A60E6;
+}
+
+.selector-component {
+	font-size: 1.2em;
+}
+
+.rankings-input {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.rankings-fields {
+    width: auto;
+    margin-left: 2%;
+    margin-right: 2%;
+	margin-top: 2%;
+	margin-bottom: 2%;
+    display: flex;
+    align-items: flex-start;
+}
+
+.btn-go-div {
+	width: 40%;
+	margin-left: 2%;
+	margin-bottom: 0%;
+	margin-top: 3%;
+	
+}
+
+.btn-go {
+    width: 100%;
+    padding-right: 4%;
+    padding-left: 4%;
+    font-size: 1.4em;
+	margin: auto;
+	color: #fff !important;
+	background-color: #248A37 !important;
+  	border-color: #248A37 !important;
+}
+
+.btn-go:hover {
+	filter:brightness(120%);
+}
+
+.results-header {
+	font-size: 2em;
+	max-width: 100%;
+	color: #1A60E6;
+	margin-left: 8%;
+	margin-bottom: 4%;
+}
+
+.results-div {
+	width: 100%;
+	margin: auto;
+	padding-top: 2%;
+	padding-bottom: 4%;
+}
+
+.title-rankings-results {
+	font-size: 1.3em !important;
+}
+
+.results {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.result-single {
+	width: 100%;
+	margin: auto;
+	margin-bottom: 8%;
+	padding-bottom: 6%;
+	background-color: #ffffff;
+}
+
+.rank-page-list {
+	width: 100%;
+	border-top: medium solid #DF8134;
+	border-bottom: medium solid #DF8134;
+	border-left: none;
+	border-right: none;
+	background-color: rgba(210,224,250, 1);
+	border-radius: 0px;
+}
+
+.rank-page-link:hover {
+	color: #1A60E6 !important;
+}
+
+.rank-page-link:focus {
+	color: #DF8134 !important;
+}
+.rank-page-btn {
+	max-width: 40% !important;
+}
+
+/* ***** END RANKINGS PAGE ***** */
+
+/* ***** ABOUT PAGE ***** */
+.text-div {
+	width: 100%;
+	height: auto;
+	margin-top: 2%;
+	margin-bottom: 2%;
+	margin-right: auto;
+	margin-left: auto;
+}
+
+.bullet-pts {
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-start;
+	max-width: 90%;
+}
+
+.bullet {
+	width: 100%;
+	padding-left: 16%;
+	padding-right: 8%;
+	margin-bottom: 2%;
+}
+
+/* ***** END ABOUT PAGE ***** */
+
+/* ***** MEDIA QUERIES ***** */
 @media (min-width: 576px) {
 	.view-more-div {
 		max-width: 33%;
 	}
 	.search-btn {
 		width: 60%
+	}
+	.rank-item {
+		font-size: 1.2em;
 	}
 }
 
@@ -279,9 +445,8 @@
 	.rankings-column {
 		max-width: 45%;
 	}
-
 	.rank-item {
-		font-size: 1.2em;
+		font-size: 1.0em;
 	}
 	.view-more-div {
 		max-width: 22.5%;
@@ -289,6 +454,41 @@
 	.search-btn {
 		width: 40%
 	}
+	.rankings-selectors {
+		margin-bottom: 2%;
+	}
+	.rankings-input {
+		flex-direction: row;
+	}
+	.btn-go-div {
+		max-width: 20%;
+		width: 20%;
+		margin-left: 0%;
+		margin-right: 2%;
+	}
+	.title-div {
+		height: 15vh;
+		padding: 1%;
+		margin-bottom: 4%;
+	}
+	.title-rankings-results {
+		font-size: 1.5em !important;
+	}
+	.results {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: stretch;
+	}
+	.result-single {
+		width: 45%;
+		margin-bottom: 2%;
+	}
+	.rank-page-list {
+		border-right: medium solid #DF8134;
+		border-left: medium solid #DF8134;
+		border-radius: 9px;
+	}
+	
 }
 
 @media (min-width: 992px) {
@@ -306,8 +506,6 @@
 	.btn-view-more:hover {
 		filter: brightness(120%)
 	}
-		
-	
 	.search-bar-div {
 		display: flex;
 		flex-direction: row;
@@ -336,11 +534,27 @@
 		padding-top: 1%;
 		padding-bottom: 1%;
 	}	
-
 	.search-btn:hover {
 		color: #fff !important;
 		background-color: #1A60E6 !important;
 		filter: brightness(100%) !important;
 	}
+	.btn-go {
+		color: #248A37 !important;
+		background-color: transparent !important;
+	}
+	.btn-go:hover {
+		color: #fff !important;
+		background-color: #248A37 !important;
+		filter: brightness(100%) !important;
+	}
+}
+
+@media (min-width: 1200px) {
+	.title-div {
+		height: 8vh;
+	}
 }
  
+
+

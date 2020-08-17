@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Untitled Document</title>
+    <!-- Bootstrap -->
+	<link href="css/bootstrap-4.4.1.css" rel="stylesheet">
+	<link href="css/site_styles.css" rel="stylesheet" type="text/css">
+  </head>
+  <body class="body-main rankings-page" style="padding-top: 70px">
+  	<!-- body code goes here -->
+	<!-- The fixed navbar will overlay your other content, unless you add padding to the bottom of the <body>. Tip: By default, the navbar is 50px high.  -->
+	<nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark"> <img class="nav-logo" src="img/cf-logo.png">
+	  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent1" aria-controls="navbarSupportedContent1" aria-expanded="false" aria-label="Toggle navigation"> <span class="navbar-toggler-icon"></span> </button>
+	  <div class="collapse navbar-collapse" id="navbarSupportedContent1">
+		<ul class="navbar-nav mr-auto">
+		  <li class="nav-item"> <a class="nav-link" href="#">Home</a> </li>
+		  <li class="nav-item active"> <a class="nav-link" href="#">Rankings<span class="sr-only">(current)</span></a> </li>
+			<li class="nav-item"> <a class="nav-link" href="#">About</a> </li>
+		</ul>
+		<form class="form-inline my-2 my-lg-0">
+		  <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
+		  <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
+		</form>
+	  </div>
+	</nav>
+
+	  <div class="content-main">
+	    <div class="text-div">
+	      <h1 class="header-welcome">About</h1>
+	      <p class="p-welcome">Thank you for visiting cashflowfec.com! My name is Gilberto Garcia and I am the creator of this site along with the software running under the hood. This site was created for two reasons. The first reason is to provide the public with information about who the biggest political contributors, spenders, and recipients in the US election system are. I believe that we have a compelling interest in knowing where the money flowing through our election system     is coming and going, and understanding the relationships between the individuals, businesses, political organizations, and candidates involved in our elections. This site makes it easy to find that information.</p>
+	      <h2 class="header-welcome">How to Use this Site</h2>
+<p class="p-welcome">There is an extensive amount of data that can be viewed here. The data is broken down into four main categories (also referred to as entities):&nbsp;
+	  <div class="bullet-pts">
+			<span class="bullet">Individuals (Individual, partnership or limited liability company)</span>
+			<span class="bullet">Committees (Candidate, Party, and Political Action Committees)</span>
+			<span class="bullet">Candidates (Federal House, Senate, and Presidential candidates)</span>
+			<span class="bullet">Top Overall Rankings (List of top donors/recipients/spenders in various categories)</span>
+		  </div>
+		  <p class="p-welcome">All incoming and outgoing transactions are reported to FEC by the Committee filing the report. One thing I didn't realize before starting this project&nbsp;is that candidates do not receive funds directly. All standard contributions are received by a candidate's committee, although there are some types of contributions that can be received directly. See the "Transaction Types" section for more info. For example, a contribution to Kanye West's (FEC ID:&nbsp; P00016741) campaign does not go to Kanye West directly, but to Kanye West's primary committee, Kanye 2020 (FEC ID:&nbsp;C00751701).</p>
+		  <p class="p-welcome">The flow of cash can generally be broken down as such: Individual or Committee contribution -&gt; Receipt by Filing Committee -&gt; Committee or Individual receipt (usually as operating expense to business or contribution refund).</p>
+		  <p class="p-welcome">Data for Individual entities contains a list of all incoming and outgoing transaction IDs attributed to that Individual. Committees include a list of all transactions&nbsp;sent to other Committees. The transaction IDs can be used to verify each transaction by searching for the transaction ID in the corresponding bulk data file. Each record in the transactions bulk data files contains the FEC Report ID, which can be used to view a digital copy of the transaction record reported to the FEC by the Filing Committee at FEC.gov.&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</p>
+		  <h3>Rankings</h3>
+<p class="p-welcome">The Rankings page hosts the Top Overall Rankings by election cycle (including All Time), category, and party. Selecting any of the entities listed on the page will display more information about that entity, inlcuding a breakdown of it's cash flow. In addition to the financial data, the senders and recipients of that entity's funds and the total amounts sent or received can also be viewed. Due to the many-to-one relationships and large volume of data, Committee entities are limited to displaying the Top 100 Individual Contributors, Committee Contributors, and Expense Recipients, while all other entities will show complete lists.</p>
+<p class="p-welcome">Additionally, Committee entities will also include a complete breakdown of the financial data as recorded by the FEC. Please note that there may be some minor discrepancies between what is reported on this site and what is reported by the FEC. Please see the "Caveats" section below for more info.&nbsp; &nbsp; &nbsp; &nbsp;</p>
+<h3>Search</h3>
+<p class="p-welcome">The data is not limited to what can viewed in the Rankings page. Use the search feature to search for any candidate or committee that has been registered by the Federal Election Commission since 1980. Yes, every Candidate and Committee since 1980!&nbsp; Individuals (individual, businees, non-profit) can also be searched, although the pool of Individuals is limited to the Top 100,000 Individuals by funds received and funds contributed (200,000 total) per election cycle. All entities can be searched by name, city &amp; state. Individuals can also be searched by employer.&nbsp; &nbsp;</p>
+<h2 class="header-welcome">Caveats</h2>
+		  <p class="p-welcome">All data on this site is derived exclusively from the bulk data files available at <a href="https://fec.gov">FEC.gov</a>.&nbsp; More detailed information about the US elections process and campaign finance can be viewed there</p>
+		  <h3>Data Discrepancies</h3>
+		  <p class="p-welcome">Due to the methodology and algorithm used to create the datasets, there may be some discrepencies between what is reported here and what is reported by the FEC. The complete financial reports for each Committee are included alongside our Committee data for this reason.</p>
+		  <p class="p-welcome">The Committee financials are a complex breakdown of the Committee's accounts. For our purposes, the Committee acounts have been generalized into four categories, 2 incoming and 2 outoing. These include the following:&nbsp; &nbsp;&nbsp;</p>
+		  <div class="bullet-pts"> 
+			  <span class="bullet">Contributions Received</span> 
+			  <span class="bullet">Other Recepits (Loans, refunds, etc...)</span> 
+			  <span class="bullet">Transfers (contributions, transfers to other Committees)</span> 
+			  <span class="bullet">Expenses (operating expenses, refunds, etc...)</span> 
+		  </div>
+		  <p class="p-welcome">The algorithm and application logic were designed to correctly attribute each transaction&nbsp;to the corresponding account with 100% accuracy. However, due to human error (wrong transaction type reported or recorded, specific types not recorded in source data, missing transactions, etc...), it is likely that there may be some minor discrepancies in the data.</p>
+		  <h3>Unique Individuals</h3>
+		  <p class="p-welcome">It is also important to note that the totals reported for a specific Individual may not truly reflect what was contributed or received by that Individual entity. This is because the FEC does not provide a unique indentifier for Individual contributors, such as a Tax ID, and Individuals must be identified using the available data.&nbsp;</p>
+		  <p class="p-welcome">An Individual is determined to be unique based on all of the following criteria: First, Last Names, Employer, and Occupation. In the event that no Emloyer and Occupation are reported, the Zip Code is used instead.&nbsp;</p>
+          <p class="p-welcome">Although we have attempted to determine an Individual to be unique as accurately as possible, there may be multiple individuals with the same name and zip code, or even the same employer and occupation. These cases would result in all transactions by individuals sharing an exact match in all criteria being attributed to a single Individual entity.&nbsp;</p>
+          <p class="p-welcome">Individuals are primarily distinguished by Employer and Occupation because it is less likely for two people to share the same name, job title, and employer, with exceptions such as large corporations in service industries. However, our focus is the top individual contributors - high-income individuals with disposble income. Given the smaller number of high-income earners and smaller job pool for high-income jobs, it is much less likely for two individuals in this range to share the same name, job title, and employer. &nbsp;</p>
+          <p class="p-welcome">It is also possible for an Individual entity to reflect less than what was truly contributed by that specific Individual. If the Individual's name, employer, and occupation, or name and zip code are reported differently across transactions, the transactions will be attributed to separate Individual entities. Some examples include name variations ("Smith, Mr. John" vs. "Smith, John"), job changes, or moving to new zip code.</p>
+          <p class="p-welcome">Although employees in high-income professions are much less likely to change jobs within one 2 year election cycle (see BLS Employee Tenure Summary - 09/20/2018), All-Time rankings may not accurately reflect the true totals contributed by a specific individual across many years.&nbsp;</p>
+          <p class="p-welcome">These limitations are less likely to affect transactions involving businesses and other non-human entities, given that businesses rarely change their name and are less likely to move to a new zip code over an arbitrary period of time. View the "Technical" section for more info on how transactions are attributed to uniquely identified Individuals entities.&nbsp;&nbsp;</p>
+          <h2 class="header-welcome">Methodology&nbsp;</h2>
+          <p class="p-welcome">The methodology for creating our datasets is fairly straight forward. Each dataset is categorized by a two year election cycle (2020, 2018...).</p>
+          <h3>Raw Data Processing&nbsp;</h3>
+          <p class="p-welcome">The FEC has made available master records of both all registered Candidates and Committees for each election cycle. First, the master files are processed and records containing static data derived from the masters are created for each Candidate and Committee. The transactions files (Individual Contributions, All Committee Transactions, and Operating Expenses) are processed once the Candidate and Committee records are created. Individual records are created &amp; updated for every Individual Contribution and Operating Expense transaction.&nbsp;</p>
+          <h4>Deriving Totals from Transactions</h4>
+          <p class="p-welcome">The Filing Committee's and Other&nbsp;(sender/receiver) entity's  accounts are debited/credited for every transaction, with the exception of transactions between Committees. There should be a corresponding transaction reported by the Other Committee, although this is not true 100% of the time (see "Caveats" above). Only the Filing Committee's accounts are debited/credited for each Committee transaction.&nbsp;The Filing Committee's and Other entity's senders/receivers lists are also updated for each transaction. For Committee transactions, only the Filing Committee's lists are updated for the same reason above.</p>
+<h4>Memo Transactions</h4>
+          <p class="p-welcome">There are also some types of Individual Contributions labled "Memo" transactions. For these transactions, only the Filing Committee's and Individual's senders/recipient lists are updated. These transaction records are included to attribute an Individual's share of funds received from a Joint Fundraising Committee by the Filing Committee. The totals for both entities are not updated for these transactions, as the amount has already been recorded in a previous transfer from the JFC. More info about Joint Filing Committees can be found at FEC.gov.&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</p>
+          <h4>&nbsp;Top Rankings Data</h4>
+          <p class="p-welcome">The corresponding Top Overall datasets for each year are checked and updated for every transaction in the given election cycle.&nbsp;The "All Time" datasets are updated for every transaction for every election cycle. For Candidates and Committees, the "Overall" category and specfic party category are updated. If a list is full, a new entity will be added only if it's new total is greater than the smallest existing total on the list, and the bottom entity will be removed.</p>
+          <h2 class="header-welcome">&nbsp;Technical</h2>
+          <p class="p-welcome">The second reason I created this project is to practice and apply my coding skills. The main application for processing and storing the data is written in Go. The data is uploaded to DynamoDB tables and is retreived by EC2 servers using Kafka and gRPC. The search index is stored in memory on the EC2 instances. The front end files are also stored in memory on the EC2 instances as well as an S3 bucket. I decided to use an open source load balancer to minimize the operating costs.&nbsp; &nbsp; &nbsp;&nbsp;</p>
+          <h3>Deriving Unique IDs for Individuals</h3>
+          <p class="p-welcome">Because unique identifiers are not provided by the FEC for Individual Contributors, UIDs had to be created for each individual from the available data. The IDs are created using the MD5 hashing algorithm and a concatenated string of the Name, Employer, and Occupation fields. In cases where there is no Employer and Occupation recorded, the zip code is used. The UID's are primarily used to look up and update the objects   in memory while processing transactions and to perist to and retrieve from local disk and DynamoDB key/value stores.</p>
+          <p class="p-welcome">The primary limitation with this method is is that the data received by the Filing Committees and reported to the FEC does not have a standardized input format for the Contributor's Name, Employer, and Occupation, and many of the records filed with the FEC are digital scans of handwritten reports. Contributors can write or digitally input their name differently ("Jr.", "Mrs.", nickname), and data from handwritten records can be mistyped or mispelled. This results in a different hash and a separate Individual object being created or updated. It is also possible for an Individual to change jobs or zip codes during and election cycle &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</p>
+</p>
+         </div>
+	  
+	  </div>
+	  <footer class="footer">
+		<p class="footer-text"> &#169; Gilberto Garcia</p>
+  </footer>
+	<!-- jQuery (necessary for Bootstrap's JavaScript plugins) --> 
+	<script src="js/jquery-3.4.1.min.js"></script>
+
+	<!-- Include all compiled plugins (below), or include individual files as needed -->
+	<script src="js/popper.min.js"></script> 
+	<script src="js/bootstrap-4.4.1.js"></script>
+  </body>
+</html>
