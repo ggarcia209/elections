@@ -19,7 +19,7 @@ type Query struct {
 // Data is used to find the DocID's common to all terms in query
 type Data struct {
 	Key   string
-	Value Entries // sorted by ID value
+	Value []string // sorted by ID value
 	Len   int
 }
 
@@ -54,26 +54,23 @@ func GetResults(q Query) ([]SearchData, error) {
 	if q.Text == "" {
 		return nil, nil
 	}
-	results := []SearchData{}
+
 	// find corresponding SearchData objects
 	terms := formatTerms(strings.Split(q.Text, " "))
 
-	// get lookups for each term
+	// get IDs for single term
 	if len(terms) == 1 {
-		lookup, err := getSearchEntry(terms[0])
+		results, err := getSearchEntry(terms[0])
 		if err != nil {
 			fmt.Println(err)
 			return nil, fmt.Errorf("GetResults failed: %v", err)
 		}
 
-		for _, result := range lookup {
-			results = append(results, *result)
-		}
 		return results, nil
 	}
 
+	// get IDs for multiple terms
 	resMap, err := getRefs(terms)
-	fmt.Println(resMap)
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("GetResults failed: %v", err)
@@ -82,17 +79,21 @@ func GetResults(q Query) ([]SearchData, error) {
 	// Sort lists by smallest to largest
 	sorted := sortMap(resMap)
 
-	// Compare keys in each map and find all common keys
-	// Start by finding the common keys in the 2 smallest maps
-	// then compare the next map to the previous comparison's intersection
+	// Compare and find all common IDs in all terms
+	// Start by finding the common IDs in the 2 smallest lists
+	// then compare the next list to the previous comparison's intersection
 	s1, s2 := sorted[0].Value, sorted[1].Value
 	common := intersection(s1, s2)
 	for i := 2; i < len(sorted); i++ {
 		common = intersection(common, sorted[i].Value)
 	}
 
-	// Get data for the common values
-	results = returnDataAsList(common)
+	// Get data for the common IDs
+	results, err := lookupSearchData(common)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("GetResults failed: %v", err)
+	}
 
 	return results, nil
 }
@@ -137,7 +138,7 @@ func ViewIndex() error {
 			b := tx.Bucket([]byte(prt.Prt))
 			c := b.Cursor()
 			for k, v := c.First(); k != nil; k, v = c.Next() {
-				d, err := decodeSearchEntry(v)
+				d, err := decodeResultsList(v)
 				if err != nil {
 					fmt.Println(err)
 					return fmt.Errorf("tx failed: %v", err)
@@ -158,9 +159,9 @@ func ViewIndex() error {
 }
 
 // getRefs finds the references for each term in query
-func getRefs(q []string) (map[string]lookupPairs, error) {
-	var resultMap = make(map[string]lookupPairs)
-	var result lookupPairs
+func getRefs(q []string) (map[string][]string, error) {
+	var resultMap = make(map[string][]string)
+	var result []string
 
 	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
 	if err != nil {
@@ -179,11 +180,11 @@ func getRefs(q []string) (map[string]lookupPairs, error) {
 			b := tx.Bucket([]byte(prt))
 			v = strings.TrimSpace(v)
 			data := b.Get([]byte(v))
-			lu, err := decodeSearchEntry(data)
+			ids, err := decodeResultsList(data)
 			if err != nil {
 				return fmt.Errorf("tx failed: %v", err)
 			}
-			result = lu
+			result = ids
 			return nil
 		})
 		if err != nil {
@@ -195,7 +196,7 @@ func getRefs(q []string) (map[string]lookupPairs, error) {
 }
 
 // sortMap converts k:v pairs to struct, adds and sorts by len(v)
-func sortMap(m map[string]lookupPairs) []Data {
+func sortMap(m map[string][]string) []Data {
 	// []Data represnts inverted index and corresponding SearchData objects
 	var ss []Data
 	for k, v := range m {
@@ -210,41 +211,47 @@ func sortMap(m map[string]lookupPairs) []Data {
 }
 
 // sort lookupPairs by ID (key) values
-func sortIDs(lu lookupPairs) Entries {
-	var es Entries
-	for k, v := range lu {
-		e := Entry{ID: k, Data: *v}
-		es = append(es, e)
-	}
-	sort.Sort(es)
-	return es
+func sortIDs(lu []string) []string {
+	sort.Slice(lu, func(i, j int) bool {
+		return lu[i] < lu[j]
+	})
+	return lu
 }
 
 // intersection returns the intersection of two integer slices
-func intersection(s1, s2 Entries) Entries {
+func intersection(s1, s2 []string) []string {
 	checkMap := map[string]bool{}
-	common := Entries{}
+	common := []string{}
 	for _, v := range s1 {
-		checkMap[v.ID] = true
+		checkMap[v] = true
 	}
 	for _, v := range s2 {
-		if v.ID > s1[len(s1)-1].ID {
+		if v > s1[len(s1)-1] {
 			break // break if v.ID > largest ID value in smaller slice
 		}
-		if _, ok := checkMap[v.ID]; ok { // common to both Entries
+		if _, ok := checkMap[v]; ok { // common to both Entries
 			common = append(common, v)
 		}
 	}
 	return common
 }
 
-// returnData retreives the data for each DocID common to all slices in query
-func returnDataAsList(c Entries) []SearchData {
-	results := []SearchData{}
-	for _, e := range c {
-		results = append(results, e.Data)
+// retreive corresponding SearchData obj for ID
+func lookupSearchData(ids []string) ([]SearchData, error) {
+	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return []SearchData{}, fmt.Errorf("lookupSearchData failed: %v", err)
 	}
-	return results
+
+	results, err := getSearchData(db, ids)
+	if err != nil {
+		fmt.Println(err)
+		return []SearchData{}, fmt.Errorf("lookupSearchData failed: %v", err)
+	}
+
+	return results, nil
 }
 
 /* func main() {

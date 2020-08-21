@@ -11,10 +11,16 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+type resultList struct {
+	Results []string
+}
+
 // save new Index entries
-func saveIndex(index indexMap) (int, error) {
+func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
 	i := 0 // new terms
 	u := 0 // updated terms
+	n := 0 // new IDs/Search Data pairs wrote
+	wrote := make(map[string]bool)
 	fmt.Println("save index - writing objects to db/search_index.db")
 
 	// open/create bucket in db/offline_db.db
@@ -26,6 +32,7 @@ func saveIndex(index indexMap) (int, error) {
 		return i, fmt.Errorf("saveIndex failed: %v", err)
 	}
 
+	// persist inverted index
 	// add/update each term for each partition
 	for prt, terms := range index {
 		// tx
@@ -36,26 +43,28 @@ func saveIndex(index indexMap) (int, error) {
 				return fmt.Errorf("tx failed failed: %v", err)
 			}
 
-			for term, lookup := range terms {
+			for term, ids := range terms {
 				// get previous data
 				prevData := b.Get([]byte(term))
 
 				if prevData != nil { // previous data exists
-					prev, err := decodeSearchEntry(prevData)
+					prev, err := decodeResultsList(prevData)
 					if err != nil {
 						fmt.Println(err)
 						return fmt.Errorf("tx failed failed: %v", err)
 					}
 
 					// update & overwrite with updated copy
-					mergeLookup(lookup, prev)
-					data, err := encodeSearchEntry(prev)
+					update := mergeIDs(ids, prev)
+					r := resultList{Results: update}
+					data, err := encodeResultsList(r)
 					if err := b.Put([]byte(term), data); err != nil { // serialize k,v
 						return fmt.Errorf("tx failed failed: %v", err)
 					}
 					u++
-				} else { // new term
-					data, err := encodeSearchEntry(lookup)
+				} else { // new term - no existing data
+					r := resultList{Results: ids}
+					data, err := encodeResultsList(r)
 					if err != nil {
 						fmt.Println(err)
 						return fmt.Errorf("tx failed failed: %v", err)
@@ -65,6 +74,7 @@ func saveIndex(index indexMap) (int, error) {
 					}
 					i++
 				}
+
 			}
 			return nil
 		}); err != nil {
@@ -72,23 +82,52 @@ func saveIndex(index indexMap) (int, error) {
 			return i, fmt.Errorf("saveIndex failed: %v", err)
 		}
 	}
+
+	// check if SearchData persisted for corresponding ID; write new if not exist
+	// 2nd transaction
+	if err := db.Update(func(tx *bolt.Tx) error {
+		for ID, sd := range lookup {
+			// check if wrote to disk previously
+			if wrote[ID] == false { // not wrote to disk in this function call
+				luB, err := tx.CreateBucketIfNotExists([]byte("lookup"))
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("tx failed failed: %v", err)
+				}
+				data, err := encodeSearchData(sd)
+				if err != nil {
+					fmt.Println()
+					return fmt.Errorf("tx failed: %v", err)
+				}
+				if err := luB.Put([]byte(ID), data); err != nil { // serialize k,v
+					return fmt.Errorf("tx failed failed: %v", err)
+				}
+				n++
+				wrote[ID] = true
+			}
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return i, fmt.Errorf("saveIndex failed: %v", err)
+	}
 	fmt.Println("index saved!")
 	fmt.Println("new items wrote: ", i)
 	fmt.Println("existing items updated: ", u)
-
+	fmt.Println("new IDs recorded: ", n)
 	fmt.Println()
 	return i, nil
 }
 
 // get lookup pairs from disk for given term
-func getSearchEntry(term string) (lookupPairs, error) {
+func getSearchEntry(term string) ([]SearchData, error) {
 	// retreive lookupPairs from disk
 	prt := getPartition(term)
 	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
-		return lookupPairs{}, fmt.Errorf("getIndexData failed: %v", err)
+		return []SearchData{}, fmt.Errorf("getIndexData failed: %v", err)
 	}
 
 	var data []byte
@@ -99,15 +138,47 @@ func getSearchEntry(term string) (lookupPairs, error) {
 		return nil
 	}); err != nil {
 		fmt.Println(err)
-		return lookupPairs{}, fmt.Errorf("getIndexData failed: %v", err)
+		return []SearchData{}, fmt.Errorf("getSearchEntry failed: %v", err)
 	}
 
-	lookup, err := decodeSearchEntry(data)
+	ids, err := decodeResultsList(data)
 	if err != nil {
 		fmt.Println(err)
-		return lookupPairs{}, fmt.Errorf("getIndexData failed: %v", err)
+		return []SearchData{}, fmt.Errorf("getSearchEntry failed: %v", err)
 	}
-	return lookup, nil
+
+	// get SeachData objects from IDS
+	results, err := getSearchData(db, ids)
+	if err != nil {
+
+	}
+
+	return results, nil
+}
+
+func getSearchData(db *bolt.DB, ids []string) ([]SearchData, error) {
+	results := []SearchData{}
+	var data []byte
+
+	// tx
+	if err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("lookup"))
+		for _, ID := range ids {
+			data = b.Get([]byte(ID))
+			sd, err := decodeSearchData(data)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("tx failed: %v", err)
+			}
+			results = append(results, *sd)
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return []SearchData{}, fmt.Errorf("getSearchData failed: %v", err)
+	}
+
+	return results, nil
 }
 
 // persist IndexData object to disk
@@ -236,14 +307,15 @@ func getPartitionMap() (map[string]bool, error) {
 	return pm, nil
 }
 
-// encode lookupPairs to protobuf
-func encodeSearchEntry(m lookupPairs) ([]byte, error) {
-	lookup := make(map[string]*protobuf.SearchResult)
-	for k, sd := range m {
-		lookup[k] = encodeSearchData(sd)
-	}
-	entry := &protobuf.SearchEntry{
-		Lookup: lookup,
+// encode SearchData to protobuf
+func encodeSearchData(sd *SearchData) ([]byte, error) {
+	entry := &protobuf.SearchResult{
+		ID:     sd.ID,
+		Name:   sd.Name,
+		City:   sd.City,
+		State:  sd.State,
+		Bucket: sd.Bucket,
+		Years:  sd.Years,
 	}
 	data, err := proto.Marshal(entry)
 	if err != nil {
@@ -253,17 +325,47 @@ func encodeSearchEntry(m lookupPairs) ([]byte, error) {
 	return data, nil
 }
 
-// encode SearchData to protobuf
-func encodeSearchData(sd *SearchData) *protobuf.SearchResult {
-	entry := &protobuf.SearchResult{
-		ID:     sd.ID,
-		Name:   sd.Name,
-		City:   sd.City,
-		State:  sd.State,
-		Bucket: sd.Bucket,
-		Years:  sd.Years,
+// decode protobuf to SearchData
+func decodeSearchData(input []byte) (*SearchData, error) {
+	sr := &protobuf.SearchResult{}
+	err := proto.Unmarshal(input, sr)
+	if err != nil {
+		fmt.Println(err)
+		return &SearchData{}, fmt.Errorf("decodeSearchData failed: %v", err)
 	}
-	return entry
+	sd := &SearchData{
+		ID:     sr.GetID(),
+		Name:   sr.GetName(),
+		City:   sr.GetCity(),
+		State:  sr.GetState(),
+		Bucket: sr.GetBucket(),
+		Years:  sr.GetYears(),
+	}
+	return sd, nil
+}
+
+func encodeResultsList(r resultList) ([]byte, error) {
+	entry := &protobuf.ResultList{
+		IDs: r.Results,
+	}
+	data, err := proto.Marshal(entry)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("encodeSearchEntry failed: %v", err)
+	}
+	return data, nil
+}
+
+func decodeResultsList(input []byte) ([]string, error) {
+	r := &protobuf.ResultList{}
+	err := proto.Unmarshal(input, r)
+	if err != nil {
+		fmt.Println(err)
+		return []string{}, fmt.Errorf("decodeSearchEntry failed: %v", err)
+	}
+	results := r.GetIDs()
+	return results, nil
+
 }
 
 // add new lookupPairs to existing data
@@ -273,35 +375,19 @@ func mergeLookup(new, prev lookupPairs) {
 	}
 }
 
-// decode protobuf to lookupPairs
-func decodeSearchEntry(input []byte) (lookupPairs, error) {
-	data := &protobuf.SearchEntry{}
-	err := proto.Unmarshal(input, data)
-	if err != nil {
-		fmt.Println(err)
-		return make(lookupPairs), fmt.Errorf("decodeSearchEntry failed: %v", err)
+func mergeIDs(new, prev []string) []string {
+	update := []string{}
+	set := make(map[string]bool)
+	for _, ID := range new {
+		set[ID] = true
 	}
-
-	pairs := make(lookupPairs)
-	lookup := data.GetLookup()
-	for k, v := range lookup {
-		pairs[k] = decodeSearchData(v)
+	for _, ID := range prev {
+		set[ID] = true
 	}
-
-	return pairs, nil
-}
-
-// decode protobuf to SearchData
-func decodeSearchData(sr *protobuf.SearchResult) *SearchData {
-	sd := &SearchData{
-		ID:     sr.GetID(),
-		Name:   sr.GetName(),
-		City:   sr.GetCity(),
-		State:  sr.GetState(),
-		Bucket: sr.GetBucket(),
-		Years:  sr.GetYears(),
+	for ID := range set {
+		update = append(update, ID)
 	}
-	return sd
+	return update
 }
 
 // encode IndexData to protobuf

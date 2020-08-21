@@ -15,6 +15,8 @@ import (
 
 // SearchData contains basic data for an object returned
 // to the client as a result of search index query.
+// Used to return basic data to user from local machine
+// instead of making API call to DynamoDB table.
 type SearchData struct {
 	ID     string
 	Name   string
@@ -25,17 +27,18 @@ type SearchData struct {
 }
 
 // IndexData type stores data related to the Index
-// Schema - term: objID: *SearchData
 type IndexData struct {
 	Size        int
 	LastUpdated time.Time
 	Completed   map[string]bool // track categories completed in event of failure
 }
 
-// Schema - partition: term: objID: *SearchData
-type indexMap map[string]map[string]lookupPairs
+// inverted index
+// Schema - partition: term: []objID
+type indexMap map[string]map[string][]string
 
 // k/v pairs containing obj ID & corresponding *SearchData object
+// Schema - term: objID: *SearchData
 type lookupPairs map[string]*SearchData
 
 // DataMap contains the *SearchData objects inititialed for each database record
@@ -159,8 +162,9 @@ func indvRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 	// process individuals
 	bucket := "individuals"
 	index := make(indexMap)
+	lookup := make(lookupPairs)
 
-	err := getTopIndvData(year, bucket, index)
+	err := getTopIndvData(year, bucket, index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("indvRtn failed: %v", err)
@@ -168,7 +172,7 @@ func indvRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, err := saveIndex(index)
+	newWrites, err := saveIndex(index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("indvRtn failed: %v", err)
@@ -190,7 +194,9 @@ func cmteRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 	// process committees
 	bucket := "committees"
 	index := make(indexMap) // reset in-memory index
-	err := getObjData(year, bucket, index)
+	lookup := make(lookupPairs)
+
+	err := getObjData(year, bucket, index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("cmteRtn failed: %v", err)
@@ -198,7 +204,7 @@ func cmteRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, err := saveIndex(index)
+	newWrites, err := saveIndex(index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("cmteRtn failed: %v", err)
@@ -220,7 +226,9 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 	// process candidates
 	bucket := "candidates"
 	index := make(indexMap) // reset in-memory index
-	err := getObjData(year, bucket, index)
+	lookup := make(lookupPairs)
+
+	err := getObjData(year, bucket, index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("candRtn failed: %v", err)
@@ -228,7 +236,7 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, err := saveIndex(index)
+	newWrites, err := saveIndex(index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("candRtn failed: %v", err)
@@ -245,7 +253,7 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 }
 
 // process top individuals by funds received/sent and add to Index
-func getTopIndvData(year, bucket string, index indexMap) error {
+func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) error {
 	fmt.Println("processing top individuals...")
 	ids := []string{}
 	i := 0 // number of records processed
@@ -297,11 +305,11 @@ func getTopIndvData(year, bucket string, index indexMap) error {
 			break
 		}
 
-		// create SearchData objects
-		sds := createSearchData(year, objs)
+		// create SearchData objects (map[id]*SearchData)
+		lu := createSearchData(year, objs)
 
 		// proces SearchData objects and add terms to Index
-		for k, sd := range sds {
+		for k, sd := range lu {
 			// derive search terms from object data
 			terms := getTerms(sd)
 			termsFmt := formatTerms(terms)
@@ -311,12 +319,11 @@ func getTopIndvData(year, bucket string, index indexMap) error {
 				}
 				prt := getPartition(term)
 				if index[prt] == nil {
-					index[prt] = make(map[string]lookupPairs)
+					index[prt] = make(map[string][]string)
 				}
-				if index[prt][term] == nil {
-					index[prt][term] = make(lookupPairs)
-				}
-				index[prt][term][k] = sd
+
+				index[prt][term] = append(index[prt][term], k)
+				lookup[k] = sd
 				pm[prt] = true
 			}
 			t += len(termsFmt)
@@ -349,7 +356,7 @@ func getTopIndvData(year, bucket string, index indexMap) error {
 }
 
 // add Candidate/Committee object info to Index
-func getObjData(year, bucket string, index indexMap) error {
+func getObjData(year, bucket string, index indexMap, lookup lookupPairs) error {
 	i := 0 // number of records processed
 	t := 0 // number of terms updated
 	n := 1000
@@ -377,10 +384,10 @@ func getObjData(year, bucket string, index indexMap) error {
 		}
 
 		// create SearchData objects
-		sds := createSearchData(year, objs)
+		lu := createSearchData(year, objs)
 
 		// proces SearchData objects and add terms to Index
-		for k, sd := range sds {
+		for k, sd := range lu {
 			// derive search terms from object data
 			terms := getTerms(sd)
 			termsFmt := formatTerms(terms)
@@ -391,12 +398,10 @@ func getObjData(year, bucket string, index indexMap) error {
 
 				prt := getPartition(term)
 				if index[prt] == nil {
-					index[prt] = make(map[string]lookupPairs)
+					index[prt] = make(map[string][]string)
 				}
-				if index[prt][term] == nil {
-					index[prt][term] = make(lookupPairs)
-				}
-				index[prt][term][k] = sd
+				index[prt][term] = append(index[prt][term], k)
+				lookup[k] = sd
 				pm[prt] = true
 			}
 			t += len(termsFmt)
@@ -425,8 +430,8 @@ func getObjData(year, bucket string, index indexMap) error {
 }
 
 // create list of SearchData objects from returned objects
-func createSearchData(year string, objs []interface{}) DataMap {
-	sds := make(DataMap)
+func createSearchData(year string, objs []interface{}) lookupPairs {
+	lookup := make(lookupPairs)
 
 	for _, obj := range objs {
 		switch t := obj.(type) {
@@ -439,7 +444,7 @@ func createSearchData(year string, objs []interface{}) DataMap {
 				Bucket: "individuals",
 				Years:  []string{year},
 			}
-			sds[sd.ID] = sd
+			lookup[sd.ID] = sd
 		case *donations.Committee:
 			sd := &SearchData{
 				ID:     obj.(*donations.Committee).ID,
@@ -449,7 +454,7 @@ func createSearchData(year string, objs []interface{}) DataMap {
 				Bucket: "committees",
 				Years:  []string{year},
 			}
-			sds[sd.ID] = sd
+			lookup[sd.ID] = sd
 		case *donations.Candidate:
 			sd := &SearchData{
 				ID:     obj.(*donations.Candidate).ID,
@@ -459,15 +464,15 @@ func createSearchData(year string, objs []interface{}) DataMap {
 				Bucket: "candidates",
 				Years:  []string{year},
 			}
-			sds[sd.ID] = sd
+			lookup[sd.ID] = sd
 		default:
 			_ = t
 			fmt.Println("createSearchData err: invalid interface type")
-			return sds
+			return lookup
 		}
 	}
 
-	return sds
+	return lookup
 }
 
 // derive search terms from SearchData
@@ -485,7 +490,7 @@ func getTerms(sd *SearchData) []string {
 		"MT": "Montana", "NE": "Nebraska", "NV": "Nevada", "NH": "New Hampshire",
 		"NJ": "New Jersey", "NM": "New Mexico", "NY": "New York", "NC": "North Carolina",
 		"ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma", "OR": "Oregon", "PA": "Pennsylvania",
-		"RI": "Rhode Island", "SC": "SouthCarolina", "SD": "South Dakota", "TN": "Tennessee",
+		"RI": "Rhode Island", "SC": "South Carolina", "SD": "South Dakota", "TN": "Tennessee",
 		"TX": "Texas", "UT": "Utah", "VT": "Vermont", "VA": "Virginia", "WA": "Washington",
 		"WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming",
 	}
