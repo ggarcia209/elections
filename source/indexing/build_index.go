@@ -28,9 +28,10 @@ type SearchData struct {
 
 // IndexData type stores data related to the Index
 type IndexData struct {
-	Size        int
-	LastUpdated time.Time
-	Completed   map[string]bool // track categories completed in event of failure
+	Size           int
+	LastUpdated    time.Time
+	Completed      map[string]bool // track categories completed in event of failure
+	YearsCompleted []string
 }
 
 // inverted index
@@ -48,6 +49,7 @@ type DataMap map[string]*SearchData
 var mu sync.Mutex
 
 // BuildIndex creates a new search index from the objects in the db/offline_db.db
+// TEST IDEMPOTENCY ACROSS YEARS
 func BuildIndex(year string) error {
 	var wg sync.WaitGroup
 
@@ -97,6 +99,7 @@ func BuildIndex(year string) error {
 
 	// reset map and save
 	indexData.Completed = make(map[string]bool)
+	indexData.YearsCompleted = append(indexData.YearsCompleted, year)
 	err = saveIndexData(indexData)
 	if err != nil {
 		fmt.Println(err)
@@ -111,6 +114,7 @@ func BuildIndex(year string) error {
 }
 
 // UpdateIndex updates the Index with terms dervied from the given bucket
+// TEST IDEMPOTENCY ACROSS YEARS
 func UpdateIndex(year, bucket string) error {
 	var wg sync.WaitGroup
 	id, err := getIndexData()

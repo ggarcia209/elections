@@ -16,7 +16,7 @@ func LogOffset(year, key string, offset int64) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	db, err := bolt.Open("db/disk_cache.db", 0644, nil)
+	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("LogOffset failed: %v", err)
@@ -48,7 +48,7 @@ func GetOffset(year, key string) (int64, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	db, err := bolt.Open("db/disk_cache.db", 0644, nil)
+	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
 	var val int
 	if err != nil {
 		fmt.Println(err)
@@ -82,7 +82,7 @@ func LogKey(year, bucket, key string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	db, err := bolt.Open("db/disk_cache.db", 0644, nil)
+	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("LogKeys failed: %v", err)
@@ -115,7 +115,7 @@ func GetKey(year, bucket string) (string, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	db, err := bolt.Open("db/disk_cache.db", 0644, nil)
+	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
 	var key string
 	if err != nil {
 		fmt.Println(err)
@@ -142,4 +142,80 @@ func GetKey(year, bucket string) (string, error) {
 		return "", fmt.Errorf("GetKeys failed: %v", err)
 	}
 	return key, nil
+}
+
+// LogPath saves the input/output file path to disk cache
+func LogPath(path string, input bool) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("LogPath failed: %v", err)
+	}
+	defer db.Close()
+
+	var key string
+	if input {
+		key = "input_path"
+	} else {
+		key = "output_path"
+	}
+
+	// tx
+	if err := db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte("filepaths"))
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("tx failed: %v", err)
+		}
+		if err := b.Put([]byte(key), []byte(path)); err != nil { // serialize k,v
+			fmt.Println(err)
+			return fmt.Errorf("tx failed: %v", err)
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("LogPath failed: %v", err)
+	}
+	return nil
+}
+
+// GetPath retreives the input/output filepaths
+// returns nil if none
+func GetPath(input bool) (string, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
+	var path string
+	if err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("GetPath failed: %v", err)
+	}
+	defer db.Close()
+
+	// tx
+	if err := db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte("filepaths"))
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("tx failed: %v", err)
+		}
+
+		var key string
+		if input {
+			key = "input_path"
+		} else {
+			key = "output_path"
+		}
+
+		path = string(b.Get([]byte(key)))
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("GetKeys failed: %v", err)
+	}
+	return path, nil
 }

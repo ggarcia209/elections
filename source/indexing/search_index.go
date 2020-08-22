@@ -49,6 +49,16 @@ func (s prtEntries) Len() int           { return len(s) }
 func (s prtEntries) Less(i, j int) bool { return s[i].Prt < s[j].Prt }
 func (s prtEntries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
+// CreateQuery returns a Query object with the given data
+func CreateQuery(text, UID string) Query {
+	q := Query{
+		Text:      text,
+		UserID:    UID,
+		TimeStamp: time.Now(),
+	}
+	return q
+}
+
 // GetResults returns search results to user from user query.
 func GetResults(q Query) ([]SearchData, error) {
 	if q.Text == "" {
@@ -89,7 +99,7 @@ func GetResults(q Query) ([]SearchData, error) {
 	}
 
 	// Get data for the common IDs
-	results, err := lookupSearchData(common)
+	results, err := LookupSearchData(common)
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("GetResults failed: %v", err)
@@ -237,18 +247,18 @@ func intersection(s1, s2 []string) []string {
 }
 
 // retreive corresponding SearchData obj for ID
-func lookupSearchData(ids []string) ([]SearchData, error) {
+func LookupSearchData(ids []string) ([]SearchData, error) {
 	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
-		return []SearchData{}, fmt.Errorf("lookupSearchData failed: %v", err)
+		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
 	}
 
 	results, err := getSearchData(db, ids)
 	if err != nil {
 		fmt.Println(err)
-		return []SearchData{}, fmt.Errorf("lookupSearchData failed: %v", err)
+		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
 	}
 
 	return results, nil

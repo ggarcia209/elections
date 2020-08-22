@@ -11,6 +11,9 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+// OUTPUT_PATH is used to set the directory to write the search index to
+var OUTPUT_PATH string
+
 type resultList struct {
 	Results []string
 }
@@ -25,7 +28,7 @@ func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
 
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -123,7 +126,7 @@ func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
 func getSearchEntry(term string) ([]SearchData, error) {
 	// retreive lookupPairs from disk
 	prt := getPartition(term)
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -183,7 +186,7 @@ func getSearchData(db *bolt.DB, ids []string) ([]SearchData, error) {
 
 // persist IndexData object to disk
 func saveIndexData(index *IndexData) error {
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -215,7 +218,7 @@ func saveIndexData(index *IndexData) error {
 
 // retreive IndexData from disk
 func getIndexData() (*IndexData, error) {
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -249,7 +252,7 @@ func getIndexData() (*IndexData, error) {
 
 // save PartitionMap
 func savePartitionMap(pm map[string]bool) error {
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -281,7 +284,7 @@ func savePartitionMap(pm map[string]bool) error {
 
 // get PartitionMap
 func getPartitionMap() (map[string]bool, error) {
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)

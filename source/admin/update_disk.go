@@ -11,11 +11,15 @@ import (
 	"github.com/elections/source/persist"
 )
 
+/* IN PROGRESS */
+// determine if new records are appended to .txt files
+
 // UpdateRecordsOnDisk updates the on disk database with all files contained
 // in the /update folder for the given year.
 func UpdateRecordsOnDisk(year string) error {
+	//path, err := persist.GetPath()
 	// open update subdir and read files
-	dirName := "../../" + year + "/update"
+	dirName := "../../raw_data/" + year + "/update"
 	fInfo, err := getFiles(dirName)
 	if err != nil {
 		fmt.Println(err)
@@ -127,7 +131,7 @@ func updateCandidates(year, fileName string) error {
 	return nil
 }
 
-// idempotent - will not overwrite existing objects
+// NOT idempotent - will overwrite CmteTxData objs
 func updateCommittees(year, fileName string) error {
 	// open file
 	file, err := os.Open(fileName)

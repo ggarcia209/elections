@@ -11,31 +11,57 @@ import (
 	"github.com/elections/source/donations"
 	"github.com/elections/source/parse"
 	"github.com/elections/source/persist"
+	"github.com/elections/source/util"
 )
 
 /* DB CREATE OPERATIONS */
 
 // ProcessNewRecords processes the FEC bulk data files for the given year.
 // All directories must have the following files:
-//   /[year]/cands.txt
-//   /[year]/cmtex.txt
-//   /[year]/cmte_fin.txt
-//   /[year]/ccs.txt
-//   /[year]/ics.txt
-//   /[year]/disbs.txt
-func ProcessNewRecords(year string) error {
+//   input/[year]/cmte/cn.txt
+//   input/[year]/cand/cm.txt
+//   input/[year]/pac/webk.txt
+//   input/[year]/ctx/itoth.txt
+//   input/[year]/indiv/itcont.txt
+//   input/[year]/exp/oppexp.txt
+func ProcessNewRecords() error {
 	fmt.Println("******************************************")
-	fmt.Println("PROCESS NEW RECORDS BEGIN - YEAR: ", year)
 	fmt.Println()
+
+	// get input folder path
+	input, err := getPath(true)
+
+	// derive year from filepath
+	year := util.GetYear()
+	fmt.Println("Chosen year: ", year)
+
+	// get output path
+	output, err := getPath(false)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ProcessNewRecords failed: %v", err)
+	}
+
+	persist.OUTPUT_PATH = output
+
+	fmt.Println("filepaths set - continue with data processing?")
+	yes := util.Ask4confirm()
+	if !yes {
+		fmt.Println("Returning to menu...")
+		return nil
+	}
+
+	fmt.Println("PROCESS NEW RECORDS BEGIN - YEAR: ", year)
 
 	// get year from Command Line input
 	// input file paths - placeholders
-	candPath := "../../" + year + "/cands.txt"
-	cmtePath := "../../" + year + "/cmtes.txt"
-	icPath := "../../" + year + "/ics.txt"
-	ccPath := "../../" + year + "/ccs.txt"
-	disbPath := "../../" + year + "/disbs.txt"
-	cmteFinPath := "../../" + year + "/cmte_fin.txt"
+	root := input + year
+	candPath := root + "cand/cn.txt"
+	cmtePath := root + "cmte/cm.txt"
+	icPath := root + "indiv/itcont.txt"
+	ccPath := root + "ctx/itoth.txt"
+	disbPath := root + "exp/oppexp.txt"
+	cmteFinPath := root + "pac/webk.txt"
 
 	// initialize database and TopOverallData objects
 	//   REFACTOR FOR IDEMPOTENCY
@@ -585,4 +611,55 @@ func pathExists(path string) (bool, error) {
 		return false, nil
 	}
 	return true, err
+}
+
+func getPath(input bool) (string, error) {
+	var name string
+	var msg string
+	if input {
+		name = "input"
+		msg = "Enter input folder filepath (schema: /root/input): "
+	} else {
+		name = "output"
+		msg = "Enter database & search index output folder (schema: /root/output): "
+	}
+	// get folder path
+	path, err := persist.GetPath(input)
+	if err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("getPath failed: %v", err)
+	}
+	if path != "" { // if path set previously
+		fmt.Printf("Set new %s path? Current path will be overwritten.\n\t%s\n", name, path)
+		yes := util.Ask4confirm()
+		if yes {
+			fmt.Printf("Continuing with current %s path: %s\n", name, path)
+		} else { // confirm overwrite
+			fmt.Println(">>> Are you sure you want to overwrite the existing path?")
+			yes := util.Ask4confirm()
+			if !yes {
+				fmt.Printf("Continuing with current %s path: %s\n", name, path)
+			} else { // set new path
+				fmt.Println(msg)
+				path = util.GetPathFromUser()
+				err := persist.LogPath(path, input)
+				fmt.Printf("New path: %s saved\n", path)
+				if err != nil {
+					fmt.Println(err)
+					return "", fmt.Errorf("getPath failed: %v", err)
+				}
+			}
+		}
+	}
+
+	// path is not set previously
+	fmt.Println(msg)
+	path = util.GetPathFromUser()
+	err = persist.LogPath(path, input)
+	fmt.Printf("New path: %s saved\n", path)
+	if err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("getPath failed: %v", err)
+	}
+	return path, nil
 }

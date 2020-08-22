@@ -34,7 +34,8 @@ func InitSesh() *dynamodb.DynamoDB {
 }
 
 // ListTables lists the tables in the database
-func ListTables(svc *dynamodb.DynamoDB) error {
+func ListTables(svc *dynamodb.DynamoDB) (int, error) {
+	t := 0
 	input := &dynamodb.ListTablesInput{}
 	fmt.Println("Tables:")
 
@@ -54,11 +55,12 @@ func ListTables(svc *dynamodb.DynamoDB) error {
 				// and Message from the error
 				fmt.Println(err.Error())
 			}
-			return fmt.Errorf("ListTables failed: %v", err)
+			return 0, fmt.Errorf("ListTables failed: %v", err)
 		}
 
 		for _, n := range result.TableNames {
 			fmt.Println(*n)
+			t++
 		}
 
 		// assign the last read tablename as the start for our next call to the ListTables function
@@ -70,7 +72,7 @@ func ListTables(svc *dynamodb.DynamoDB) error {
 			break
 		}
 	}
-	return nil
+	return t, nil
 }
 
 // CreateTable creates a new table with the parameters passed to the Table struct
