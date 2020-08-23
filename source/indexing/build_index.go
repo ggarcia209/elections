@@ -10,7 +10,7 @@ import (
 
 	"github.com/elections/source/donations"
 	"github.com/elections/source/persist"
-	"github.com/elections/source/util"
+	"github.com/elections/source/ui"
 )
 
 // SearchData contains basic data for an object returned
@@ -62,7 +62,7 @@ func BuildIndex(year string) error {
 	// get user confirmation if new index
 	if len(indexData.Completed) == 0 {
 		fmt.Println("*** Build new index? ***")
-		y := util.Ask4confirm()
+		y := ui.Ask4confirm()
 		if !y {
 			fmt.Println("operation stopped")
 			fmt.Println("new items wrote: 0")
@@ -260,9 +260,10 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) error {
 	fmt.Println("processing top individuals...")
 	ids := []string{}
-	i := 0 // number of records processed
+	r := 0 // number of records processed
 	t := 0 // number of terms updated
-	n := 25
+	n := 250
+	x := n
 
 	// get Top Individuals by incoming & outgoing funds
 	topIndv, err := persist.GetObject(year, "top_overall", "indv")
@@ -299,6 +300,9 @@ func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) err
 	fmt.Println("got partition map")
 
 	for {
+		if len(ids) < n { // queue exhausted - last write
+			n = len(ids) // set starting index to 0
+		}
 		// pop n IDs from stack and return corresponding objects
 		objs, _, err := persist.BatchGetByID(year, bucket, ids[len(ids)-n:])
 		if err != nil {
@@ -335,13 +339,14 @@ func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) err
 
 		fmt.Println("search terms added to index")
 
-		if len(objs) < n || len(ids) == n { // last batch write complete
+		if len(objs) < x || len(ids) == n { // last batch write complete
 			break
 		}
+		r += n
 
 		// remove processed IDs from stack
 		ids = ids[:len(ids)-n]
-		fmt.Println("records processed: ", i)
+		fmt.Println("records processed: ", r)
 		fmt.Println("terms created/updated: ", t)
 	}
 

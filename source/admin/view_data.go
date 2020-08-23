@@ -3,11 +3,12 @@ package admin
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/elections/source/donations"
 	"github.com/elections/source/indexing"
 	"github.com/elections/source/persist"
-	"github.com/elections/source/util"
+	"github.com/elections/source/ui"
 )
 
 // entry represents a k/v pair in a sorted map
@@ -34,11 +35,19 @@ func ViewMenu() error {
 		"Return to Main Menu",
 		// Query DynamoDB
 	}
-	menu := util.CreateMenu("admin-view-data", opts)
+	menu := ui.CreateMenu("admin-view-data", opts)
 
 	fmt.Println("***** View Data *****")
+	// get output path
+	output, err := getPath(false)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ViewMenu failed: %v", err)
+	}
+
+	indexing.OUTPUT_PATH = output
 	for {
-		ch, err := util.Ask4MenuChoice(menu)
+		ch, err := ui.Ask4MenuChoice(menu)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("ViewMenu failed: %v", err)
@@ -70,13 +79,43 @@ func ViewMenu() error {
 	}
 }
 
+func searchData() error {
+	opts := []string{"Search Datasets", "Lookup by Object IDs", "Return"}
+	menu := ui.CreateMenu("admin-search-sub", opts)
+	for {
+		ch, err := ui.Ask4MenuChoice(menu)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("searchData failed: %v", err)
+		}
+		switch {
+		case menu.OptionsMap[ch] == "Search Datasets":
+			err := queryData()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "Lookup by Object IDs":
+			err := lookupByID()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "Return":
+			fmt.Println("Returning to menu...")
+			return nil
+		}
+	}
+}
+
 // routine for searching data by query
 // returns results and provides sub menu for
 // selecting dataset by object ID and year
-func searchData() error {
+func queryData() error {
 	for {
 		// get query from user / return & print results
-		txt := util.GetQuery()
+		fmt.Println("*** Search ***")
+		txt := ui.GetQuery()
 		q := indexing.CreateQuery(txt, "local_admin")
 		res, err := indexing.GetResults(q)
 		if err != nil {
@@ -93,43 +132,145 @@ func searchData() error {
 			resMap[r.ID] = r
 		}
 		ids = append(ids, "exit")
-		idsSubmenu := util.CreateMenu("admin-search-results", ids)
-		fmt.Println("Choose an ID from the list to view more info or choose 'exit' to return")
-		chID, err := util.Ask4MenuChoice(idsSubmenu)
-		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("searchData failed: %v", err)
+		idsSubmenu := ui.CreateMenu("admin-search-results", ids)
+		for {
+			fmt.Println("Choose an ID from the list to view more info or choose 'exit' to return")
+			chID, err := ui.Ask4MenuChoice(idsSubmenu)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+			objID := idsSubmenu.OptionsMap[chID]
+			if objID == "exit" {
+				fmt.Println("Returning to menu...")
+				return nil
+			}
+
+			// select year for given object
+			yrs := resMap[objID].Years
+			yrsSubMenu := ui.CreateMenu("admin-search-result-years", yrs)
+			fmt.Println("Choose a year to view the objects data for that year: ")
+			chYr, err := ui.Ask4MenuChoice(yrsSubMenu)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+			year := yrsSubMenu.OptionsMap[chYr]
+			bucket := resMap[objID].Bucket
+
+			// get year/obj dataset from disk
+			obj, err := persist.GetObject(year, bucket, objID)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+
+			fmt.Println("RESULT: ")
+			fmt.Printf("%#v\n", obj)
+			fmt.Println()
+
+			fmt.Println("Return to results?")
+			yes := ui.Ask4confirm()
+			if yes {
+				continue
+			}
+			break
 		}
-		objID := idsSubmenu.OptionsMap[chID]
-		if objID == "exit" {
+
+		fmt.Println("New Search?")
+		yes := ui.Ask4confirm()
+		if !yes {
 			fmt.Println("Returning to menu...")
 			return nil
 		}
+	}
+}
 
-		// select year for given object
-		yrs := resMap[objID].Years
-		yrsSubMenu := util.CreateMenu("admin-search-result-years", yrs)
-		fmt.Println("Choose a year to view the objects data for that year: ")
-		chYr, err := util.Ask4MenuChoice(yrsSubMenu)
+func lookupByID() error {
+	for {
+		// get query from user / return & print results
+		fmt.Println("*** Lookup by ID ***")
+		fmt.Println("Enter IDs seperated by spaces")
+		lu := []string{}
+		txt := ui.GetQuery()
+		ss := strings.Split(txt, " ")
+		for _, s := range ss {
+			s = strings.TrimSpace(s)
+			lu = append(lu, s)
+		}
+
+		res, err := indexing.LookupSearchData(lu)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("searchData failed: %v", err)
 		}
-		year := yrsSubMenu.OptionsMap[chYr]
-		bucket := resMap[objID].Bucket
+		resMap := make(map[string]indexing.SearchData)
+		printResults(res)
 
-		// get year/obj dataset from disk
-		obj, err := persist.GetObject(year, bucket, objID)
-		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("searchData failed: %v", err)
+		// crate submenus for selecting dataset from search results
+		ids := []string{}
+		for _, r := range res {
+			ids = append(ids, r.ID)
+			resMap[r.ID] = r
 		}
+		ids = append(ids, "exit")
+		idsSubmenu := ui.CreateMenu("admin-search-results", ids)
+		for {
+			fmt.Println("Choose an ID from the list to view more info or choose 'exit' to return")
+			chID, err := ui.Ask4MenuChoice(idsSubmenu)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+			objID := idsSubmenu.OptionsMap[chID]
+			if objID == "exit" {
+				fmt.Println("Returning to menu...")
+				break
+			}
 
-		fmt.Println("RESULT: ")
-		fmt.Printf("%#v\n", obj)
-		fmt.Println()
-		fmt.Println("Search again?")
-		yes := util.Ask4confirm()
+			// select year for given object
+			yrs := resMap[objID].Years
+			yrsSubMenu := ui.CreateMenu("admin-search-result-years", yrs)
+			fmt.Println("Choose a year to view the objects data for that year: ")
+			chYr, err := ui.Ask4MenuChoice(yrsSubMenu)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+			year := yrsSubMenu.OptionsMap[chYr]
+			bucket := resMap[objID].Bucket
+
+			// get year/obj dataset from disk
+			obj, err := persist.GetObject(year, bucket, objID)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
+			if bucket == "committees" {
+				// get tx data for committee
+				txData, err := persist.GetObject(year, "cmte_tx_data", objID)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("searchData failed: %v", err)
+				}
+				fmt.Println("RESULT: ")
+				fmt.Printf("%#v\n", obj)
+				fmt.Printf("%#v\n", txData)
+				fmt.Println()
+			} else {
+				fmt.Println("RESULT: ")
+				fmt.Printf("%#v\n", obj)
+				fmt.Println()
+			}
+			fmt.Println("Return to results?")
+			yes := ui.Ask4confirm()
+			if yes {
+				continue
+			}
+			break
+		}
+		fmt.Println("New search?")
+		yes := ui.Ask4confirm()
 		if !yes {
 			fmt.Println("Returning to menu...")
 			return nil
@@ -146,23 +287,25 @@ func viewRankings() error {
 		"1990", "1988", "1986", "1984", "1982",
 		"1980",
 	}
-	yrsMenu := util.CreateMenu("admin-rankings-yrs", yrs)
+	yrsMenu := ui.CreateMenu("admin-rankings-yrs", yrs)
 
 	cats := []string{
 		"indv", "indv_rec", "cmte_donors", "cmte_recs", "cmte_exp", "cand", "cand_exp",
 	}
-	catMenu := util.CreateMenu("admin-rankings-cats", cats)
+	catMenu := ui.CreateMenu("admin-rankings-cats", cats)
 	ptyMap := map[string][]string{
-		"cmte_donors": []string{"cmte_donors_all", "cmte_donors_d", "cmte_donors_r", "cmte_donors_na", "cmte_donors_misc"},
-		"cmte_recs":   []string{"cmte_rec_all", "cmte_rec_d", "cmte_rec_r", "cmte_rec_na", "cmte_rec_misc"},
-		"cmte_exp":    []string{"cmte_exp_all", "cmte_exp_d", "cmte_exp_r", "cmte_exp_na", "cmte_exp_misc"},
-		"cand":        []string{"cand_all", "cand_d", "cand_r", "cand_na", "cand_misc"},
-		"cand_exp":    []string{"cand_exp_all", "cand_exp_d", "cand_exp_r", "cand_exp_na", "cand_exp_misc"},
+		"indv":        []string{"indv", "cancel"},
+		"indv_rec":    []string{"indv_rec", "cancel"},
+		"cmte_donors": []string{"cmte_donors_all", "cmte_donors_d", "cmte_donors_r", "cmte_donors_na", "cmte_donors_misc", "cancel"},
+		"cmte_recs":   []string{"cmte_rec_all", "cmte_rec_d", "cmte_rec_r", "cmte_rec_na", "cmte_rec_misc", "cancel"},
+		"cmte_exp":    []string{"cmte_exp_all", "cmte_exp_d", "cmte_exp_r", "cmte_exp_na", "cmte_exp_misc", "cancel"},
+		"cand":        []string{"cand_all", "cand_d", "cand_r", "cand_na", "cand_misc", "cancel"},
+		"cand_exp":    []string{"cand_exp_all", "cand_exp_d", "cand_exp_r", "cand_exp_na", "cand_exp_misc", "cancel"},
 	}
 
 	for {
 		// get Year
-		ch, err := util.Ask4MenuChoice(yrsMenu)
+		ch, err := ui.Ask4MenuChoice(yrsMenu)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("viewRankings failed: %v", err)
@@ -170,7 +313,7 @@ func viewRankings() error {
 		year := yrsMenu.OptionsMap[ch]
 
 		// get category
-		ch, err = util.Ask4MenuChoice(catMenu)
+		ch, err = ui.Ask4MenuChoice(catMenu)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("viewRankings failed: %v", err)
@@ -179,8 +322,8 @@ func viewRankings() error {
 
 		// get party sub category
 		ptys := ptyMap[cat]
-		ptysMenu := util.CreateMenu("admin-rankings-pty", ptys)
-		ch, err = util.Ask4MenuChoice(ptysMenu)
+		ptysMenu := ui.CreateMenu("admin-rankings-pty", ptys)
+		ch, err = ui.Ask4MenuChoice(ptysMenu)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("viewRankings failed: %v", err)
@@ -188,6 +331,11 @@ func viewRankings() error {
 
 		// display sorted rankings from selection
 		selection := ptysMenu.OptionsMap[ch]
+		fmt.Println("selection: ", selection)
+		if selection == "cancel" {
+			fmt.Println("Returning to menu...")
+			return nil
+		}
 		rankings, err := persist.GetObject(year, "top_overall", selection)
 		sorted := sortRankings(rankings.(*donations.TopOverallData).Amts)
 		err = printSortedRankings(rankings.(*donations.TopOverallData), sorted)
@@ -196,13 +344,24 @@ func viewRankings() error {
 			return fmt.Errorf("viewRankings failed: %v", err)
 		}
 
+		fmt.Println("Lookup by ID?")
+		yes := ui.Ask4confirm()
+		if yes {
+			err := lookupByID()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("viewRankings failed: %v", err)
+			}
+		}
+
 		fmt.Println("View new category?")
-		yes := util.Ask4confirm()
+		yes = ui.Ask4confirm()
 		if !yes {
 			fmt.Println("Returning to menu...")
 			return nil
 		}
 	}
+
 }
 
 // prints search results

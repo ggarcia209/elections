@@ -108,6 +108,24 @@ func GetResults(q Query) ([]SearchData, error) {
 	return results, nil
 }
 
+// LookupSearchData Retreives corresponding SearchData obj for ID
+func LookupSearchData(ids []string) ([]SearchData, error) {
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
+	}
+
+	results, err := getSearchData(db, ids)
+	if err != nil {
+		fmt.Println(err)
+		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
+	}
+
+	return results, nil
+}
+
 // ViewIndex displays the index
 func ViewIndex() error {
 	ct := 0
@@ -135,7 +153,7 @@ func ViewIndex() error {
 	sort.Sort(&es)
 
 	// open db
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("ViewIndex failed: %v", err)
@@ -173,7 +191,7 @@ func getRefs(q []string) (map[string][]string, error) {
 	var resultMap = make(map[string][]string)
 	var result []string
 
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("getRefs failed: %v", err)
@@ -244,24 +262,6 @@ func intersection(s1, s2 []string) []string {
 		}
 	}
 	return common
-}
-
-// retreive corresponding SearchData obj for ID
-func LookupSearchData(ids []string) ([]SearchData, error) {
-	db, err := bolt.Open("../../db/search_index.db", 0644, nil)
-	defer db.Close()
-	if err != nil {
-		fmt.Println(err)
-		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
-	}
-
-	results, err := getSearchData(db, ids)
-	if err != nil {
-		fmt.Println(err)
-		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
-	}
-
-	return results, nil
 }
 
 /* func main() {

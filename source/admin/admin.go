@@ -1,17 +1,16 @@
 package admin
 
 import (
-	"flag"
 	"fmt"
 	"os"
-	"strconv"
+	"path/filepath"
 
 	"github.com/elections/source/cache"
 	"github.com/elections/source/databuilder"
 	"github.com/elections/source/donations"
 	"github.com/elections/source/parse"
 	"github.com/elections/source/persist"
-	"github.com/elections/source/util"
+	"github.com/elections/source/ui"
 )
 
 /* DB CREATE OPERATIONS */
@@ -29,23 +28,41 @@ func ProcessNewRecords() error {
 	fmt.Println()
 
 	// get input folder path
-	input, err := getPath(true)
-
-	// derive year from filepath
-	year := util.GetYear()
-	fmt.Println("Chosen year: ", year)
-
-	// get output path
-	output, err := getPath(false)
+	input, err := persist.GetPath(true)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
+	}
+	if input == "" {
+		input, err = getPath(true)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("ProcessNewRecords failed: %v", err)
+		}
+	}
+
+	// derive year from filepath
+	year := ui.GetYear()
+	fmt.Println("Chosen year: ", year)
+
+	// get output path
+	output, err := persist.GetPath(false)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ProcessNewRecords failed: %v", err)
+	}
+	if output == "" {
+		output, err = getPath(false)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("ProcessNewRecords failed: %v", err)
+		}
 	}
 
 	persist.OUTPUT_PATH = output
 
 	fmt.Println("filepaths set - continue with data processing?")
-	yes := util.Ask4confirm()
+	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
 		return nil
@@ -55,13 +72,13 @@ func ProcessNewRecords() error {
 
 	// get year from Command Line input
 	// input file paths - placeholders
-	root := input + year
-	candPath := root + "cand/cn.txt"
-	cmtePath := root + "cmte/cm.txt"
-	icPath := root + "indiv/itcont.txt"
-	ccPath := root + "ctx/itoth.txt"
-	disbPath := root + "exp/oppexp.txt"
-	cmteFinPath := root + "pac/webk.txt"
+	root := filepath.Join(input, year)
+	candPath := filepath.Join(root, "cand", "cn.txt")
+	cmtePath := filepath.Join(root, "cmte", "cm.txt")
+	icPath := filepath.Join(root, "indiv", "itcont.txt")
+	ccPath := filepath.Join(root, "ctx", "itoth.txt")
+	disbPath := filepath.Join(root, "exp", "oppexp.txt")
+	cmteFinPath := filepath.Join(root, "pac", "webk.txt")
 
 	// initialize database and TopOverallData objects
 	//   REFACTOR FOR IDEMPOTENCY
@@ -513,49 +530,72 @@ func processDisbursements(year, filepath string) error {
 	return nil
 }
 
-func viewTopOverall(year string) error {
-	testCmte, err := persist.GetObject(year, "cmte_tx_data", "C00343871") // C00401224
-	if err != nil {
-		fmt.Println(err)
-		return err
+// pathExists checks to see if given file path is valid
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
 	}
-
-	odIndv, err := persist.GetObject(year, "top_overall", "indv")
-	if err != nil {
-		fmt.Println(err)
-		return err
+	if os.IsNotExist(err) {
+		return false, nil
 	}
-
-	odCmte, err := persist.GetObject(year, "top_overall", "cmte_recs_all")
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	testIndv, err := persist.GetObject(year, "individuals", "01489ace1a99994034ef8df6455bb6de")
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	fmt.Println("*** TEST COMMITTEES ***")
-	fmt.Println(testCmte)
-	fmt.Println()
-	fmt.Println("*** TEST INDIVIDUAL ***")
-	fmt.Println(testIndv)
-	fmt.Println()
-
-	fmt.Println("*** TOP COMMITTEES ***")
-	fmt.Println(odCmte)
-	fmt.Println()
-	fmt.Println("*** TOP INDIVIDUALS ***")
-	fmt.Println(odIndv)
-	fmt.Println()
-
-	return nil
+	return true, err
 }
 
-func getYear() (string, error) {
+func getPath(input bool) (string, error) {
+	var name string
+	var msg string
+	if input {
+		name = "input"
+		msg = "Enter input folder filepath (schema: /root/input): "
+	} else {
+		name = "output"
+		msg = "Enter database & search index output folder (schema: /root/output): "
+	}
+	// get folder path
+	path, err := persist.GetPath(input)
+	fmt.Println("Found path: ", path)
+	if err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("getPath failed: %v", err)
+	}
+	if path != "" { // if path set previously
+		fmt.Printf("Set new %s path? Current path will be overwritten:\n\t%s\n", name, path)
+		yes := ui.Ask4confirm()
+		if !yes {
+			fmt.Printf("Continuing with current %s path: %s\n", name, path)
+		} else { // confirm overwrite
+			fmt.Println(">>> Are you sure you want to overwrite the existing path?")
+			yes := ui.Ask4confirm()
+			if !yes {
+				fmt.Printf("Continuing with current %s path: %s\n", name, path)
+			} else { // set new path
+				fmt.Println(msg)
+				path = ui.GetPathFromUser()
+				err := persist.LogPath(path, input)
+				fmt.Printf("New path: %s saved\n", path)
+				if err != nil {
+					fmt.Println(err)
+					return "", fmt.Errorf("getPath failed: %v", err)
+				}
+			}
+		}
+		return path, nil
+	}
+
+	// path is not set previously
+	fmt.Println(msg)
+	path = ui.GetPathFromUser()
+	err = persist.LogPath(path, input)
+	fmt.Printf("New path: %s saved\n", path)
+	if err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("getPath failed: %v", err)
+	}
+	return path, nil
+}
+
+/* func getYear() (string, error) {
 	yearStr := "" // default return value
 
 	for {
@@ -601,65 +641,45 @@ func getYear() (string, error) {
 	return yearStr, nil
 }
 
-// pathExists checks to see if given file path is valid
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return true, err
-}
-
-func getPath(input bool) (string, error) {
-	var name string
-	var msg string
-	if input {
-		name = "input"
-		msg = "Enter input folder filepath (schema: /root/input): "
-	} else {
-		name = "output"
-		msg = "Enter database & search index output folder (schema: /root/output): "
-	}
-	// get folder path
-	path, err := persist.GetPath(input)
+func viewTopOverall(year string) error {
+	testCmte, err := persist.GetObject(year, "cmte_tx_data", "C00343871") // C00401224
 	if err != nil {
 		fmt.Println(err)
-		return "", fmt.Errorf("getPath failed: %v", err)
-	}
-	if path != "" { // if path set previously
-		fmt.Printf("Set new %s path? Current path will be overwritten.\n\t%s\n", name, path)
-		yes := util.Ask4confirm()
-		if yes {
-			fmt.Printf("Continuing with current %s path: %s\n", name, path)
-		} else { // confirm overwrite
-			fmt.Println(">>> Are you sure you want to overwrite the existing path?")
-			yes := util.Ask4confirm()
-			if !yes {
-				fmt.Printf("Continuing with current %s path: %s\n", name, path)
-			} else { // set new path
-				fmt.Println(msg)
-				path = util.GetPathFromUser()
-				err := persist.LogPath(path, input)
-				fmt.Printf("New path: %s saved\n", path)
-				if err != nil {
-					fmt.Println(err)
-					return "", fmt.Errorf("getPath failed: %v", err)
-				}
-			}
-		}
+		return err
 	}
 
-	// path is not set previously
-	fmt.Println(msg)
-	path = util.GetPathFromUser()
-	err = persist.LogPath(path, input)
-	fmt.Printf("New path: %s saved\n", path)
+	odIndv, err := persist.GetObject(year, "top_overall", "indv")
 	if err != nil {
 		fmt.Println(err)
-		return "", fmt.Errorf("getPath failed: %v", err)
+		return err
 	}
-	return path, nil
+
+	odCmte, err := persist.GetObject(year, "top_overall", "cmte_recs_all")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	testIndv, err := persist.GetObject(year, "individuals", "01489ace1a99994034ef8df6455bb6de")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Println("*** TEST COMMITTEES ***")
+	fmt.Println(testCmte)
+	fmt.Println()
+	fmt.Println("*** TEST INDIVIDUAL ***")
+	fmt.Println(testIndv)
+	fmt.Println()
+
+	fmt.Println("*** TOP COMMITTEES ***")
+	fmt.Println(odCmte)
+	fmt.Println()
+	fmt.Println("*** TOP INDIVIDUALS ***")
+	fmt.Println(odIndv)
+	fmt.Println()
+
+	return nil
 }
+*/

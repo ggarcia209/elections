@@ -5,7 +5,7 @@ import (
 
 	"github.com/elections/source/indexing"
 	"github.com/elections/source/persist"
-	"github.com/elections/source/util"
+	"github.com/elections/source/ui"
 )
 
 // Delete provides menu options for delete operations
@@ -17,10 +17,10 @@ func Delete() error {
 		"Delete SearchIndex",
 		"Delete Metadata",
 		"Delete All Data on Disk",
-		// Delete DynamoDB Table
+		"Delete DynamoDB Table",
 		"Return",
 	}
-	menu := util.CreateMenu("admin-delete", opts)
+	menu := ui.CreateMenu("admin-delete", opts)
 	path, err := getPath(false)
 	if err != nil {
 		fmt.Println(err)
@@ -30,7 +30,7 @@ func Delete() error {
 	indexing.OUTPUT_PATH = path
 
 	for {
-		ch, err := util.Ask4MenuChoice(menu)
+		ch, err := ui.Ask4MenuChoice(menu)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("Delete failed: %v", err)
@@ -66,8 +66,14 @@ func Delete() error {
 				fmt.Println(err)
 				return fmt.Errorf("Delete failed: %v", err)
 			}
-		case menu.OptionsMap[ch] == "Delete All":
+		case menu.OptionsMap[ch] == "Delete All Data on Disk":
 			err := delAll()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("Delete failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "Delete DynamoDB Table":
+			err := DeleteDynamoTable()
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("Delete failed: %v", err)
@@ -77,20 +83,19 @@ func Delete() error {
 			return nil
 		}
 	}
-
 }
 
 // get user input and delete by year
 func deleteYr() error {
 	fmt.Println("Delete by year: ")
-	year := util.GetYear()
+	year := ui.GetYear()
 	if year == "cancel" {
 		fmt.Println("Returning to menu...")
 		return nil
 	}
 
 	fmt.Printf("Are you sure you want to delete all data for the year %s?\n", year)
-	yes := util.Ask4confirm()
+	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
 		return nil
@@ -108,16 +113,16 @@ func deleteYr() error {
 // get user input and delete by year/category
 func deleteCat() error {
 	fmt.Println("Delete by year: ")
-	year := util.GetYear()
+	year := ui.GetYear()
 	if year == "cancel" {
 		fmt.Println("Returning to menu...")
 		return nil
 	}
 
 	opts := []string{"individuals", "committees", "candidates", "top_overall", "cancel"}
-	menu := util.CreateMenu("admin-delete-bycat", opts)
+	menu := ui.CreateMenu("admin-delete-bycat", opts)
 	fmt.Printf("Choose a cateogry to delete (year: %s):\n", year)
-	ch, err := util.Ask4MenuChoice(menu)
+	ch, err := ui.Ask4MenuChoice(menu)
 	cat := menu.OptionsMap[ch]
 	if cat == "cancel" {
 		fmt.Println("Returning to menu...")
@@ -125,7 +130,7 @@ func deleteCat() error {
 	}
 
 	fmt.Printf("Are you sure you want to delete all data for the year/category %s - %s?\n", year, cat)
-	yes := util.Ask4confirm()
+	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
 		return nil
@@ -142,7 +147,7 @@ func deleteCat() error {
 
 func delDB() error {
 	fmt.Printf("Are you sure you want to delete the database at %s?\n", persist.OUTPUT_PATH)
-	yes := util.Ask4confirm()
+	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
 		return nil
@@ -157,7 +162,7 @@ func delDB() error {
 
 func delIndex() error {
 	fmt.Printf("Are you sure you want to delete the search index at %s?\n", persist.OUTPUT_PATH)
-	yes := util.Ask4confirm()
+	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
 		return nil
@@ -172,7 +177,7 @@ func delIndex() error {
 
 func delMeta() error {
 	fmt.Printf("Are you sure you want to delete all metadata at ../db?\n")
-	yes := util.Ask4confirm()
+	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
 		return nil
@@ -187,7 +192,7 @@ func delMeta() error {
 
 func delAll() error {
 	fmt.Println("Are you sure you want to delete ALL data on disk?")
-	yes := util.Ask4confirm()
+	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
 		return nil

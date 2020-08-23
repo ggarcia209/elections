@@ -34,7 +34,8 @@ func InitSesh() *dynamodb.DynamoDB {
 }
 
 // ListTables lists the tables in the database
-func ListTables(svc *dynamodb.DynamoDB) (int, error) {
+func ListTables(svc *dynamodb.DynamoDB) ([]string, int, error) {
+	names := []string{}
 	t := 0
 	input := &dynamodb.ListTablesInput{}
 	fmt.Println("Tables:")
@@ -55,11 +56,12 @@ func ListTables(svc *dynamodb.DynamoDB) (int, error) {
 				// and Message from the error
 				fmt.Println(err.Error())
 			}
-			return 0, fmt.Errorf("ListTables failed: %v", err)
+			return nil, 0, fmt.Errorf("ListTables failed: %v", err)
 		}
 
 		for _, n := range result.TableNames {
 			fmt.Println(*n)
+			names = append(names, *n)
 			t++
 		}
 
@@ -72,7 +74,7 @@ func ListTables(svc *dynamodb.DynamoDB) (int, error) {
 			break
 		}
 	}
-	return t, nil
+	return names, t, nil
 }
 
 // CreateTable creates a new table with the parameters passed to the Table struct
@@ -181,6 +183,20 @@ func UpdateItem(svc *dynamodb.DynamoDB, q *Query, t *Table) error {
 	}
 
 	fmt.Printf("Updated %v: %v: %s = %v\n", q.PrimaryValue, q.SortValue, q.UpdateFieldName, q.UpdateValue)
+	return nil
+}
+
+// DeleteTable deletes the selected table
+func DeleteTable(svc *dynamodb.DynamoDB, t *Table) error {
+	input := &dynamodb.DeleteTableInput{
+		TableName: aws.String(t.TableName),
+	}
+	_, err := svc.DeleteTable(input)
+	if err != nil {
+		fmt.Println(err.Error())
+		return fmt.Errorf("DeleteTable failed: %v", err)
+	}
+	fmt.Println("Deleted Table: ", t.TableName)
 	return nil
 }
 

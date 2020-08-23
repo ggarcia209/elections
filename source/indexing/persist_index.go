@@ -115,9 +115,9 @@ func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
 		return i, fmt.Errorf("saveIndex failed: %v", err)
 	}
 	fmt.Println("index saved!")
-	fmt.Println("new items wrote: ", i)
-	fmt.Println("existing items updated: ", u)
-	fmt.Println("new IDs recorded: ", n)
+	fmt.Println("new terms wrote: ", i)
+	fmt.Println("existing terms: ", u)
+	fmt.Println("IDs recorded/updated: ", n)
 	fmt.Println()
 	return i, nil
 }

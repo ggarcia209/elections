@@ -10,6 +10,18 @@ import (
 	"github.com/boltdb/bolt"
 )
 
+// OUTPUT_PATH sets the output path for all database & search index storage & retreiveal operations.
+var OUTPUT_PATH = "../.." // default value
+
+// InitDiskCache creates the disk cache directory next to the admin app
+func InitDiskCache() {
+	// metadata - store in /admin_app
+	if _, err := os.Stat("../db"); os.IsNotExist(err) {
+		os.Mkdir("../db", 0744)
+		fmt.Printf("CreateDB successful: '../db' directory created")
+	}
+}
+
 // Init inititalizes the program by creating the db directory, disk_cache.db, offline_db.db, and corresponding buckets
 func Init(year string) error {
 	createDB()
@@ -34,7 +46,7 @@ func Init(year string) error {
 func StoreObjects(year string, objs []interface{}) error {
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
-	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("StoreObjects failed: ", err)
@@ -75,7 +87,7 @@ func PutObject(year string, object interface{}) error {
 
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
-	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("PutObject failed: ", err)
@@ -98,7 +110,7 @@ func PutObject(year string, object interface{}) error {
 
 // GetObject gets an object by year:bucket:key and returns it as an interface
 func GetObject(year, bucket, key string) (interface{}, error) {
-	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -130,7 +142,7 @@ func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, st
 	objs := []interface{}{}
 	currKey := startKey
 
-	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -176,7 +188,7 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 	objs := []interface{}{}
 	nilIDs := []string{}
 
-	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
@@ -196,9 +208,9 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 			}
 			if obj == nil {
 				nilIDs = append(nilIDs, id)
-			} else {
-				objs = append(objs, obj)
+				continue
 			}
+			objs = append(objs, obj)
 		}
 		return nil
 	}); err != nil {
@@ -213,7 +225,7 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 func GetTopOverall(year string) ([]interface{}, error) {
 	objs := []interface{}{}
 
-	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("GetObject failed: ", err)
@@ -251,6 +263,10 @@ func GetTopOverall(year string) ([]interface{}, error) {
 
 // encodeToProto encodes an object interface to protobuf
 func encodeToProto(obj interface{}) (string, string, []byte, error) {
+	if obj == nil {
+		fmt.Println("empty object passed to encodeProto")
+		return "", "", nil, nil
+	}
 	switch obj.(type) {
 	case nil:
 		return "", "", nil, fmt.Errorf("encodeToProto failed: nil interface")
@@ -352,9 +368,10 @@ func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 // CreateDB creates the database directory. CreateDB must be called
 // before any other function in 'parse' package is called.
 func createDB() {
-	if _, err := os.Stat("../../db"); os.IsNotExist(err) {
-		os.Mkdir("../../db", 0744)
-		fmt.Println("CreateDB successful: 'db' directory created")
+	// create output directory
+	if _, err := os.Stat(OUTPUT_PATH + "/db"); os.IsNotExist(err) {
+		os.Mkdir(OUTPUT_PATH+"/db", 0744)
+		fmt.Printf("CreateDB successful: '%s/db' directory created\n", OUTPUT_PATH)
 	}
 }
 
@@ -372,7 +389,7 @@ func createObjBuckets(year string) error {
 
 // createLookupBucket initializes the 'id_lookup' bucket in disk_cache.db
 func createLookupBuckets() error {
-	db, err := bolt.Open("../../db/disk_cache.db", 0644, nil)
+	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("createLookupBucket failed: ", err)
@@ -409,7 +426,7 @@ func createLookupBuckets() error {
 }
 
 func createBucket(year, name string) error {
-	db, err := bolt.Open("../../db/offline_db.db", 0644, nil)
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
 		fmt.Println("createBucket failed: ", err)
