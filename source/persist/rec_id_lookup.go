@@ -1,10 +1,6 @@
 package persist
 
-import (
-	"fmt"
-
-	"github.com/boltdb/bolt"
-)
+/* DEPRECATED
 
 // RecordIDByZip saves ID Lookup entries to disk
 // get old values and update map before recording

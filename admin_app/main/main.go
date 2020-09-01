@@ -44,7 +44,7 @@ func main() {
 
 		switch {
 		case menu.OptionsMap[ch] == "Process Raw Data": // process new records
-			err := admin.ProcessNewRecords()
+			err := admin.ProcessData()
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)

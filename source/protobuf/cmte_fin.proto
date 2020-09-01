@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package protobuf;
+
+import "google/protobuf/timestamp.proto";
+
+message CmteFinancials {
+    string CmteID = 1;
+    float TotalReceipts = 2;
+	float TxsFromAff = 3;
+	float IndvConts = 4;
+	float OtherConts = 5;
+	float CandCont = 6;
+	float CandLoans = 7;
+	float TotalLoans = 8;
+	float TotalDisb = 9;
+	float TxToAff = 10;
+	float IndvRefunds = 11; 
+	float OtherRefunds = 12;
+	float LoanRepay = 13;
+	float CashBOP = 14;
+	float CashCOP = 15;
+	float DebtsOwed = 16;
+	float NonFedTxsRecvd = 17;
+	float ContToOtherCmte = 18;
+	float IndExp = 19;
+	float PartyExp = 20;
+	float NonFedSharedExp = 21;
+    google.protobuf.Timestamp CovgEndDate = 22;
+}

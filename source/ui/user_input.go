@@ -134,6 +134,7 @@ func GetPathFromUser() string {
 		y = strings.ToLower(y)
 		if y == "y" || y == "yes" {
 			fmt.Println("new path: ", s)
+			fmt.Println()
 			return s
 		}
 	}
@@ -150,7 +151,6 @@ func GetYear() string {
 	}
 
 	var s string
-	var y string
 	for {
 		fmt.Printf("Enter year: ")
 		_, err := fmt.Scan(&s)
@@ -166,18 +166,7 @@ func GetYear() string {
 			continue
 		}
 
-		fmt.Println("Confirm year: ", s)
-		fmt.Printf("(y/N): ")
-		_, err = fmt.Scan(&y)
-		if err != nil {
-			panic(err)
-		}
-
-		y = strings.TrimSpace(y)
-		y = strings.ToLower(y)
-		if y == "y" || y == "yes" {
-			return s
-		}
+		return s
 	}
 }
 
@@ -191,6 +180,7 @@ func GetQuery() string {
 	}
 
 	fmt.Println("Query: ", s)
+	fmt.Println()
 	return s
 }
 

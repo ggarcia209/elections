@@ -8,21 +8,28 @@ import (
 	"github.com/elections/source/donations"
 )
 
-// compare obj to top overall threshold
-func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
+// CompareTopOverall compares a
+func CompareTopOverall(ID string, total float32, od *donations.TopOverallData) error {
+	if total == 0 {
+		return nil
+	}
+
+	if od.Amts == nil {
+		od.Amts = make(map[string]float32)
+	}
 	// add to Amts map if len(Amts) < Size Limit
 	if len(od.Amts) < od.SizeLimit {
-		od.Amts[e.ID] = e.Total
+		od.Amts[ID] = total
 		return nil
 	}
 
 	// check threshold when updating existing entry
-	if od.Amts[e.ID] != 0 {
-		od.Amts[e.ID] = e.Total
-		th, err := checkODThreshold(e.ID, od.Amts, od.Threshold)
+	if od.Amts[ID] != 0 {
+		od.Amts[ID] = total
+		th, err := checkODThreshold(ID, od.Amts, od.Threshold)
 		if err != nil {
-			fmt.Println("compareTopOverall failed: ", err)
-			return fmt.Errorf("compareTopOverall failed: %v", err)
+			fmt.Println(err)
+			return fmt.Errorf("CompareTopOverall failed: %v", err)
 		}
 		od.Threshold = th
 		return nil
@@ -36,8 +43,8 @@ func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 		es := sortTopX(od.Amts)
 		least, err = setThresholdLeast10(es)
 		if err != nil {
-			fmt.Println("compareTopOverall failed: ", err)
-			return fmt.Errorf("compareTopOverall failed: %v", err)
+			fmt.Println(err)
+			return fmt.Errorf("CompareTopOverall failed: %v", err)
 		}
 	} else {
 		for _, entry := range od.Threshold {
@@ -47,12 +54,12 @@ func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 
 	// compare sen cmte's total received value to threshold
 	threshold := least[len(least)-1].Total // last/smallest obj in least
-	if e.Total > threshold {
-		new := newEntry(e.ID, e.Total)
+	if total > threshold {
+		new := newEntry(ID, total)
 		delID, newEntries := reSortLeast(new, least)
 		least = newEntries
 		delete(od.Amts, delID)
-		od.Amts[e.ID] = e.Total
+		od.Amts[ID] = total
 	} else {
 		newTh := []*donations.Entry{}
 		for _, e := range least {
@@ -71,6 +78,13 @@ func compareTopOverall(e *donations.Entry, od *donations.TopOverallData) error {
 
 	return nil
 }
+
+// UpdateYearlyTotal updates the total of a YearlyTotal object.
+func UpdateYearlyTotal(amt float32, yt *donations.YearlyTotal) {
+	yt.Total += amt
+}
+
+/* DEPRECATED
 
 func updateTopOverall(filer *donations.CmteTxData, other interface{}, incoming, transfer bool, cache map[string]map[string]interface{}) error {
 	switch t := other.(type) {
@@ -428,7 +442,7 @@ func updateAndSave(category string, entry *donations.Entry, cache map[string]int
 	}
 
 	return nil
-}
+} */
 
 // check to see if previous total of entry is in threshold range when updating existing entry
 func checkODThreshold(newID string, m map[string]float32, th []*donations.Entry) ([]*donations.Entry, error) {

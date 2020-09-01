@@ -4,6 +4,7 @@ package persist
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/elections/source/donations"
 
@@ -18,7 +19,7 @@ func InitDiskCache() {
 	// metadata - store in /admin_app
 	if _, err := os.Stat("../db"); os.IsNotExist(err) {
 		os.Mkdir("../db", 0744)
-		fmt.Printf("CreateDB successful: '../db' directory created")
+		fmt.Printf("CreateDB successful: '../db' directory created\n")
 	}
 }
 
@@ -26,13 +27,7 @@ func InitDiskCache() {
 func Init(year string) error {
 	createDB()
 
-	err := createLookupBuckets()
-	if err != nil {
-		fmt.Println("Init failed: ", err)
-		return fmt.Errorf("Init failed: %v", err)
-	}
-
-	err = createObjBuckets(year)
+	err := createObjBuckets(year)
 	if err != nil {
 		fmt.Println("Init failed: ", err)
 		return fmt.Errorf("Init failed: %v", err)
@@ -44,22 +39,25 @@ func Init(year string) error {
 
 // StoreObjects persists a list of objects to the on-disk database
 func StoreObjects(year string, objs []interface{}) error {
+	i := 0
+	bkt := ""
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
-	defer db.Close()
 	if err != nil {
-		fmt.Println("StoreObjects failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("StoreObjects failed: %v", err)
 	}
+	defer db.Close()
 
 	// tx
+
 	if err := db.Update(func(tx *bolt.Tx) error {
 		for _, obj := range objs {
 			// encode object
 			bucket, key, data, err := encodeToProto(obj)
 			if err != nil {
-				fmt.Println("StoreObjects failed: ", err)
+				fmt.Println(err)
 				return fmt.Errorf("StoreObjects failed: %v", err)
 			}
 
@@ -67,12 +65,27 @@ func StoreObjects(year string, objs []interface{}) error {
 			if err := b.Put([]byte(key), data); err != nil { // serialize k,v
 				return fmt.Errorf("StoreObjects failed: %v", err)
 			}
+			i++
+			bkt = bucket
 		}
 		return nil
 	}); err != nil {
-		fmt.Println("StoreObjects failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("StoreObjecs failed: %v", err)
 	}
+	fmt.Println("items put per transaction: ", i)
+
+	// fmt.Printf("items saved - %s: %d\n", bkt, i)
+	if bkt == "committees" {
+		keyN := 0
+		db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(year)).Bucket([]byte("committees"))
+			keyN = b.Stats().KeyN
+			return nil
+		})
+		fmt.Printf("items in bucket committees: %d\n", keyN)
+	}
+
 	return nil
 }
 
@@ -88,11 +101,11 @@ func PutObject(year string, object interface{}) error {
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
-	defer db.Close()
 	if err != nil {
 		fmt.Println("PutObject failed: ", err)
 		return fmt.Errorf("PutObject failed: %v", err)
 	}
+	defer db.Close()
 
 	// tx
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -111,11 +124,11 @@ func PutObject(year string, object interface{}) error {
 // GetObject gets an object by year:bucket:key and returns it as an interface
 func GetObject(year, bucket, key string) (interface{}, error) {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
-	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
+	defer db.Close()
 
 	var data []byte
 
@@ -141,6 +154,7 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, string, error) {
 	objs := []interface{}{}
 	currKey := startKey
+	i := 0
 
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
@@ -167,18 +181,21 @@ func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, st
 				return fmt.Errorf("tx failed: %v", err)
 			}
 			objs = append(objs, obj)
-			ckBytes, _ := c.Next()
-			currKey = string(ckBytes)
+			currKey = string(k)
 			if len(objs) == n {
 				break
 			}
+			i++
 		}
 		return nil
 	}); err != nil {
 		fmt.Println(err)
 		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
 	}
-
+	if len(objs) < n {
+		currKey = ""
+	}
+	fmt.Println("items scanned: ", i)
 	return objs, currKey, nil
 }
 
@@ -226,39 +243,184 @@ func GetTopOverall(year string) ([]interface{}, error) {
 	objs := []interface{}{}
 
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
-	defer db.Close()
 	if err != nil {
-		fmt.Println("GetObject failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
+	defer db.Close()
 
-	var data [][]byte
-
-	db.View(func(tx *bolt.Tx) error {
+	if err := db.View(func(tx *bolt.Tx) error {
 		// Assume bucket exists and has keys
 		b := tx.Bucket([]byte(year)).Bucket([]byte("top_overall"))
-
 		c := b.Cursor()
 
-		i := 0
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			data = append(data, v)
-			i++
+			if v == nil {
+				fmt.Printf("nil object: %s\n", string(k))
+				continue
+			}
+			obj, err := decodeFromProto("top_overall", v)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("tx failed: %v", err)
+			}
+			objs = append(objs, obj)
 		}
-
 		return nil
-	})
-
-	for _, bs := range data {
-		obj, err := decodeFromProto("top_overall", bs)
-		if err != nil {
-			fmt.Println("GetTopOverall failed: ", err)
-			return nil, fmt.Errorf("GetTopOverall failed: %v", err)
-		}
-		objs = append(objs, obj)
+	}); err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("GetTopOverall failed: %v", err)
 	}
 
 	return objs, nil
+}
+
+// SaveTopOverall saves a list of TopOverall objects by year/bucket/category
+func SaveTopOverall(year, bucket string, ods []interface{}) error {
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("SaveTopOverall failed: %v", err)
+	}
+	defer db.Close()
+
+	// tx
+	if err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(year)).Bucket([]byte("top_overall"))
+
+		for _, od := range ods {
+			_, key, data, err := encodeToProto(od)
+			fmt.Println("saved: ", key)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("tx failed %v", err)
+			}
+			if err = b.Put([]byte(key), data); err != nil { // serialize k,v
+				return fmt.Errorf("tx failed %v", err)
+			}
+		}
+
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("SaveTopOverall failed: %v", err)
+	}
+	return nil
+}
+
+// GetYearlyTotals retreives the Yearly objects from disk for the given year/cateogry.
+func GetYearlyTotals(year, cat string) ([]interface{}, error) {
+	objs := []interface{}{}
+
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("GetObject failed: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte(year)).Bucket([]byte("yearly_totals"))
+		c := b.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			obj, err := decodeFromProto("yearly_totals", v)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("tx failed: %v", err)
+			}
+			objs = append(objs, obj)
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("GetYearlyTotals failed: %v", err)
+	}
+
+	return objs, nil
+}
+
+// SaveYearlyTotals saves a list of YearlyTotal objects by year/category
+func SaveYearlyTotals(year, cat string, yts []interface{}) error {
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("SaveTopOverall failed: %v", err)
+	}
+	defer db.Close()
+
+	// tx
+	if err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(year)).Bucket([]byte("yearly_totals"))
+
+		for _, yt := range yts {
+			_, key, data, err := encodeToProto(yt)
+			fmt.Println("saved: ", key)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("tx failed %v", err)
+			}
+			if err = b.Put([]byte(key), data); err != nil { // serialize k,v
+				return fmt.Errorf("tx failed %v", err)
+			}
+		}
+
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("SaveYearlyTotals failed: %v", err)
+	}
+	return nil
+}
+
+// ViewDataByBucket prints 1000 objects stored at at the given year/bucket
+// per function call and returns the last key printed.
+// Enter "" to start at first key.
+func ViewDataByBucket(year, bucket, start string) (string, error) {
+	fmt.Printf("Displaying data for %s - %s: \n", year, bucket)
+	i := 0
+	curr := start
+	keyN := 0
+
+	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("ViewDataByBucket failed: %v", err)
+	}
+
+	if err := db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte(year)).Bucket([]byte(bucket))
+		keyN = b.Stats().KeyN
+
+		c := b.Cursor()
+
+		if start == "" {
+			skBytes, _ := c.First()
+			start = string(skBytes)
+		}
+
+		for k, _ := c.Seek([]byte(start)); k != nil; k, _ = c.Next() {
+			fmt.Printf("%d) %s - %s:\t%s\n", i, year, bucket, string(k))
+			i++
+			if i == 1000 {
+				break
+			}
+			curr = string(k)
+		}
+		if i < 1000 {
+			curr = ""
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return "", fmt.Errorf("ViewDataByBucket failed: %v", err)
+	}
+	fmt.Printf("items in bucket %s: %d\n", bucket, keyN)
+	fmt.Println("items scanned: ", i)
+	return curr, nil
 }
 
 // encodeToProto encodes an object interface to protobuf
@@ -306,10 +468,28 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
+	case *donations.CmteFinancials:
+		bucket := "cmte_fin"
+		key := obj.(*donations.CmteFinancials).CmteID
+		data, err := encodeCmteFinancials(*obj.(*donations.CmteFinancials))
+		if err != nil {
+			fmt.Println("encodeToProto failed: ", err)
+			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
+		}
+		return bucket, key, data, nil
 	case *donations.TopOverallData:
 		bucket := "top_overall"
-		key := obj.(*donations.TopOverallData).Category
+		key := obj.(*donations.TopOverallData).ID
 		data, err := encodeOverallData(*obj.(*donations.TopOverallData))
+		if err != nil {
+			fmt.Println("encodeToProto failed: ", err)
+			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
+		}
+		return bucket, key, data, nil
+	case *donations.YearlyTotal:
+		bucket := "yearly_totals"
+		key := obj.(*donations.YearlyTotal).ID
+		data, err := encodeYrTotal(*obj.(*donations.YearlyTotal))
 		if err != nil {
 			fmt.Println("encodeToProto failed: ", err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
@@ -353,8 +533,22 @@ func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
+	case "cmte_fin":
+		data, err := decodeCmteFinancials(data)
+		if err != nil {
+			fmt.Println("decodeFromProto failed: ", err)
+			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
+		}
+		return &data, nil
 	case "top_overall":
 		data, err := decodeOverallData(data)
+		if err != nil {
+			fmt.Println("decodeFromProto failed: ", err)
+			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
+		}
+		return &data, nil
+	case "yearly_totals":
+		data, err := decodeYrTotal(data)
 		if err != nil {
 			fmt.Println("decodeFromProto failed: ", err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
@@ -369,57 +563,21 @@ func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 // before any other function in 'parse' package is called.
 func createDB() {
 	// create output directory
-	if _, err := os.Stat(OUTPUT_PATH + "/db"); os.IsNotExist(err) {
-		os.Mkdir(OUTPUT_PATH+"/db", 0744)
+	if _, err := os.Stat(filepath.Join(OUTPUT_PATH, "db")); os.IsNotExist(err) {
+		os.Mkdir(filepath.Join(OUTPUT_PATH, "db"), 0744)
 		fmt.Printf("CreateDB successful: '%s/db' directory created\n", OUTPUT_PATH)
+		fmt.Println()
 	}
 }
 
 func createObjBuckets(year string) error {
-	buckets := []string{"individuals", "committees", "candidates", "cmte_tx_data", "top_overall"}
+	buckets := []string{"individuals", "committees", "candidates", "cmte_tx_data", "cmte_fin", "top_overall", "yearly_totals"}
 	for _, bucket := range buckets {
 		err := createBucket(year, bucket)
 		if err != nil {
-			fmt.Println("createObjBuckets failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("createObjBuckets failed: %v", err)
 		}
-	}
-	return nil
-}
-
-// createLookupBucket initializes the 'id_lookup' bucket in disk_cache.db
-func createLookupBuckets() error {
-	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
-	defer db.Close()
-	if err != nil {
-		fmt.Println("createLookupBucket failed: ", err)
-		return fmt.Errorf("createLookupBucket failed: %v", err)
-	}
-
-	// indv ID lookup
-	if err := db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte("id_lookup"))
-		if err != nil {
-			fmt.Println("createLookupBucket failed: ", err)
-			return fmt.Errorf("createLookupBucket failed: %v", err)
-		}
-		return nil
-	}); err != nil {
-		fmt.Println("createLookupBucket failed: ", err)
-		return fmt.Errorf("createLookupBucket failed: %v", err)
-	}
-
-	// disb_rec ID lookup
-	if err := db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte("rec_id_lookup"))
-		if err != nil {
-			fmt.Println("createLookupBucket failed: ", err)
-			return fmt.Errorf("createLookupBucket failed: %v", err)
-		}
-		return nil
-	}); err != nil {
-		fmt.Println("createLookupBucket failed: ", err)
-		return fmt.Errorf("createLookupBucket failed: %v", err)
 	}
 
 	return nil
@@ -429,7 +587,7 @@ func createBucket(year, name string) error {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
-		fmt.Println("createBucket failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("createBucket failed: %v", err)
 	}
 
@@ -437,19 +595,20 @@ func createBucket(year, name string) error {
 	if err := db.Update(func(tx *bolt.Tx) error {
 		yb, err := tx.CreateBucketIfNotExists([]byte(year))
 		if err != nil {
-			fmt.Println("createBucket failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("createBucket failed: %v", err)
 		}
 		_, err = yb.CreateBucketIfNotExists([]byte(name))
 		if err != nil {
-			fmt.Println("createBucket failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("createBucet failed: %v", err)
 		}
 		return nil
 	}); err != nil {
-		fmt.Println("createBucket failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("createBucket failed: %v", err)
 	}
+	fmt.Printf("created bucket: %s - %s\n", year, name)
 
 	return nil
 }

@@ -19,16 +19,16 @@ message Candidate {
 	string State = 9; 
 	string Zip = 10;    
 	repeated string OtherAffiliates = 11;
-	float TotalDirectInAmt = 12;
-	float TotalDirectInTxs = 13;
-	float AvgDirectIn = 14;
-	float TotalDirectOutAmt = 15;
-	float TotalDirectOutTxs = 16;
-	float AvgDirectOut = 17;
-	float NetBalanceDirectTx = 18;
-	map<string, float> DirectRecipientsAmts = 19;
-	map<string, float> DirectRecipientsTxs = 20;
-	map<string, float> DirectSendersAmts = 21;
-	map<string, float> DirectSendersTxs = 22;
-
+	repeated string TransactionsList = 12;
+	float TotalDirectInAmt = 13;
+	float TotalDirectInTxs = 14;
+	float AvgDirectIn = 15;
+	float TotalDirectOutAmt = 16;
+	float TotalDirectOutTxs = 17;
+	float AvgDirectOut = 18;
+	float NetBalanceDirectTx = 19;
+	map<string, float> DirectRecipientsAmts = 20;
+	map<string, float> DirectRecipientsTxs = 21;
+	map<string, float> DirectSendersAmts = 22;
+	map<string, float> DirectSendersTxs = 23;
 }

@@ -40,6 +40,7 @@ func createCacheFromContribution(year string, txQueue []*donations.Contribution)
 
 	cache := map[string]map[string]interface{}{
 		"individuals":  make(map[string]interface{}),
+		"committees":   make(map[string]interface{}),
 		"cmte_tx_data": make(map[string]interface{}),
 		"candidates":   make(map[string]interface{}),
 		"top_overall":  make(map[string]interface{}),
@@ -50,7 +51,7 @@ func createCacheFromContribution(year string, txQueue []*donations.Contribution)
 		// get filing committee object
 		filer, err := persist.GetObject(year, "cmte_tx_data", tx.CmteID)
 		if err != nil {
-			fmt.Println("createCacheFromContribution failed: ", err)
+			fmt.Println(err)
 			return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
 		}
 		cache["cmte_tx_data"][tx.CmteID] = filer
@@ -59,15 +60,16 @@ func createCacheFromContribution(year string, txQueue []*donations.Contribution)
 		if filer.(*donations.CmteTxData).CandID != "" {
 			cand, err := persist.GetObject(year, "candidates", filer.(*donations.CmteTxData).CandID)
 			if err != nil {
-				fmt.Println("createCacheFromContribution failed: ", err)
+				fmt.Println(err)
 				return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
 			}
-			cache["candidates"][filer.(*donations.CmteTxData).CandID] = cand
+			candID := filer.(*donations.CmteTxData).CandID
+			cache["candidates"][candID] = cand
 
 			// nil object returned - linked candidate object does not exist
 			if cand.(*donations.Candidate).ID == "" {
-				cand = createCand(filer.(*donations.CmteTxData).CandID)
-				cache["candidates"][filer.(*donations.CmteTxData).CandID] = cand
+				cand = createCand(candID)
+				cache["candidates"][candID] = cand
 			}
 
 		}
@@ -83,7 +85,7 @@ func createCacheFromContribution(year string, txQueue []*donations.Contribution)
 					// check database
 					other, err = persist.GetObject(year, "individuals", id)
 					if err != nil {
-						fmt.Println("createCacheFromContribution failed: ", err)
+						fmt.Println(err)
 						return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
 					}
 					if other.(*donations.Individual).ID == "" { // object does not exist - create new obj
@@ -98,7 +100,7 @@ func createCacheFromContribution(year string, txQueue []*donations.Contribution)
 					// check database
 					other, err = persist.GetObject(year, "individuals", id)
 					if err != nil {
-						fmt.Println("createCacheFromContribution failed: ", err)
+						fmt.Println(err)
 						return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
 					}
 					if other.(*donations.Individual).ID == "" { // object does not exist - create new obj
@@ -121,26 +123,20 @@ func createCacheFromContribution(year string, txQueue []*donations.Contribution)
 
 				// no record in cycle's bulk data file - nil object returned
 				if bucket == "cmte_tx_data" && other.(*donations.CmteTxData).CmteID == "" { // edge case - Other Registered filers not registered in current election cycle
-					other = createCmte(tx.OtherID)
-					cache[bucket][tx.OtherID] = other
+					var txData *donations.CmteTxData
+					var unk *donations.Committee
+					unk, txData = createCmte(tx.OtherID)
+					cache["committees"][tx.OtherID] = unk
+					cache[bucket][tx.OtherID] = txData
 				}
 				if bucket == "candidates" && other.(*donations.Candidate).ID == "" { // edge case - Other Registered filers not registered in current election cycle
-					other = createCand(tx.OtherID)
-					cache[bucket][tx.OtherID] = other
+					var unk *donations.Candidate
+					unk = createCand(tx.OtherID)
+					cache[bucket][tx.OtherID] = unk
 				}
 			}
 
 		}
-	}
-
-	// add top overall objects
-	overall, err := persist.GetTopOverall(year)
-	if err != nil {
-		fmt.Println("createCacheFromContribution failed: ", err)
-		return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
-	}
-	for _, od := range overall {
-		cache["top_overall"][od.(*donations.TopOverallData).Category] = od
 	}
 
 	return cache, nil
@@ -202,16 +198,6 @@ func createCacheFromDisbursement(year string, txQueue []*donations.Disbursement)
 			tx.RecID = other.(*donations.Individual).ID
 			cache["individuals"][tx.RecID] = other
 		}
-	}
-
-	// add top overall objects
-	overall, err := persist.GetTopOverall(year)
-	if err != nil {
-		fmt.Println("createCacheFromDisbursement failed: ", err)
-		return nil, fmt.Errorf("createCacheFromDisbursement failed: %v", err)
-	}
-	for _, od := range overall {
-		cache["top_overall"][od.(*donations.TopOverallData).Category] = od
 	}
 
 	return cache, nil

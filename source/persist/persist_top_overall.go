@@ -12,7 +12,11 @@ import (
 // encode to protobuf
 func encodeOverallData(od donations.TopOverallData) ([]byte, error) { // move conversions to protobuf package?
 	entry := &protobuf.TopOverallData{
+		ID:        od.ID,
+		Year:      od.Year,
+		Bucket:    od.Bucket,
 		Category:  od.Category,
+		Party:     od.Party,
 		Amts:      od.Amts,
 		Threshold: encodeThreshold(od.Threshold),
 		SizeLimit: int32(od.SizeLimit),
@@ -42,12 +46,16 @@ func decodeOverallData(data []byte) (donations.TopOverallData, error) {
 	od := &protobuf.TopOverallData{}
 	err := proto.Unmarshal(data, od)
 	if err != nil {
-		fmt.Println("convProtoToIndv failed: ", err)
-		return donations.TopOverallData{}, fmt.Errorf("convProtoToIndv failed: %v", err)
+		fmt.Println("decodeOverallData failed: ", err)
+		return donations.TopOverallData{}, fmt.Errorf("decodeOverallData failed: %v", err)
 	}
 
 	entry := donations.TopOverallData{
+		ID:        od.GetID(),
+		Year:      od.GetYear(),
+		Bucket:    od.GetBucket(),
 		Category:  od.GetCategory(),
+		Party:     od.GetParty(),
 		Amts:      od.GetAmts(),
 		Threshold: decodeThreshold(od.GetThreshold()),
 		SizeLimit: int(od.GetSizeLimit()),

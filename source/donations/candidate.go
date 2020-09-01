@@ -18,6 +18,7 @@ type Candidate struct {
 	State                string
 	Zip                  string
 	OtherAffiliates      []string // ID's of other affiliated committees
+	TransactionsList     []string // all direct incoming/outgoing transactions
 	TotalDirectInAmt     float32
 	TotalDirectInTxs     float32
 	AvgDirectIn          float32

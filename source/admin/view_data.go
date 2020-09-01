@@ -9,6 +9,7 @@ import (
 	"github.com/elections/source/indexing"
 	"github.com/elections/source/persist"
 	"github.com/elections/source/ui"
+	"github.com/elections/source/util"
 )
 
 // entry represents a k/v pair in a sorted map
@@ -30,10 +31,12 @@ func (s entries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 func ViewMenu() error {
 	opts := []string{
 		"Search Data",
+		"View Data by Year/Bucket",
 		"View Top Rankings",
+		"View Yearly Totals",
 		"View Search Index",
+		"Query DyanamoDB",
 		"Return to Main Menu",
-		// Query DynamoDB
 	}
 	menu := ui.CreateMenu("admin-view-data", opts)
 
@@ -46,6 +49,7 @@ func ViewMenu() error {
 	}
 
 	indexing.OUTPUT_PATH = output
+	persist.OUTPUT_PATH = output
 	for {
 		ch, err := ui.Ask4MenuChoice(menu)
 		if err != nil {
@@ -54,25 +58,43 @@ func ViewMenu() error {
 		}
 
 		switch {
-		case ch == 0: // Seach
+		case menu.OptionsMap[ch] == "Search Data":
 			err := searchData()
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("ViewMenu failed: %v", err)
 			}
-		case ch == 1: // Rankings
+		case menu.OptionsMap[ch] == "View Data by Year/Bucket":
+			err := viewBucket()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("ViewMenu failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "View Top Rankings":
 			err := viewRankings()
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("ViewMenu failed: %v", err)
 			}
-		case ch == 2: // View Index
+		case menu.OptionsMap[ch] == "View Yearly Totals":
+			err := viewYrTotals()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("ViewMenu failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "View Search Index":
 			err := indexing.ViewIndex()
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("ViewMenu failed: %v", err)
 			}
-		case ch == 3: // Return
+		case menu.OptionsMap[ch] == "Query DyanamoDB":
+			err := QueryDynamoDB()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("ViewMenu failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "Return to Main Menu":
 			fmt.Println("Returning to menu...")
 			return nil
 		}
@@ -280,45 +302,44 @@ func lookupByID() error {
 
 // routine for viewing rankings by year/category/party
 func viewRankings() error {
-	yrs := []string{
-		"2020", "2018", "2016", "2014", "2012",
-		"2010", "2008", "2006", "2004", "2002",
-		"2000", "1998", "1996", "1994", "1992",
-		"1990", "1988", "1986", "1984", "1982",
-		"1980",
-	}
-	yrsMenu := ui.CreateMenu("admin-rankings-yrs", yrs)
-
 	cats := []string{
-		"indv", "indv_rec", "cmte_donors", "cmte_recs", "cmte_exp", "cand", "cand_exp",
+		"Individual Donors", "Individual Recipients", "Committee Donors", "Committee Recipients",
+		"Committee Spenders", "Candidate Recipients", "Candidate Donors", "Candidate Spenders",
+	}
+	catMap := map[string][]string{
+		"Individual Donors":     []string{"individuals", "donor"},
+		"Individual Recipients": []string{"individuals", "rec"},
+		"Committee Donors":      []string{"cmte_tx_data", "donor"},
+		"Committee Recipients":  []string{"cmte_tx_data", "rec"},
+		"Committee Spenders":    []string{"cmte_tx_data", "exp"},
+		"Candidate Recipients":  []string{"candidates", "rec"},
+		"Candidate Donors":      []string{"candidates", "donor"},
+		"Candidate Spenders":    []string{"candidates", "exp"},
 	}
 	catMenu := ui.CreateMenu("admin-rankings-cats", cats)
 	ptyMap := map[string][]string{
-		"indv":        []string{"indv", "cancel"},
-		"indv_rec":    []string{"indv_rec", "cancel"},
-		"cmte_donors": []string{"cmte_donors_all", "cmte_donors_d", "cmte_donors_r", "cmte_donors_na", "cmte_donors_misc", "cancel"},
-		"cmte_recs":   []string{"cmte_rec_all", "cmte_rec_d", "cmte_rec_r", "cmte_rec_na", "cmte_rec_misc", "cancel"},
-		"cmte_exp":    []string{"cmte_exp_all", "cmte_exp_d", "cmte_exp_r", "cmte_exp_na", "cmte_exp_misc", "cancel"},
-		"cand":        []string{"cand_all", "cand_d", "cand_r", "cand_na", "cand_misc", "cancel"},
-		"cand_exp":    []string{"cand_exp_all", "cand_exp_d", "cand_exp_r", "cand_exp_na", "cand_exp_misc", "cancel"},
+		"Individual Donors":     []string{"ALL", "cancel"},
+		"Individual Recipients": []string{"ALL", "cancel"},
+		"Committee Donors":      []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
+		"Committee Recipients":  []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
+		"Committee Spenders":    []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
+		"Candidate Recipients":  []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
+		"Candidate Donors":      []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
+		"Candidate Spenders":    []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
 	}
 
 	for {
 		// get Year
-		ch, err := ui.Ask4MenuChoice(yrsMenu)
-		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("viewRankings failed: %v", err)
-		}
-		year := yrsMenu.OptionsMap[ch]
+		year := ui.GetYear()
 
 		// get category
-		ch, err = ui.Ask4MenuChoice(catMenu)
+		ch, err := ui.Ask4MenuChoice(catMenu)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("viewRankings failed: %v", err)
 		}
 		cat := catMenu.OptionsMap[ch]
+		b, c := catMap[cat][0], catMap[cat][1]
 
 		// get party sub category
 		ptys := ptyMap[cat]
@@ -329,21 +350,32 @@ func viewRankings() error {
 			return fmt.Errorf("viewRankings failed: %v", err)
 		}
 
-		// display sorted rankings from selection
-		selection := ptysMenu.OptionsMap[ch]
-		fmt.Println("selection: ", selection)
-		if selection == "cancel" {
+		// get party
+		pty := ptysMenu.OptionsMap[ch]
+		fmt.Println("selection: ", pty)
+		if pty == "cancel" {
 			fmt.Println("Returning to menu...")
 			return nil
 		}
-		rankings, err := persist.GetObject(year, "top_overall", selection)
-		sorted := sortRankings(rankings.(*donations.TopOverallData).Amts)
-		err = printSortedRankings(rankings.(*donations.TopOverallData), sorted)
+
+		// get object
+		id := year + "-" + b + "-" + c + "-" + pty
+		obj, err := persist.GetObject(year, "top_overall", id)
+		rankings := obj.(*donations.TopOverallData)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("viewRankings failed: %v", err)
 		}
 
+		// print sorted list of top overall entities
+		sorted := util.SortMapObjectTotals(rankings.Amts)
+		err = printSortedRankings(rankings, sorted)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("viewRankings failed: %v", err)
+		}
+
+		// option to lookup object form list by ID
 		fmt.Println("Lookup by ID?")
 		yes := ui.Ask4confirm()
 		if yes {
@@ -354,6 +386,7 @@ func viewRankings() error {
 			}
 		}
 
+		// option to view new top overall category
 		fmt.Println("View new category?")
 		yes = ui.Ask4confirm()
 		if !yes {
@@ -362,6 +395,187 @@ func viewRankings() error {
 		}
 	}
 
+}
+
+// routine for viewing rankings by year/category/party
+func viewYrTotals() error {
+	// menu options
+	cats := []string{"Funds Received", "Funds Donated or Transferred", "Funds Expensed"}
+	catMap := map[string]string{
+		"Funds Received":               "rec",
+		"Funds Donated or Transferred": "donor",
+		"Funds Expensed":               "exp",
+	}
+	catMenu := ui.CreateMenu("admin-rankings-cats", cats)
+	ptys := []string{"All", "Democrat", "Republican", "Independent/Non-Affiliated", "Other", "Unknown", "cancel"}
+	ptyMap := map[string]string{
+		"All":                        "ALL",
+		"Democrat":                   "DEM",
+		"Republican":                 "REP",
+		"Independent/Non-Affiliated": "IND",
+		"Other":                      "OTH",
+		"Unknown":                    "UNK",
+		"cancel":                     "cancel",
+	}
+
+	for {
+		// get Year
+		year := ui.GetYear()
+
+		// get category
+		ch, err := ui.Ask4MenuChoice(catMenu)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("viewYrTotals failed: %v", err)
+		}
+		c := catMenu.OptionsMap[ch]
+		cat := catMap[c]
+
+		// get party sub category
+		ptysMenu := ui.CreateMenu("admin-rankings-pty", ptys)
+		ch, err = ui.Ask4MenuChoice(ptysMenu)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("viewYrTotals failed: %v", err)
+		}
+
+		// get party
+		p := ptysMenu.OptionsMap[ch]
+		pty := ptyMap[p]
+		fmt.Println("selection: ", pty)
+		if pty == "cancel" {
+			fmt.Println("Returning to menu...")
+			return nil
+		}
+
+		// get object
+		id := year + "-" + cat + "-" + pty
+		obj, err := persist.GetObject(year, "yearly_totals", id)
+		yt := obj.(*donations.YearlyTotal)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("viewYrTotals failed: %v", err)
+		}
+
+		// print sorted list of top overall entities
+		fmt.Println("Yearly Total:")
+		fmt.Printf("%s\t%s\t%s\n\tTotal: %d\n", yt.Year, yt.Category, yt.Party, int(yt.Total))
+
+		// option to view new top overall category
+		fmt.Println("View new category?")
+		yes := ui.Ask4confirm()
+		if !yes {
+			fmt.Println("Returning to menu...")
+			return nil
+		}
+	}
+
+}
+
+func viewBucket() error {
+	year := ui.GetYear()
+	opts := []string{"individuals", "committees", "cmte_tx_data", "cmte_fin", "candidates", "top_overall", "yearly_totals", "cancel"}
+	menu := ui.CreateMenu("view-data-by-bucket", opts)
+	start := ""   // start at first key in bucket
+	curr := start // initialize starting key of next batch
+	cont := false // continue to print next batch
+
+	for {
+		ch, err := ui.Ask4MenuChoice(menu)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("viewBucket failed: %v", err)
+		}
+		switch {
+		case menu.OptionsMap[ch] == "individuals":
+			for {
+				curr, cont, err = viewNext(year, menu.OptionsMap[ch], curr)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("viewBucket failed: %v", err)
+				}
+				if !cont {
+					fmt.Println("Returning to menu...")
+					break
+				}
+			}
+		case menu.OptionsMap[ch] == "committees":
+			for {
+				curr, cont, err = viewNext(year, menu.OptionsMap[ch], curr)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("viewBucket failed: %v", err)
+				}
+				if !cont {
+					fmt.Println("Returning to menu...")
+					break
+				}
+			}
+		case menu.OptionsMap[ch] == "cmte_tx_data":
+			for {
+				curr, cont, err = viewNext(year, menu.OptionsMap[ch], curr)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("viewBucket failed: %v", err)
+				}
+				if !cont {
+					fmt.Println("Returning to menu...")
+					break
+				}
+			}
+		case menu.OptionsMap[ch] == "cmte_fin":
+			for {
+				curr, cont, err = viewNext(year, menu.OptionsMap[ch], curr)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("viewBucket failed: %v", err)
+				}
+				if !cont {
+					fmt.Println("Returning to menu...")
+					break
+				}
+			}
+		case menu.OptionsMap[ch] == "candidates":
+			for {
+				curr, cont, err = viewNext(year, menu.OptionsMap[ch], curr)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("viewBucket failed: %v", err)
+				}
+				if !cont {
+					fmt.Println("Returning to menu...")
+					break
+				}
+			}
+		case menu.OptionsMap[ch] == "top_overall":
+			for {
+				curr, cont, err = viewNext(year, menu.OptionsMap[ch], curr)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("viewBucket failed: %v", err)
+				}
+				if !cont {
+					fmt.Println("Returning to menu...")
+					break
+				}
+			}
+		case menu.OptionsMap[ch] == "yearly_totals":
+			for {
+				curr, cont, err = viewNext(year, menu.OptionsMap[ch], curr)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("viewBucket failed: %v", err)
+				}
+				if !cont {
+					fmt.Println("Returning to menu...")
+					break
+				}
+			}
+		case menu.OptionsMap[ch] == "cancel":
+			fmt.Println("Returning to menu...")
+			return nil
+		}
+	}
 }
 
 // prints search results
@@ -388,13 +602,14 @@ func sortRankings(m map[string]float32) entries {
 }
 
 // lookup corresponding SearchData object for each ID in rankings and print data
-func printSortedRankings(r *donations.TopOverallData, sorted entries) error {
+func printSortedRankings(r *donations.TopOverallData, sorted util.SortedTotalsMap) error {
 	fmt.Println("Top Rankings")
-	fmt.Println("Category: ", r.Category)
-	fmt.Println("Size Limit: ", r.SizeLimit)
-	fmt.Printf("Top %d:\n", r.SizeLimit)
+	fmt.Printf("%s\t%s\t%s\n", r.Year, r.Category, r.Party)
+	fmt.Println()
+
 	ids := []string{}
 	for _, e := range sorted {
+		// sfmt.Printf("ID: %s\tTotal: %.2f\n", e.ID, e.Total)
 		ids = append(ids, e.ID)
 	}
 	sds, err := indexing.LookupSearchData(ids)
@@ -403,9 +618,32 @@ func printSortedRankings(r *donations.TopOverallData, sorted entries) error {
 		return fmt.Errorf("printSortedRankings failed: %v", err)
 	}
 	for i, sd := range sds {
-		fmt.Printf("Rank %d)  %s - %s (%s, %s): %v\n", i, sd.ID, sd.Name, sd.City, sd.State, r.Amts[sd.ID])
+		fmt.Printf("Rank %d)  %s - %s (%s, %s): %.2f\n", i, sd.ID, sd.Name, sd.City, sd.State, r.Amts[sd.ID])
+		if sd.Bucket == "individuals" && i == 99 {
+			break
+		}
 	}
 	fmt.Println()
 
 	return nil
+}
+
+// print 1000 items from databse, ask user if continue
+func viewNext(year, bucket, start string) (string, bool, error) {
+	cont := false
+	curr, err := persist.ViewDataByBucket(year, bucket, start)
+	if err != nil {
+		fmt.Println(err)
+		return "", false, fmt.Errorf("viewNext failed: %v", err)
+	}
+	if curr == "" { // list exhausted
+		return curr, false, nil
+	}
+	fmt.Println()
+	fmt.Println(">>> Scan finished - print next 1000 objects?")
+	yes := ui.Ask4confirm()
+	if yes {
+		cont = true
+	}
+	return curr, cont, nil
 }

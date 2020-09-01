@@ -266,12 +266,14 @@ func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) err
 	x := n
 
 	// get Top Individuals by incoming & outgoing funds
-	topIndv, err := persist.GetObject(year, "top_overall", "indv")
+	odID := year + "-individuals-donor-ALL"
+	topIndv, err := persist.GetObject(year, "top_overall", odID)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("getTopIndvData failed: %v", err)
 	}
-	topIndvRec, err := persist.GetObject(year, "top_overall", "indv_rec")
+	odID = year + "-individuals-rec-ALL"
+	topIndvRec, err := persist.GetObject(year, "top_overall", odID)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("getTopIndvData failed: %v", err)

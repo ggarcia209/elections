@@ -3,6 +3,8 @@ package admin
 import (
 	"fmt"
 
+	"github.com/elections/source/persist"
+
 	"github.com/elections/source/indexing"
 	"github.com/elections/source/ui"
 )
@@ -17,6 +19,7 @@ func BuildIndexFromYear() error {
 		return fmt.Errorf("BuildIndexFromYear failed: %v", err)
 	}
 	indexing.OUTPUT_PATH = output
+	persist.OUTPUT_PATH = output
 	// create submenu
 	opts := []string{"Build New Index", "Update Index", "Return"}
 	menu := ui.CreateMenu("admin-index-options", opts)

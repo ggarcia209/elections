@@ -19,7 +19,7 @@ import (
 func UpdateRecordsOnDisk(year string) error {
 	//path, err := persist.GetPath()
 	// open update subdir and read files
-	dirName := "../../raw_data/" + year + "/update"
+	dirName := persist.OUTPUT_PATH + year + "/update"
 	fInfo, err := getFiles(dirName)
 	if err != nil {
 		fmt.Println(err)

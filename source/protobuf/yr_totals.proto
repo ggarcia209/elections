@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package protobuf;
+
+message YearlyTotal {
+    string ID = 1;
+    string Year = 2;
+    string Category = 3;
+    string Party = 4;
+    float Total = 5;
+}
+
+

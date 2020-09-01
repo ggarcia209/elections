@@ -1,12 +1,7 @@
 package persist
 
-import (
-	"fmt"
-
-	"github.com/boltdb/bolt"
-	"github.com/elections/source/protobuf"
-	"github.com/golang/protobuf/proto"
-)
+/* DEPRECATED */
+/*
 
 // IDLookup is used to marshall/unmarshall protobufs
 // used for both DonorID and RecID lookups; "job" string interchangeable with "zip"
@@ -117,8 +112,7 @@ func decodeLookupMap(data []byte) (map[string]string, error) {
 	return entry.LookupByJob, nil
 }
 
-/* DEPRECATED */
-/*
+
 
 // CreateIDBucket creates the "ID's" bucket in the "disk_cache.db" file
 func CceateIDBucket() error {

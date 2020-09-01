@@ -82,8 +82,8 @@ func Upload() error {
 	}
 }
 
-// Query retreives an object from DynamoDB per the specified input
-func Query() error {
+// QueryDynamoDB retreives an object from DynamoDB per the specified input
+func QueryDynamoDB() error {
 	// get dataset year
 	year := ui.GetYear()
 	// init sesh and db with default options

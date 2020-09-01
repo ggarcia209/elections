@@ -8,9 +8,12 @@ message Entry {
 }
 
 message TopOverallData {
-    string Category = 1;
-    map<string, float> Amts = 2;
-    repeated Entry Threshold = 3;
-    int32 SizeLimit = 4;
+    string ID = 1;
+    string Year = 2;
+    string Bucket = 3;
+    string Category = 4;
+    string Party = 5;
+    map<string, float> Amts = 6;
+    repeated Entry Threshold = 7;
+    int32 SizeLimit = 8;
 }
-

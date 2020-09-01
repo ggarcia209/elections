@@ -64,6 +64,7 @@ type CmteTxData struct {
 	TransfersAmt                   float32            // $ value of contributions/transfers/loans to other committees
 	TransfersTxs                   float32            // # of contributions/transfers/loans to other committees
 	AvgTransfer                    float32            // Average value of transfers to other committees
+	TransfersList                  []string           // list of transfer tx ID's
 	ExpendituresAmt                float32            // $ value of expenditure transactions (operating expenses/loan repayments/refunds/etc)
 	ExpendituresTxs                float32            // # of expenditure transactions (operating expenses/loan repayments/refunds/etc)
 	AvgExpenditure                 float32            // Average value of expenditures
@@ -92,45 +93,25 @@ type CmteFinancials struct {
 	designation string
 	filingFreq  string
 	// all following int values represent dollar values
-	TotalReceipts   int       // total receipts
-	TxsFromAff      int       //  transfers from affilliates ($)
-	IndvConts       int       // individual contributions ($)
-	OtherConts      int       // Other political committee contributions ($)
-	CandCont        int       // contributions from candidate
-	CandLoans       int       // candidate loans
-	TotalLoans      int       // total loans received
-	TotalDisb       int       // total disbursements
-	TxToAff         int       // transfers to affiliates
-	IndvRefunds     int       // Refunds to individuals
-	OtherRefunds    int       // other political committee refunds
-	LoanRepay       int       // candidate loan repayments
-	CashBOP         int       // cash at beginning of period
-	CashCOP         int       // cash at end of period
-	DebtsOwed       int       // debts owed by
-	NonFedTxsRecvd  int       // non federal transfers received
-	ContToOtherCmte int       // contributions to other committess
-	IndExp          int       // independent expenditures
-	PartyExp        int       // party coordinated expenditures
-	NonFedSharedExp int       // non-federal shared expenditures
+	TotalReceipts   float32   // total receipts
+	TxsFromAff      float32   //  transfers from affilliates ($)
+	IndvConts       float32   // individual contributions ($)
+	OtherConts      float32   // Other political committee contributions ($)
+	CandCont        float32   // contributions from candidate
+	CandLoans       float32   // candidate loans
+	TotalLoans      float32   // total loans received
+	TotalDisb       float32   // total disbursements
+	TxToAff         float32   // transfers to affiliates
+	IndvRefunds     float32   // Refunds to individuals
+	OtherRefunds    float32   // other political committee refunds
+	LoanRepay       float32   // candidate loan repayments
+	CashBOP         float32   // cash at beginning of period
+	CashCOP         float32   // cash at end of period
+	DebtsOwed       float32   // debts owed by
+	NonFedTxsRecvd  float32   // non federal transfers received
+	ContToOtherCmte float32   // contributions to other committess
+	IndExp          float32   // independent expenditures
+	PartyExp        float32   // party coordinated expenditures
+	NonFedSharedExp float32   // non-federal shared expenditures
 	CovgEndDate     time.Time // coverage end date
 }
-
-// DEPRECATED
-/*
-
-// DisbRecipient representst a recipient of a committee's disbursement
-type DisbRecipient struct {
-	ID                 string
-	Name               string
-	City               string
-	State              string
-	Zip                string
-	Disbursements      []string // IN <- Disb. TxID's
-	TotalDisbursements float32
-	TotalReceived      float32
-	AvgReceived        float32
-	SendersAmt         map[string]float32 // IN <- disbursements from committees
-	SendersTxs         map[string]float32 // IN <- disbursements from committees
-}
-
-*/

@@ -7,6 +7,7 @@ import (
 	"github.com/elections/source/protobuf"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 )
 
 // ecnodeCmte/decodeCmte encodes/decodes Committee structs as protocol buffers
@@ -51,6 +52,7 @@ func encodeCmteTxData(data donations.CmteTxData) ([]byte, error) {
 		TransfersAmt:                   data.TransfersAmt,
 		TransfersTxs:                   data.TransfersTxs,
 		AvgTransfer:                    data.AvgTransfer,
+		TransfersList:                  data.TransfersList,
 		ExpendituresAmt:                data.ExpendituresAmt,
 		ExpendituresTxs:                data.ExpendituresTxs,
 		AvgExpenditure:                 data.AvgExpenditure,
@@ -142,6 +144,7 @@ func decodeCmteTxData(input []byte) (donations.CmteTxData, error) {
 		TransfersAmt:                   data.GetTransfersAmt(),
 		TransfersTxs:                   data.GetTransfersTxs(),
 		AvgTransfer:                    data.GetAvgTransfer(),
+		TransfersList:                  data.GetTransfersList(),
 		ExpendituresAmt:                data.GetExpendituresAmt(),
 		ExpendituresTxs:                data.GetExpendituresTxs(),
 		AvgExpenditure:                 data.GetAvgExpenditure(),
@@ -175,4 +178,82 @@ func decodeCmteThreshold(es []*protobuf.CmteEntry) []interface{} {
 		entries = append(entries, &entry)
 	}
 	return entries
+}
+
+// ecnodeCmte/decodeCmte encodes/decodes Committee structs as protocol buffers
+func encodeCmteFinancials(cmte donations.CmteFinancials) ([]byte, error) { // move conversions to protobuf package?
+	entry := &protobuf.CmteFinancials{
+		CmteID:          cmte.CmteID,
+		TotalReceipts:   cmte.TotalReceipts,
+		TxsFromAff:      cmte.TxsFromAff,
+		IndvConts:       cmte.IndvConts,
+		OtherConts:      cmte.OtherConts,
+		CandCont:        cmte.CandCont,
+		TotalLoans:      cmte.TotalLoans,
+		TotalDisb:       cmte.TotalDisb,
+		TxToAff:         cmte.TxToAff,
+		IndvRefunds:     cmte.IndvRefunds,
+		OtherRefunds:    cmte.OtherRefunds,
+		LoanRepay:       cmte.LoanRepay,
+		CashBOP:         cmte.CashBOP,
+		CashCOP:         cmte.CashCOP,
+		DebtsOwed:       cmte.DebtsOwed,
+		NonFedTxsRecvd:  cmte.NonFedTxsRecvd,
+		ContToOtherCmte: cmte.ContToOtherCmte,
+		IndExp:          cmte.IndExp,
+		PartyExp:        cmte.PartyExp,
+		NonFedSharedExp: cmte.NonFedSharedExp,
+	}
+	ts, err := ptypes.TimestampProto(cmte.CovgEndDate)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("encodeCmteFinancials failed: %v", err)
+	}
+	entry.CovgEndDate = ts
+	data, err := proto.Marshal(entry)
+	if err != nil {
+		fmt.Println("encodeCmteFinancials failed: ", err)
+		return nil, fmt.Errorf("encodeCmteFinancials failed: %v", err)
+	}
+	return data, nil
+}
+
+func decodeCmteFinancials(data []byte) (donations.CmteFinancials, error) {
+	cmte := &protobuf.CmteFinancials{}
+	err := proto.Unmarshal(data, cmte)
+	if err != nil {
+		fmt.Println("decodeCmteFinancials failed: ", err)
+		return donations.CmteFinancials{}, fmt.Errorf("decodeCmteFinancials failed: %v", err)
+	}
+
+	entry := donations.CmteFinancials{
+		CmteID:          cmte.GetCmteID(),
+		TotalReceipts:   cmte.GetTotalReceipts(),
+		TxsFromAff:      cmte.GetTxsFromAff(),
+		IndvConts:       cmte.GetIndvConts(),
+		OtherConts:      cmte.GetOtherConts(),
+		CandCont:        cmte.GetCandCont(),
+		TotalLoans:      cmte.GetTotalLoans(),
+		TotalDisb:       cmte.GetTotalDisb(),
+		TxToAff:         cmte.GetTxToAff(),
+		IndvRefunds:     cmte.GetIndvRefunds(),
+		OtherRefunds:    cmte.GetOtherRefunds(),
+		LoanRepay:       cmte.GetLoanRepay(),
+		CashBOP:         cmte.GetCashBOP(),
+		CashCOP:         cmte.GetCashCOP(),
+		DebtsOwed:       cmte.GetDebtsOwed(),
+		NonFedTxsRecvd:  cmte.GetNonFedTxsRecvd(),
+		ContToOtherCmte: cmte.GetContToOtherCmte(),
+		IndExp:          cmte.GetIndExp(),
+		PartyExp:        cmte.GetPartyExp(),
+		NonFedSharedExp: cmte.GetNonFedSharedExp(),
+	}
+	ts, err := ptypes.Timestamp(cmte.GetCovgEndDate())
+	if err != nil {
+		fmt.Println(err)
+		return donations.CmteFinancials{}, fmt.Errorf("decodeCmteFinancials failed: %v", err)
+	}
+	entry.CovgEndDate = ts
+
+	return entry, nil
 }

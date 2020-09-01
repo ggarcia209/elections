@@ -1,11 +1,5 @@
 package cache
 
-// update - Removed DonorID global variable and added as argument to FindPerson function
-// update - removed in memory map and implement lookup from disc
-// update - removed update logic; FindPerson now returns a donor obj in both cases; updating done outside FindPerson
-// update - moved to parse package
-// 8/3/20 - Removed Organization cases and references
-
 import (
 	"fmt"
 
@@ -104,9 +98,17 @@ func findOrgFromDisbursement(id string, disb *donations.Disbursement) *donations
 }
 
 // createCmte creates a new CmteTxData object and returns the pointer
-func createCmte(ID string) *donations.CmteTxData {
-	cmte := donations.CmteTxData{
+func createCmte(ID string) (*donations.Committee, *donations.CmteTxData) {
+	cmte := donations.Committee{
+		ID:    ID,
+		Name:  "Unknown",
+		City:  "???",
+		State: "???",
+		Party: "UNK",
+	}
+	txData := donations.CmteTxData{
 		CmteID:                    ID,
+		Party:                     "UNK",
 		TopIndvContributorsAmt:    make(map[string]float32),
 		TopIndvContributorsTxs:    make(map[string]float32),
 		TopCmteOrgContributorsAmt: make(map[string]float32),
@@ -116,13 +118,17 @@ func createCmte(ID string) *donations.CmteTxData {
 		TopExpRecipientsAmt:       make(map[string]float32),
 		TopExpRecipientsTxs:       make(map[string]float32),
 	}
-	return &cmte
+	return &cmte, &txData
 }
 
 // createCand creates a new Candidate object and returns the pointer
 func createCand(ID string) *donations.Candidate {
 	cand := donations.Candidate{
 		ID:                   ID,
+		Name:                 "Unknown",
+		City:                 "???",
+		State:                "???",
+		Party:                "UNK",
 		DirectRecipientsAmts: make(map[string]float32),
 		DirectRecipientsTxs:  make(map[string]float32),
 		DirectSendersAmts:    make(map[string]float32),

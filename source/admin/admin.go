@@ -7,7 +7,6 @@ import (
 
 	"github.com/elections/source/cache"
 	"github.com/elections/source/databuilder"
-	"github.com/elections/source/donations"
 	"github.com/elections/source/parse"
 	"github.com/elections/source/persist"
 	"github.com/elections/source/ui"
@@ -15,15 +14,47 @@ import (
 
 /* DB CREATE OPERATIONS */
 
+// ProcessData contains options for processing raw data and creating secondary datasets
+// All input directories must have the following files:
+//   input/[year]/cmte/cn.txt - candidate master
+//   input/[year]/cand/cm.txt - committee master
+//   input/[year]/pac/webk.txt - PAC summary
+//   input/[year]/ctx/itoth.txt - any tx between committees
+//   input/[year]/indiv/itcont.txt - individiual contributions
+//   input/[year]/exp/oppexp.txt - operating expenses
+func ProcessData() error {
+	fmt.Println("***** PROCESS DATA *****")
+	opts := []string{"Process Raw Data", "Create Secondary Datasets", "Return"}
+	menu := ui.CreateMenu("process-data-main", opts)
+
+	for {
+		ch, err := ui.Ask4MenuChoice(menu)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("ProcessData failed: %v", err)
+		}
+		switch {
+		case menu.OptionsMap[ch] == "Process Raw Data":
+			err := processNewRecords()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("ProcessData failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "Create Secondary Datasets":
+			err := createSecondaryDatasets()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("ProcessData failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "Return":
+			fmt.Println("Returning to menu...")
+			return nil
+		}
+	}
+}
+
 // ProcessNewRecords processes the FEC bulk data files for the given year.
-// All directories must have the following files:
-//   input/[year]/cmte/cn.txt
-//   input/[year]/cand/cm.txt
-//   input/[year]/pac/webk.txt
-//   input/[year]/ctx/itoth.txt
-//   input/[year]/indiv/itcont.txt
-//   input/[year]/exp/oppexp.txt
-func ProcessNewRecords() error {
+func processNewRecords() error {
 	fmt.Println("******************************************")
 	fmt.Println()
 
@@ -31,13 +62,13 @@ func ProcessNewRecords() error {
 	input, err := persist.GetPath(true)
 	if err != nil {
 		fmt.Println(err)
-		return fmt.Errorf("ProcessNewRecords failed: %v", err)
+		return fmt.Errorf("processNewRecords failed: %v", err)
 	}
 	if input == "" {
 		input, err = getPath(true)
 		if err != nil {
 			fmt.Println(err)
-			return fmt.Errorf("ProcessNewRecords failed: %v", err)
+			return fmt.Errorf("processNewRecords failed: %v", err)
 		}
 	}
 
@@ -81,25 +112,7 @@ func ProcessNewRecords() error {
 	cmteFinPath := filepath.Join(root, "pac", "webk.txt")
 
 	// initialize database and TopOverallData objects
-	//   REFACTOR FOR IDEMPOTENCY
 	persist.Init(year)
-
-	// get starting offset value; 0 if none
-	start, err := persist.GetOffset(year, "cand")
-	if err != nil {
-		fmt.Println("processCandidates failed: ", err)
-		return fmt.Errorf("processCandidates failed: %v", err)
-	}
-
-	if start == 0 {
-		// initialize and persist TopOverallData objects
-		topOverallList := donations.InitTopOverallDataObjs(100)
-		err := persist.StoreObjects(year, topOverallList)
-		if err != nil {
-			fmt.Println("ProcessNewRecords failed: ", err)
-			return fmt.Errorf("ProcessNewRecords failed: %v", err)
-		}
-	}
 
 	// process candidates and committee objects first
 	err = processCandidates(year, candPath)
@@ -114,10 +127,12 @@ func ProcessNewRecords() error {
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
 	}
 
-	err = processCmteFinancials(year, cmteFinPath)
-	if err != nil {
-		fmt.Println("ProcessNewRecords failed: ", err)
-		return fmt.Errorf("ProcessNewRecords failed: %v", err)
+	if year >= "1996" { // no data prior to 1996
+		err = processCmteFinancials(year, cmteFinPath)
+		if err != nil {
+			fmt.Println("ProcessNewRecords failed: ", err)
+			return fmt.Errorf("ProcessNewRecords failed: %v", err)
+		}
 	}
 
 	// process transactions
@@ -133,10 +148,12 @@ func ProcessNewRecords() error {
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
 	}
 
-	err = processDisbursements(year, disbPath)
-	if err != nil {
-		fmt.Println("ProcessNewRecords failed: ", err)
-		return fmt.Errorf("ProcessNewRecords failed: %v", err)
+	if year >= "2004" { // no data prior to 2004
+		err = processDisbursements(year, disbPath)
+		if err != nil {
+			fmt.Println("ProcessNewRecords failed: ", err)
+			return fmt.Errorf("ProcessNewRecords failed: %v", err)
+		}
 	}
 
 	fmt.Println("PROCESS NEW RECORDS COMPLETE - YEAR: ", year)
@@ -148,6 +165,7 @@ func ProcessNewRecords() error {
 
 func processCandidates(year, filePath string) error {
 	// defer wg.Done()
+	j := 0
 
 	// open file
 	file, err := os.Open(filePath)
@@ -188,12 +206,14 @@ func processCandidates(year, filePath string) error {
 		}
 		start = offset
 
+		j += len(objQueue)
 		// break if at end of file
 		if len(objQueue) < 100 {
 			break
 		}
 	}
 
+	fmt.Println("Candidate records scanned: ", j)
 	fmt.Println("Candidates - DONE")
 
 	return nil
@@ -201,6 +221,7 @@ func processCandidates(year, filePath string) error {
 
 func processCommittees(year, filePath string) error {
 	// defer wg.Done()
+	j, k := 0, 0
 
 	// open file
 	file, err := os.Open(filePath)
@@ -246,18 +267,24 @@ func processCommittees(year, filePath string) error {
 		}
 		start = offset
 
+		j += len(objQueue)
+		k += len(txDataQueue)
+
 		// break if at end of file
 		if len(objQueue) < 100 {
 			break
 		}
 	}
 
+	fmt.Println("Committee records scanned: ", j)
+	fmt.Println("CmteTxData objects created: ", k)
 	fmt.Println("Committees - DONE")
 	return nil
 }
 
 func processCmteFinancials(year, filePath string) error {
 	// defer wg.Done()
+	j := 0
 
 	// open file
 	file, err := os.Open(filePath)
@@ -297,6 +324,7 @@ func processCmteFinancials(year, filePath string) error {
 			return fmt.Errorf("processCmteFinancials failed: %v", err)
 		}
 		start = offset
+		j += len(objQueue)
 
 		// break if at end of file
 		if len(objQueue) < 100 {
@@ -304,6 +332,7 @@ func processCmteFinancials(year, filePath string) error {
 		}
 	}
 
+	fmt.Println("CmteFinancials records scanned: ", j)
 	fmt.Println("Candidates - DONE")
 
 	return nil
@@ -531,6 +560,7 @@ func processDisbursements(year, filepath string) error {
 }
 
 // pathExists checks to see if given file path is valid
+// move to util
 func pathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -564,16 +594,19 @@ func getPath(input bool) (string, error) {
 		yes := ui.Ask4confirm()
 		if !yes {
 			fmt.Printf("Continuing with current %s path: %s\n", name, path)
+			fmt.Println()
 		} else { // confirm overwrite
 			fmt.Println(">>> Are you sure you want to overwrite the existing path?")
 			yes := ui.Ask4confirm()
 			if !yes {
 				fmt.Printf("Continuing with current %s path: %s\n", name, path)
+				fmt.Println()
 			} else { // set new path
 				fmt.Println(msg)
 				path = ui.GetPathFromUser()
 				err := persist.LogPath(path, input)
 				fmt.Printf("New path: %s saved\n", path)
+				fmt.Println()
 				if err != nil {
 					fmt.Println(err)
 					return "", fmt.Errorf("getPath failed: %v", err)
@@ -588,6 +621,7 @@ func getPath(input bool) (string, error) {
 	path = ui.GetPathFromUser()
 	err = persist.LogPath(path, input)
 	fmt.Printf("New path: %s saved\n", path)
+	fmt.Println()
 	if err != nil {
 		fmt.Println(err)
 		return "", fmt.Errorf("getPath failed: %v", err)
@@ -595,7 +629,9 @@ func getPath(input bool) (string, error) {
 	return path, nil
 }
 
-/* func getYear() (string, error) {
+/* DEPRECATED
+
+func getYear() (string, error) {
 	yearStr := "" // default return value
 
 	for {
@@ -641,45 +677,4 @@ func getPath(input bool) (string, error) {
 	return yearStr, nil
 }
 
-func viewTopOverall(year string) error {
-	testCmte, err := persist.GetObject(year, "cmte_tx_data", "C00343871") // C00401224
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	odIndv, err := persist.GetObject(year, "top_overall", "indv")
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	odCmte, err := persist.GetObject(year, "top_overall", "cmte_recs_all")
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	testIndv, err := persist.GetObject(year, "individuals", "01489ace1a99994034ef8df6455bb6de")
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	fmt.Println("*** TEST COMMITTEES ***")
-	fmt.Println(testCmte)
-	fmt.Println()
-	fmt.Println("*** TEST INDIVIDUAL ***")
-	fmt.Println(testIndv)
-	fmt.Println()
-
-	fmt.Println("*** TOP COMMITTEES ***")
-	fmt.Println(odCmte)
-	fmt.Println()
-	fmt.Println("*** TOP INDIVIDUALS ***")
-	fmt.Println(odIndv)
-	fmt.Println()
-
-	return nil
-}
 */

@@ -41,8 +41,6 @@ func contributionUpdate(year string, conts []*donations.Contribution, cache map[
 		// get sender/receiver objects
 		other := cache[bucket][cont.OtherID]
 
-		// start := time.Now()
-
 		// update incoming/outgoing tx data
 		if incoming {
 			err := incomingTxUpdate(cont, filer.(*donations.CmteTxData), other, transfer, memo)
@@ -52,16 +50,6 @@ func contributionUpdate(year string, conts []*donations.Contribution, cache map[
 			}
 		} else {
 			err := outgoingTxUpdate(cont, filer.(*donations.CmteTxData), other, transfer, memo)
-			if err != nil {
-				fmt.Println("contributionUpdate failed: ", err)
-				return fmt.Errorf("contributionUpdate failed: %v", err)
-			}
-		}
-
-		// update TopOverall rankings if not memo transaction
-		if !memo {
-			// update top individuals, organizations and committees
-			err := updateTopOverall(filer.(*donations.CmteTxData), other, incoming, transfer, cache)
 			if err != nil {
 				fmt.Println("contributionUpdate failed: ", err)
 				return fmt.Errorf("contributionUpdate failed: %v", err)
@@ -88,15 +76,6 @@ func opExpensesUpdate(year string, disbs []*donations.Disbursement, cache map[st
 			fmt.Println("opExpensesUpdate failed: ", err)
 			return fmt.Errorf("opExpensesUpdate failed: %v", err)
 		}
-
-		// update TopOverall rankings
-		// update top individuals, organizations and committees
-		err = updateTopOverall(filer.(*donations.CmteTxData), receiver, false, false, cache)
-		if err != nil {
-			fmt.Println("opExpensesUpdate failed: ", err)
-			return fmt.Errorf("opExpensesUpdate failed: %v", err)
-		}
-
 	}
 	return nil
 }
@@ -216,6 +195,10 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		sender.(*donations.Individual).AvgTxOut = sender.(*donations.Individual).TotalOutAmt / sender.(*donations.Individual).TotalOutTxs
 		sender.(*donations.Individual).NetBalance = sender.(*donations.Individual).TotalInAmt - sender.(*donations.Individual).TotalOutAmt
 	case *donations.Candidate:
+		if cont.CmteID != sender.(*donations.Candidate).PCC {
+			sender.(*donations.Candidate).OtherAffiliates = append(sender.(*donations.Candidate).OtherAffiliates, cont.CmteID)
+		}
+		sender.(*donations.Candidate).TransactionsList = append(sender.(*donations.Candidate).TransactionsList, cont.TxID)
 		sender.(*donations.Candidate).TotalDirectOutAmt += cont.TxAmt
 		sender.(*donations.Candidate).TotalDirectOutTxs++
 		sender.(*donations.Candidate).AvgDirectOut = sender.(*donations.Candidate).TotalDirectOutAmt / sender.(*donations.Candidate).TotalDirectOutTxs
@@ -258,6 +241,7 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		filerData.TransfersAmt += cont.TxAmt
 		filerData.TransfersTxs++
 		filerData.AvgTransfer = filerData.TransfersAmt / filerData.TransfersTxs
+		filerData.TransfersList = append(filerData.TransfersList, cont.CmteID)
 	} else {
 		filerData.ExpendituresAmt += cont.TxAmt
 		filerData.ExpendituresTxs++
@@ -271,11 +255,15 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	// debit receiver accounts
 	switch t := receiver.(type) {
 	case *donations.Individual:
+		receiver.(*donations.Individual).Transactions = append(receiver.(*donations.Individual).Transactions, cont.TxID)
 		receiver.(*donations.Individual).TotalInAmt += cont.TxAmt
 		receiver.(*donations.Individual).TotalInTxs++
 		receiver.(*donations.Individual).AvgTxIn = receiver.(*donations.Individual).TotalInAmt / receiver.(*donations.Individual).TotalInTxs
 		receiver.(*donations.Individual).NetBalance = receiver.(*donations.Individual).TotalInAmt - receiver.(*donations.Individual).TotalOutAmt
 	case *donations.Candidate:
+		if cont.CmteID != receiver.(*donations.Candidate).PCC {
+			receiver.(*donations.Candidate).TransactionsList = append(receiver.(*donations.Candidate).TransactionsList, cont.TxID)
+		}
 		receiver.(*donations.Candidate).TotalDirectInAmt += cont.TxAmt
 		receiver.(*donations.Candidate).TotalDirectInTxs++
 		receiver.(*donations.Candidate).AvgDirectIn = receiver.(*donations.Candidate).TotalDirectInAmt / receiver.(*donations.Candidate).TotalDirectInTxs
