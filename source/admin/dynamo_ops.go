@@ -27,7 +27,7 @@ func Upload() error {
 	}
 	persist.OUTPUT_PATH = path
 
-	opts := []string{"individuals", "committees", "candidates", "top_overall", "all", "Return"}
+	opts := []string{"individuals", "committees", "cmte_tx_data", "cmte_fin", "candidates", "top_overall", "yearly_totals", "all", "Return"}
 	menu := ui.CreateMenu("admin-upload-category", opts)
 
 	fmt.Println("Choose year: ")
@@ -39,6 +39,7 @@ func Upload() error {
 		fmt.Println(err)
 		return fmt.Errorf("Upload failed: %v", err)
 	}
+	initTableObjs(db, year)
 
 	for {
 		fmt.Println("Choose a category: ")
@@ -55,7 +56,7 @@ func Upload() error {
 		}
 		if cat == "all" {
 			// upload all categories for given year; return when complete
-			for _, cat := range opts[:4] {
+			for _, cat := range opts[:7] {
 				err := uploadFromDisk(db, year, cat, 1000)
 				if err != nil {
 					fmt.Println(err)
@@ -362,17 +363,20 @@ func uploadFromDisk(db *dynamo.DbInfo, year, bucket string, n int) error {
 				break
 			}
 			if len(objs) < 25 { // final batch write
-				err := dynamo.BatchWriteCreate(db.Svc, db.Tables[bucket], db.FailConfig, objs)
+				tn := getTableName(year, bucket)
+				err := dynamo.BatchWriteCreate(db.Svc, db.Tables[tn], db.FailConfig, objs)
 				if err != nil {
 					fmt.Println(err)
 					return fmt.Errorf("UploadFromDisk failed: %v", err)
 				}
+				i += len(objs)
 				break
 			}
 
 			// batch write 25 objects from stack
+			tn := getTableName(year, bucket)
 			data := objs[len(objs)-25:]
-			err := dynamo.BatchWriteCreate(db.Svc, db.Tables[bucket], db.FailConfig, data)
+			err := dynamo.BatchWriteCreate(db.Svc, db.Tables[tn], db.FailConfig, data)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("UploadFromDisk failed: %v", err)
@@ -392,8 +396,6 @@ func uploadFromDisk(db *dynamo.DbInfo, year, bucket string, n int) error {
 			return fmt.Errorf("UploadFromDisk failed: %v", err)
 		}
 
-		fmt.Println("objects wrote to table: ", i)
-
 		// last batch of objects wrote to table
 		if len(objs) < n {
 			fmt.Println("last batch wrote to table")
@@ -410,7 +412,8 @@ func uploadFromDisk(db *dynamo.DbInfo, year, bucket string, n int) error {
 	}
 
 	fmt.Println("***** UPLOAD FINSIHED *****")
-	fmt.Printf("wrote %d items to table %s\n", i, db.Tables[bucket].TableName)
+	tn := getTableName(year, bucket)
+	fmt.Printf("wrote %d items to table %s\n", i, tn)
 	fmt.Println()
 
 	return nil
@@ -419,12 +422,13 @@ func uploadFromDisk(db *dynamo.DbInfo, year, bucket string, n int) error {
 // initTableObjs creates dynamo.Table objects for given year in memory only and
 // adds them to the db.Tables field. See InitDynamoTables description for TableName format.
 func initTableObjs(db *dynamo.DbInfo, year string) {
-	indv := fmt.Sprintf("cf-%s-individuals", year)        // pk = State
-	cand := fmt.Sprintf("cf-%s-candidates", year)         // pk = State
-	cmte := fmt.Sprintf("cf-%s-committees", year)         // pk = State
-	cmteData := fmt.Sprintf("cf-%s-cmte_tx_data", year)   // pk = Name
-	cmteFin := fmt.Sprintf("cf-%s-cmte_financials", year) // pk = Name
-	topOverall := fmt.Sprintf("cf-%s-top_overall", year)  // pk = SizeLimit
+	indv := "cf-" + year + "-individuals"        // pk = State
+	cand := "cf-" + year + "-candidates"         // pk = State
+	cmte := "cf-" + year + "-committees"         // pk = State
+	cmteData := "cf-" + year + "-cmte_tx_data"   // pk = Name
+	cmteFin := "cf-" + year + "-cmte_financials" // pk = Name
+	topOverall := "cf-" + year + "-top_overall"  // pk = SizeLimit
+	yrTotals := "cf-" + year + "-yearly_totals"  // pk = SizeLimit
 
 	// create object tables
 	t := dynamo.CreateNewTableObj(indv, "State", "string", "ID", "string")
@@ -447,7 +451,11 @@ func initTableObjs(db *dynamo.DbInfo, year string) {
 	db.AddTable(t)
 
 	// create TopOverall table
-	t = dynamo.CreateNewTableObj(topOverall, "SizeLimit", "int", "Category", "string")
+	t = dynamo.CreateNewTableObj(topOverall, "Category", "int", "ID", "string")
+	db.AddTable(t)
+
+	// create TopOverall table
+	t = dynamo.CreateNewTableObj(yrTotals, "Category", "string", "ID", "string")
 	db.AddTable(t)
 
 	return
@@ -497,11 +505,13 @@ func uploadTopIndv(db *dynamo.DbInfo, year, bucket string, n int) error {
 				break
 			}
 			if len(objs) < 25 { // final batch write
-				err := dynamo.BatchWriteCreate(db.Svc, db.Tables[bucket], db.FailConfig, objs)
+				tn := getTableName(year, bucket)
+				err := dynamo.BatchWriteCreate(db.Svc, db.Tables[tn], db.FailConfig, objs)
 				if err != nil {
 					fmt.Println(err)
 					return fmt.Errorf("UploadFromDisk failed: %v", err)
 				}
+				i += len(objs)
 				break
 			}
 			fmt.Println(objs)
@@ -524,9 +534,23 @@ func uploadTopIndv(db *dynamo.DbInfo, year, bucket string, n int) error {
 		fmt.Println("objects wrote to table: ", i)
 	}
 
+	tn := getTableName(year, bucket)
 	fmt.Println("***** UPLOAD FINSIHED *****")
-	fmt.Printf("wrote %d items to table %s\n", i, db.Tables[bucket].TableName)
+	fmt.Printf("wrote %d items to table %s\n", i, tn)
 	fmt.Println()
 
 	return nil
+}
+
+func getTableName(year, bucket string) string {
+	tables := map[string]string{
+		"individuals":   "cf-" + year + "-individuals",
+		"candidates":    "cf-" + year + "-candidates",
+		"committees":    "cf-" + year + "-committees",
+		"cmte_tx_data":  "cf-" + year + "-cmte_tx_data",
+		"cmte_fin":      "cf-" + year + "-cmte_financials",
+		"top_overall":   "cf-" + year + "-top_overall",
+		"yearly_totals": "cf-" + year + "-yearly_totals",
+	}
+	return tables[bucket]
 }

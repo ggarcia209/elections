@@ -231,6 +231,7 @@ func BatchWriteCreate(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 	// create PutRequests for each item
 	for _, item := range items {
 		if item == nil {
+			fmt.Println("nil item")
 			continue
 		}
 
