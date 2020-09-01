@@ -3,11 +3,9 @@ package parse
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/elections/source/donations"
 )
@@ -239,11 +237,11 @@ func ScanCmteFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) 
 			nfe = 0
 		}
 
-		txDateFmt := "01/02/2006"
-		ced, err := time.Parse(txDateFmt, fieldMap[24])
-		if err != nil {
-			fmt.Println(err)
-		}
+		// txDateFmt := "01/02/2006"
+		// ced, err := time.Parse(txDateFmt, fieldMap[24])
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
 
 		// create object to be stored in database
 		fin := &donations.CmteFinancials{
@@ -268,7 +266,7 @@ func ScanCmteFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) 
 			IndExp:          float32(ie),
 			PartyExp:        float32(pe),
 			NonFedSharedExp: float32(nfe),
-			CovgEndDate:     ced,
+			// CovgEndDate:     ced,
 		}
 
 		// add donation to queue of items, stop at 25 items
@@ -310,13 +308,13 @@ func ScanContributions(year string, file io.ReadSeeker, start int64) ([]*donatio
 		fieldMap = scanRow(row, fieldMap)
 
 		// convert non-string values from original strings
-		txDateFmt := "01/02/2006"
+		/* txDateFmt := "01/02/2006"
 		txDate, err := time.Parse(txDateFmt, fmtDateStr(fieldMap[13]))
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("txID: ", fieldMap[16])
 			return nil, start, fmt.Errorf("ParseContributions failed: %v", err)
-		}
+		} */
 		txAmt, _ := strconv.ParseFloat(fieldMap[14], 32)
 		fileNum, _ := strconv.Atoi(fieldMap[17])
 		subID, _ := strconv.Atoi(fieldMap[20])
@@ -336,14 +334,14 @@ func ScanContributions(year string, file io.ReadSeeker, start int64) ([]*donatio
 			Zip:        fieldMap[10],
 			Employer:   fieldMap[11],
 			Occupation: fieldMap[12],
-			TxDate:     txDate,
-			TxAmt:      float32(txAmt),
-			OtherID:    fieldMap[15],
-			TxID:       fieldMap[16],
-			FileNum:    fileNum,
-			MemoCode:   fieldMap[18],
-			MemoText:   fieldMap[19],
-			SubID:      subID,
+			// TxDate:     txDate,
+			TxAmt:    float32(txAmt),
+			OtherID:  fieldMap[15],
+			TxID:     fieldMap[16],
+			FileNum:  fileNum,
+			MemoCode: fieldMap[18],
+			MemoText: fieldMap[19],
+			SubID:    subID,
 		}
 
 		// add donation to queue of items, stop at 25 items
@@ -385,23 +383,23 @@ func ScanDisbursements(year string, file io.ReadSeeker, start int64) ([]*donatio
 		fieldMap = scanRow(row, fieldMap)
 
 		// convert non-string values from original strings
-		txDateFmt := "01/02/2006"
+		/* txDateFmt := "01/02/2006"
 		txDate, err := time.Parse(txDateFmt, fieldMap[12])
 		if err != nil {
 			fmt.Println(err)
-		}
+		} */
 		txAmt, _ := strconv.ParseFloat(fieldMap[13], 32)
 		fileNum, _ := strconv.Atoi(fieldMap[22])
 		subID, _ := strconv.Atoi(fieldMap[21])
 
 		// create object to be stored in database
 		disb := &donations.Disbursement{
-			CmteID:       fieldMap[0],
-			Name:         fieldMap[8],
-			City:         fieldMap[9],
-			State:        fieldMap[10],
-			Zip:          fieldMap[11],
-			TxDate:       txDate,
+			CmteID: fieldMap[0],
+			Name:   fieldMap[8],
+			City:   fieldMap[9],
+			State:  fieldMap[10],
+			Zip:    fieldMap[11],
+			// TxDate:       txDate,
 			TxAmt:        float32(txAmt),
 			TxPGI:        fieldMap[14],
 			Purpose:      fieldMap[15],

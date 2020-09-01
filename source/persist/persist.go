@@ -39,8 +39,6 @@ func Init(year string) error {
 
 // StoreObjects persists a list of objects to the on-disk database
 func StoreObjects(year string, objs []interface{}) error {
-	i := 0
-	bkt := ""
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
@@ -65,25 +63,11 @@ func StoreObjects(year string, objs []interface{}) error {
 			if err := b.Put([]byte(key), data); err != nil { // serialize k,v
 				return fmt.Errorf("StoreObjects failed: %v", err)
 			}
-			i++
-			bkt = bucket
 		}
 		return nil
 	}); err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("StoreObjecs failed: %v", err)
-	}
-	fmt.Println("items put per transaction: ", i)
-
-	// fmt.Printf("items saved - %s: %d\n", bkt, i)
-	if bkt == "committees" {
-		keyN := 0
-		db.View(func(tx *bolt.Tx) error {
-			b := tx.Bucket([]byte(year)).Bucket([]byte("committees"))
-			keyN = b.Stats().KeyN
-			return nil
-		})
-		fmt.Printf("items in bucket committees: %d\n", keyN)
 	}
 
 	return nil
@@ -154,7 +138,6 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, string, error) {
 	objs := []interface{}{}
 	currKey := startKey
-	i := 0
 
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
@@ -185,7 +168,7 @@ func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, st
 			if len(objs) == n {
 				break
 			}
-			i++
+
 		}
 		return nil
 	}); err != nil {
@@ -195,7 +178,6 @@ func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, st
 	if len(objs) < n {
 		currKey = ""
 	}
-	fmt.Println("items scanned: ", i)
 	return objs, currKey, nil
 }
 
@@ -290,7 +272,6 @@ func SaveTopOverall(year, bucket string, ods []interface{}) error {
 
 		for _, od := range ods {
 			_, key, data, err := encodeToProto(od)
-			fmt.Println("saved: ", key)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed %v", err)
@@ -356,7 +337,6 @@ func SaveYearlyTotals(year, cat string, yts []interface{}) error {
 
 		for _, yt := range yts {
 			_, key, data, err := encodeToProto(yt)
-			fmt.Println("saved: ", key)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed %v", err)
