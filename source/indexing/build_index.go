@@ -260,9 +260,7 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) error {
 	fmt.Println("processing top individuals...")
 	ids := []string{}
-	r := 0 // number of records processed
-	t := 0 // number of terms updated
-	n := 250
+	n := 20000
 	x := n
 
 	// get Top Individuals by incoming & outgoing funds
@@ -299,8 +297,6 @@ func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) err
 		pm = make(map[string]bool)
 	}
 
-	fmt.Println("got partition map")
-
 	for {
 		if len(ids) < n { // queue exhausted - last write
 			n = len(ids) // set starting index to 0
@@ -336,20 +332,14 @@ func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) err
 				lookup[k] = sd
 				pm[prt] = true
 			}
-			t += len(termsFmt)
 		}
-
-		fmt.Println("search terms added to index")
 
 		if len(objs) < x || len(ids) == n { // last batch write complete
 			break
 		}
-		r += n
 
 		// remove processed IDs from stack
 		ids = ids[:len(ids)-n]
-		fmt.Println("records processed: ", r)
-		fmt.Println("terms created/updated: ", t)
 	}
 
 	err = savePartitionMap(pm)
@@ -368,9 +358,7 @@ func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) err
 
 // add Candidate/Committee object info to Index
 func getObjData(year, bucket string, index indexMap, lookup lookupPairs) error {
-	i := 0 // number of records processed
-	t := 0 // number of terms updated
-	n := 1000
+	n := 10000
 	startKey := ""
 
 	// get partition map
@@ -415,7 +403,6 @@ func getObjData(year, bucket string, index indexMap, lookup lookupPairs) error {
 				lookup[k] = sd
 				pm[prt] = true
 			}
-			t += len(termsFmt)
 		}
 
 		if len(objs) < n { // last batch write complete
@@ -423,9 +410,6 @@ func getObjData(year, bucket string, index indexMap, lookup lookupPairs) error {
 		}
 
 		startKey = currKey
-
-		fmt.Println("records processed: ", i)
-		fmt.Println("terms created/updated: ", t)
 	}
 
 	err = savePartitionMap(pm)

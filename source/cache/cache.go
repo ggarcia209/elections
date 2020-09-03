@@ -43,99 +43,114 @@ func createCacheFromContribution(year string, txQueue []*donations.Contribution)
 		"committees":   make(map[string]interface{}),
 		"cmte_tx_data": make(map[string]interface{}),
 		"candidates":   make(map[string]interface{}),
-		"top_overall":  make(map[string]interface{}),
+	}
+	filerIDs := []string{}
+	otherIDs := map[string][]string{
+		"individuals":  []string{},
+		"cmte_tx_data": []string{},
+		"candidates":   []string{},
+	}
+	seen := make(map[string]bool)
+
+	for _, tx := range txQueue {
+		// edge case - earmarked transaction type, treat as incoming transaction type to OtherID cmte
+		if tx.TxType == "24I" {
+			if tx.OtherID != "" {
+				tx.CmteID = tx.OtherID
+				tx.TxType = "15E"
+			} else { // edge case
+				fmt.Println("WARNING: NIL RECIPIENT - txID: ", tx.TxID)
+				// transaction will be treated as incoming/memo transaction
+				// from individual to intermediary (filing cmte)
+				tx.TxType = "15E"
+			}
+		}
+
+		// get filer IDs for obj lookup
+		if !seen[tx.CmteID] {
+			filerIDs = append(filerIDs, tx.CmteID)
+			seen[tx.CmteID] = true
+		}
+
+		em := earmark(tx.TxType)
+
+		// get otherIDs
+		// initialize placeholder objects for Individuals
+		if tx.OtherID == "" || em { // not registered filer or earmarked transaction - get Individual Object
+			if tx.Occupation != "" { // find Individual by name/job
+				id := idhash.NewHash(idhash.FormatIndvInput(tx.Name, tx.Employer, tx.Occupation, tx.Zip))
+				if cache["individuals"][id] == nil { // not in cache
+					other := createIndv(id, tx)
+					cache["individuals"][id] = other
+				}
+				tx.OtherID = id
+			} else { // find Individual by name/zip
+				id := idhash.NewHash(idhash.FormatOrgInput(tx.Name, tx.Zip))
+				if cache["individuals"][id] == nil { // not in cache
+					other := createOrg(id, tx)
+					cache["individuals"][id] = other
+				}
+				tx.OtherID = id
+			}
+		}
+		if !seen[tx.OtherID] {
+			bkt := getBucket(tx.OtherID)
+			otherIDs[bkt] = append(otherIDs[bkt], tx.OtherID)
+			seen[tx.OtherID] = true
+		}
 	}
 
-	// add all filing committees and other objects if not already in cache
-	for _, tx := range txQueue {
-		// get filing committee object
-		filer, err := persist.GetObject(year, "cmte_tx_data", tx.CmteID)
+	// batch get filer objs, add to cache
+	bucket := "cmte_tx_data"
+	filers, nilIDs, err := persist.BatchGetByID(year, bucket, filerIDs)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
+	}
+	for _, f := range filers {
+		ID := f.(*donations.CmteTxData).CmteID
+		cache[bucket][ID] = f
+	}
+	for _, nID := range nilIDs {
+		if cache[bucket][nID] == nil {
+			unk, txData := createCmte(nID)
+			cache["committees"][nID] = unk
+			cache[bucket][nID] = txData
+		}
+	}
+
+	// batch get other objs, add to cache
+	for bkt, objIDs := range otherIDs {
+		others, nilIDs, err := persist.BatchGetByID(year, bkt, objIDs)
 		if err != nil {
 			fmt.Println(err)
 			return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
 		}
-		cache["cmte_tx_data"][tx.CmteID] = filer
-
-		// get linked candidate if any
-		if filer.(*donations.CmteTxData).CandID != "" {
-			cand, err := persist.GetObject(year, "candidates", filer.(*donations.CmteTxData).CandID)
-			if err != nil {
-				fmt.Println(err)
-				return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
-			}
-			candID := filer.(*donations.CmteTxData).CandID
-			cache["candidates"][candID] = cand
-
-			// nil object returned - linked candidate object does not exist
-			if cand.(*donations.Candidate).ID == "" {
-				cand = createCand(candID)
-				cache["candidates"][candID] = cand
-			}
-
+		for _, o := range others {
+			ID := getObjID(o)
+			cache[bkt][ID] = o // overwrites placeholder Individuals if any
 		}
 
-		// get other object if not in cache
-		var other interface{}
+		if bkt == "individuals" {
+			continue
+		}
 
-		if tx.OtherID == "" {
-			// not registered filer - get Individual Object
-			if tx.Occupation != "" { // find Individual by name/job
-				id := idhash.NewHash(idhash.FormatIndvInput(tx.Name, tx.Employer, tx.Occupation, tx.Zip))
-				if cache["indviduals"][id] == nil { // not in cache
-					// check database
-					other, err = persist.GetObject(year, "individuals", id)
-					if err != nil {
-						fmt.Println(err)
-						return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
-					}
-					if other.(*donations.Individual).ID == "" { // object does not exist - create new obj
-						other = createIndv(id, tx)
-					}
-					tx.OtherID = other.(*donations.Individual).ID
-					cache["individuals"][tx.OtherID] = other
-				}
-			} else { // find Individual by name/zip
-				id := idhash.NewHash(idhash.FormatOrgInput(tx.Name, tx.Zip))
-				if cache["indviduals"][id] == nil { // not in cache
-					// check database
-					other, err = persist.GetObject(year, "individuals", id)
-					if err != nil {
-						fmt.Println(err)
-						return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
-					}
-					if other.(*donations.Individual).ID == "" { // object does not exist - create new obj
-						other = createOrg(id, tx)
-					}
-				}
-			}
-			tx.OtherID = other.(*donations.Individual).ID
-			cache["individuals"][tx.OtherID] = other
-		} else {
-			// registered filer - create if not in DB
-			bucket := getBucket(tx.OtherID)
-			if cache[bucket][tx.OtherID] == nil {
-				other, err := persist.GetObject(year, bucket, tx.OtherID)
-				if err != nil {
-					fmt.Println("createCacheFromContribution failed: ", err)
-					return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
-				}
-				cache[bucket][tx.OtherID] = other
-
-				// no record in cycle's bulk data file - nil object returned
-				if bucket == "cmte_tx_data" && other.(*donations.CmteTxData).CmteID == "" { // edge case - Other Registered filers not registered in current election cycle
+		// create placeholder objects for registered filers not listed in current election cycle's data
+		for _, nID := range nilIDs {
+			if cache[bkt][nID] == nil {
+				if bkt == "cmte_tx_data" { // edge case - committee not registered in current election cycle
 					var txData *donations.CmteTxData
 					var unk *donations.Committee
-					unk, txData = createCmte(tx.OtherID)
-					cache["committees"][tx.OtherID] = unk
-					cache[bucket][tx.OtherID] = txData
+					unk, txData = createCmte(nID)
+					cache["committees"][nID] = unk
+					cache[bkt][nID] = txData
 				}
-				if bucket == "candidates" && other.(*donations.Candidate).ID == "" { // edge case - Other Registered filers not registered in current election cycle
+				if bkt == "candidates" { // edge case - candidate not registered in current election cycle
 					var unk *donations.Candidate
-					unk = createCand(tx.OtherID)
-					cache[bucket][tx.OtherID] = unk
+					unk = createCand(nID)
+					cache[bkt][nID] = unk
 				}
 			}
-
 		}
 	}
 
@@ -151,53 +166,65 @@ func createCacheFromDisbursement(year string, txQueue []*donations.Disbursement)
 		"individuals":  make(map[string]interface{}),
 		"cmte_tx_data": make(map[string]interface{}),
 		"candidates":   make(map[string]interface{}),
-		"top_overall":  make(map[string]interface{}),
+		"committees":   make(map[string]interface{}),
 	}
+	seen := make(map[string]bool)
+
+	filerIDs := []string{}
+	otherIDs := []string{}
 
 	// add all filing committees and other objects if not already in cache
 	for _, tx := range txQueue {
-		// get filing committee object
-		filer, err := persist.GetObject(year, "cmte_tx_data", tx.CmteID)
-		if err != nil {
-			fmt.Println("createCacheFromDisbursement failed: ", err)
-			return nil, fmt.Errorf("createCacheFromDisbursement failed: %v", err)
-		}
-		cache["cmte_tx_data"][tx.CmteID] = filer
-
-		// get linked candidate if any
-		if filer.(*donations.CmteTxData).CandID != "" {
-			cand, err := persist.GetObject(year, "candidates", filer.(*donations.CmteTxData).CandID)
-			if err != nil {
-				fmt.Println("createCacheFromDisbursement failed: ", err)
-				return nil, fmt.Errorf("createCacheFromDisbursement failed: %v", err)
-			}
-			cache["candidates"][filer.(*donations.CmteTxData).CandID] = cand
-
-			// nil object returned - linked candidate object does not exist
-			if cand.(*donations.Candidate).ID == "" {
-				cand = createCand(filer.(*donations.CmteTxData).CandID)
-				cache["candidates"][filer.(*donations.CmteTxData).CandID] = cand
-			}
-
+		// get filer IDs for obj lookup
+		if !seen[tx.CmteID] {
+			filerIDs = append(filerIDs, tx.CmteID)
+			seen[tx.CmteID] = true
 		}
 
-		// get other object if not in cache
-		var other interface{}
-
+		// initialize placeholder objects for Individuals
 		id := idhash.NewHash(idhash.FormatOrgInput(tx.Name, tx.Zip))
-		if cache["indviduals"][id] == nil { // not in cache
-			// check database
-			other, err = persist.GetObject(year, "individuals", id)
-			if err != nil {
-				fmt.Println("createCacheFromContribution failed: ", err)
-				return nil, fmt.Errorf("createCacheFromContribution failed: %v", err)
-			}
-			if other.(*donations.Individual).ID == "" { // object does not exist - create new obj
-				other = createOrg(id, tx)
-			}
-			tx.RecID = other.(*donations.Individual).ID
+		if cache["individuals"][id] == nil { // not in cache
+			other := createOrg(id, tx)
+			tx.RecID = other.ID
 			cache["individuals"][tx.RecID] = other
+		} else {
+			tx.RecID = id
 		}
+
+		// get otherIDs
+		if !seen[tx.RecID] {
+			otherIDs = append(otherIDs, tx.RecID)
+			seen[tx.RecID] = true
+		}
+	}
+
+	// get filing cmte objects & add to cache
+	filers, nilIDs, err := persist.BatchGetByID(year, "cmte_tx_data", filerIDs)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("createCacheFromDisbursement failed: %v", err)
+	}
+	for _, f := range filers {
+		ID := f.(*donations.CmteTxData).CmteID
+		cache["cmte_tx_data"][ID] = f
+	}
+	for _, nID := range nilIDs {
+		if cache["cmte_tx_data"][nID] == nil {
+			unk, txData := createCmte(nID)
+			cache["committees"][nID] = unk
+			cache["cmte_tx_data"][nID] = txData
+		}
+	}
+
+	// get other objects and add to cache
+	others, _, err := persist.BatchGetByID(year, "individuals", otherIDs)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("createCacheFromDisbursement failed: %v", err)
+	}
+	for _, o := range others {
+		ID := o.(*donations.Individual).ID
+		cache["cmte_tx_data"][ID] = o
 	}
 
 	return cache, nil
@@ -217,6 +244,10 @@ func SerializeCache(cache map[string]map[string]interface{}) []interface{} {
 }
 
 func getBucket(otherID string) string {
+	if otherID == "" {
+		return "individuals"
+	}
+
 	var bucket string
 
 	// determine contributor/receiver type - derive from OtherID
@@ -224,12 +255,43 @@ func getBucket(otherID string) string {
 	idCode := IDss[0]
 	switch {
 	case idCode == "C":
-		bucket = "cmte_tx_data"
+		if len(otherID) < 16 {
+			bucket = "cmte_tx_data"
+		} else {
+			bucket = "individuals" // edge case - hashes beginning with C
+		}
 	case idCode == "H" || idCode == "S" || idCode == "P":
-		bucket = "candidates"
+		if len(otherID) < 16 {
+			bucket = "candidates"
+		} else {
+			bucket = "individuals" // edge case - hashes beginning with H, S, P
+		}
 	default:
 		bucket = "individuals"
 	}
 
 	return bucket
+}
+
+func getObjID(obj interface{}) string {
+	switch t := obj.(type) {
+	case *donations.Individual:
+		return t.ID
+	case *donations.CmteTxData:
+		return t.CmteID
+	case *donations.Candidate:
+		return t.ID
+	default:
+		return ""
+	}
+}
+
+func earmark(code string) bool {
+	check := map[string]bool{
+		"15E": true,
+		"15I": true,
+		"15T": true,
+		"24I": true,
+	}
+	return check[code]
 }

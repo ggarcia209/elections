@@ -153,8 +153,18 @@ func queryData() error {
 			ids = append(ids, r.ID)
 			resMap[r.ID] = r
 		}
-		ids = append(ids, "exit")
-		idsSubmenu := ui.CreateMenu("admin-search-results", ids)
+		sds, err := indexing.LookupSearchData(ids)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("searchData failed: %v", err)
+		}
+		options := []string{}
+		for _, sd := range sds {
+			optn := sd.ID + " " + sd.Name + " " + sd.City + ", " + sd.State
+			options = append(options, optn)
+		}
+		options = append(options, "exit")
+		idsSubmenu := ui.CreateMenu("admin-search-results", options)
 		for {
 			fmt.Println("Choose an ID from the list to view more info or choose 'exit' to return")
 			chID, err := ui.Ask4MenuChoice(idsSubmenu)
@@ -170,6 +180,7 @@ func queryData() error {
 
 			// select year for given object
 			yrs := resMap[objID].Years
+			yrs = append(yrs, "Return")
 			yrsSubMenu := ui.CreateMenu("admin-search-result-years", yrs)
 			fmt.Println("Choose a year to view the objects data for that year: ")
 			chYr, err := ui.Ask4MenuChoice(yrsSubMenu)
@@ -178,6 +189,10 @@ func queryData() error {
 				return fmt.Errorf("searchData failed: %v", err)
 			}
 			year := yrsSubMenu.OptionsMap[chYr]
+			if year == "Return" {
+				fmt.Println("Returning to menu...")
+				return nil
+			}
 			bucket := resMap[objID].Bucket
 
 			// get year/obj dataset from disk
@@ -619,7 +634,7 @@ func printSortedRankings(r *donations.TopOverallData, sorted util.SortedTotalsMa
 	}
 	for i, sd := range sds {
 		fmt.Printf("Rank %d)  %s - %s (%s, %s): %.2f\n", i, sd.ID, sd.Name, sd.City, sd.State, r.Amts[sd.ID])
-		if sd.Bucket == "individuals" && i == 99 {
+		if sd.Bucket == "individuals" && i == 499 {
 			break
 		}
 	}

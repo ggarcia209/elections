@@ -56,12 +56,14 @@ func StoreObjects(year string, objs []interface{}) error {
 			bucket, key, data, err := encodeToProto(obj)
 			if err != nil {
 				fmt.Println(err)
-				return fmt.Errorf("StoreObjects failed: %v", err)
+				fmt.Println("obj: ", obj)
+				return fmt.Errorf("tx failed: %v", err)
 			}
 
 			b := tx.Bucket([]byte(year)).Bucket([]byte(bucket))
 			if err := b.Put([]byte(key), data); err != nil { // serialize k,v
-				return fmt.Errorf("StoreObjects failed: %v", err)
+				fmt.Println("obj: ", obj)
+				return fmt.Errorf("tx failed: %v", err)
 			}
 		}
 		return nil
@@ -200,15 +202,16 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 
 		for _, id := range IDs {
 			data := b.Get([]byte(id))
+			if data == nil {
+				nilIDs = append(nilIDs, id)
+				continue
+			}
 			obj, err := decodeFromProto(bucket, data)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
 			}
-			if obj == nil {
-				nilIDs = append(nilIDs, id)
-				continue
-			}
+
 			objs = append(objs, obj)
 		}
 		return nil
@@ -588,7 +591,6 @@ func createBucket(year, name string) error {
 		fmt.Println(err)
 		return fmt.Errorf("createBucket failed: %v", err)
 	}
-	fmt.Printf("created bucket: %s - %s\n", year, name)
 
 	return nil
 }

@@ -64,7 +64,17 @@ func processNewRecords() error {
 		fmt.Println(err)
 		return fmt.Errorf("processNewRecords failed: %v", err)
 	}
-	if input == "" {
+	if input != "" {
+		fmt.Println("Set new input path?")
+		yes := ui.Ask4confirm()
+		if yes {
+			input, err = getPath(true)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("processNewRecords failed: %v", err)
+			}
+		}
+	} else {
 		input, err = getPath(true)
 		if err != nil {
 			fmt.Println(err)
@@ -82,11 +92,21 @@ func processNewRecords() error {
 		fmt.Println(err)
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
 	}
-	if output == "" {
+	if output != "" {
+		fmt.Println("Set new output path?")
+		yes := ui.Ask4confirm()
+		if yes {
+			output, err = getPath(false)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("processNewRecords failed: %v", err)
+			}
+		}
+	} else {
 		output, err = getPath(false)
 		if err != nil {
 			fmt.Println(err)
-			return fmt.Errorf("ProcessNewRecords failed: %v", err)
+			return fmt.Errorf("processNewRecords failed: %v", err)
 		}
 	}
 
@@ -413,6 +433,8 @@ func processCmteContributions(year, filepath string) error {
 }
 
 func processIndvContributions(year, filepath string) error {
+	fmt.Println("starting Individual contributions...")
+	i := 0
 	// defer wg.Done()
 
 	// open file
@@ -474,9 +496,11 @@ func processIndvContributions(year, filepath string) error {
 			return err
 		}
 		start = offset
+		i += 100000
 
 		// break if at end of file
-		if len(txQueue) < 1000 {
+		if len(txQueue) < 100000 {
+			i += len(txQueue)
 			break
 		}
 	}
@@ -488,7 +512,7 @@ func processIndvContributions(year, filepath string) error {
 
 func processDisbursements(year, filepath string) error {
 	// defer wg.Done()
-
+	i := 0
 	// open file
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -547,9 +571,11 @@ func processDisbursements(year, filepath string) error {
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 		start = offset
+		i += 100000
 
 		// break if at end of file
-		if len(txQueue) < 1000 {
+		if len(txQueue) < 100000 {
+			i += len(txQueue)
 			break
 		}
 	}

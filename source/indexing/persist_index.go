@@ -97,6 +97,15 @@ func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
 					fmt.Println(err)
 					return fmt.Errorf("tx failed failed: %v", err)
 				}
+				prevData := luB.Get([]byte(ID))
+				if prevData != nil {
+					prev, err := decodeSearchData(prevData)
+					if err != nil {
+						fmt.Println()
+						return fmt.Errorf("tx failed: %v", err)
+					}
+					sd.Years = append(sd.Years, prev.Years...)
+				}
 				data, err := encodeSearchData(sd)
 				if err != nil {
 					fmt.Println()

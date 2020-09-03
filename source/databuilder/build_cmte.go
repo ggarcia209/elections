@@ -37,6 +37,9 @@ func contributionUpdate(year string, conts []*donations.Contribution, cache map[
 
 		// get filer object
 		filer := cache["cmte_tx_data"][cont.CmteID]
+		if filer == nil {
+			fmt.Print("nil filer: ", cont.CmteID, cont.TxID)
+		}
 
 		// get sender/receiver objects
 		other := cache[bucket][cont.OtherID]
@@ -73,7 +76,7 @@ func opExpensesUpdate(year string, disbs []*donations.Disbursement, cache map[st
 		// update object account totals
 		err := disbursementTxUpdate(disb, filer.(*donations.CmteTxData), receiver.(*donations.Individual))
 		if err != nil {
-			fmt.Println("opExpensesUpdate failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("opExpensesUpdate failed: %v", err)
 		}
 	}
@@ -98,11 +101,10 @@ func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
 		"22Z": true,
 		"24G": true,
 		"24H": true,
+		"24I": true,
 		"24K": true,
 		"24U": true,
 		"24Z": true,
-		"24I": true, // verify
-		"24T": true, // verify
 		"30K": true,
 		"30G": true,
 		"30F": true,
@@ -198,7 +200,6 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		if cont.CmteID != sender.(*donations.Candidate).PCC {
 			sender.(*donations.Candidate).OtherAffiliates = append(sender.(*donations.Candidate).OtherAffiliates, cont.CmteID)
 		}
-		sender.(*donations.Candidate).TransactionsList = append(sender.(*donations.Candidate).TransactionsList, cont.TxID)
 		sender.(*donations.Candidate).TotalDirectOutAmt += cont.TxAmt
 		sender.(*donations.Candidate).TotalDirectOutTxs++
 		sender.(*donations.Candidate).AvgDirectOut = sender.(*donations.Candidate).TotalDirectOutAmt / sender.(*donations.Candidate).TotalDirectOutTxs
@@ -224,6 +225,9 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 
 // update filing committe and receiver object data for outgoing transactions
 func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, receiver interface{}, transfer, memo bool) error {
+	if cont.TxType == "24T" { // edge case - ignore earmarked transaction
+		return nil
+	}
 	// update maps only if memo == true
 	// account for percentage of amounts received by memo transactions but do not add to totals
 	if memo {
@@ -241,7 +245,6 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		filerData.TransfersAmt += cont.TxAmt
 		filerData.TransfersTxs++
 		filerData.AvgTransfer = filerData.TransfersAmt / filerData.TransfersTxs
-		filerData.TransfersList = append(filerData.TransfersList, cont.CmteID)
 	} else {
 		filerData.ExpendituresAmt += cont.TxAmt
 		filerData.ExpendituresTxs++
@@ -255,15 +258,11 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	// debit receiver accounts
 	switch t := receiver.(type) {
 	case *donations.Individual:
-		receiver.(*donations.Individual).Transactions = append(receiver.(*donations.Individual).Transactions, cont.TxID)
 		receiver.(*donations.Individual).TotalInAmt += cont.TxAmt
 		receiver.(*donations.Individual).TotalInTxs++
 		receiver.(*donations.Individual).AvgTxIn = receiver.(*donations.Individual).TotalInAmt / receiver.(*donations.Individual).TotalInTxs
 		receiver.(*donations.Individual).NetBalance = receiver.(*donations.Individual).TotalInAmt - receiver.(*donations.Individual).TotalOutAmt
 	case *donations.Candidate:
-		if cont.CmteID != receiver.(*donations.Candidate).PCC {
-			receiver.(*donations.Candidate).TransactionsList = append(receiver.(*donations.Candidate).TransactionsList, cont.TxID)
-		}
 		receiver.(*donations.Candidate).TotalDirectInAmt += cont.TxAmt
 		receiver.(*donations.Candidate).TotalDirectInTxs++
 		receiver.(*donations.Candidate).AvgDirectIn = receiver.(*donations.Candidate).TotalDirectInAmt / receiver.(*donations.Candidate).TotalDirectInTxs

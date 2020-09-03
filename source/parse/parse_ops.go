@@ -54,7 +54,7 @@ func ScanCandidates(file io.ReadSeeker, start int64) ([]interface{}, int64, erro
 
 		// add donation to queue of items, stop at 25 items
 		queue = append(queue, cand)
-		if len(queue) == 100 {
+		if len(queue) == 10000 {
 			break
 		}
 		fieldMap = make(mapOfFields)
@@ -122,7 +122,7 @@ func ScanCommittees(file io.ReadSeeker, start int64) ([]interface{}, []interface
 		// add donation to queue of items, stop at 25 items
 		queue = append(queue, cmte)
 		dataQueue = append(dataQueue, txData)
-		if len(queue) == 100 {
+		if len(queue) == 10000 {
 			break
 		}
 
@@ -271,7 +271,7 @@ func ScanCmteFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) 
 
 		// add donation to queue of items, stop at 25 items
 		queue = append(queue, fin)
-		if len(queue) == 100 {
+		if len(queue) == 10000 {
 			break
 		}
 		fieldMap = make(mapOfFields)
@@ -346,7 +346,7 @@ func ScanContributions(year string, file io.ReadSeeker, start int64) ([]*donatio
 
 		// add donation to queue of items, stop at 25 items
 		icQueue = append(icQueue, donation)
-		if len(icQueue) == 1000 {
+		if len(icQueue) == 100000 {
 			break
 		}
 		fieldMap = make(mapOfFields)
@@ -415,7 +415,7 @@ func ScanDisbursements(year string, file io.ReadSeeker, start int64) ([]*donatio
 
 		// add donation to queue of items, stop at 25 items
 		dQueue = append(dQueue, disb)
-		if len(dQueue) == 1000 {
+		if len(dQueue) == 100000 {
 			break
 		}
 		fieldMap = make(mapOfFields)

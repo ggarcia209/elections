@@ -37,7 +37,7 @@ func InitSecondaryDataObjs(year string) ([]interface{}, []interface{}) {
 // category and returns the objects in a list
 // Formats object ID's as year-bucket-category-party
 func initTopOverallDataObjs(year string) []interface{} {
-	limit := 100
+	limit := 500
 	od := []interface{}{}
 	// indv & disb_rec
 	indv := initTopOverallObj(year, "individuals", "donor", "ALL", 100000)

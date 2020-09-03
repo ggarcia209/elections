@@ -120,8 +120,10 @@ func deriveDatabyBucket(year, bucket string, odm odMapping, ytm ytMapping) error
 
 // scan each object and update TopRankings/Yearly Totals for each object
 func scanObjects(year, bucket string, ods map[string]map[string]*donations.TopOverallData, yts map[string]map[string]*donations.YearlyTotal) error {
-	n := 1000
-	j := 0
+	n := 10000
+	if bucket == "individuals" {
+		n = 100000
+	}
 	start := ""
 	curr := start
 	cmteTotals := map[string]map[string]float32{
@@ -179,7 +181,7 @@ func scanObjects(year, bucket string, ods map[string]map[string]*donations.TopOv
 					return fmt.Errorf("scanObjects failed: %v", err)
 				}
 				if bucket == "candidates" {
-					total += cmteTotals[cat][obj.(*donations.Candidate).PCC]
+					total = cmteTotals[cat][obj.(*donations.Candidate).PCC]
 				}
 				err = databuilder.CompareTopOverall(id, total, all)
 				if err != nil {
@@ -206,14 +208,11 @@ func scanObjects(year, bucket string, ods map[string]map[string]*donations.TopOv
 					ytPty := yts[cat][year+"-"+cat+"-"+pty]
 					databuilder.UpdateYearlyTotal(total, ytPty)
 				}
-				j++
 			}
 
 		}
 
 		if len(objs) < n {
-			j += len(objs)
-			fmt.Println("objects scanned: ", j)
 			break
 		}
 
