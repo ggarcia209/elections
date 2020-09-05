@@ -132,6 +132,160 @@ func ScanCommittees(file io.ReadSeeker, start int64) ([]interface{}, []interface
 	return queue, dataQueue, offset, nil
 }
 
+// ScanCmpnFin scans 100 lines of a committee financials file
+// and returns 100 CmteFinancials objects per call
+func ScanCmpnFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) {
+	offset := start
+	// seek to starting byte offset
+	if _, err := file.Seek(offset, 0); err != nil {
+		return nil, offset, err
+	}
+
+	scanner := bufio.NewScanner(file)
+	fieldMap := make(mapOfFields)
+	queue := []interface{}{}
+
+	// scanLines records the byte offset in order to recover from a failure
+	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		advance, token, err = bufio.ScanLines(data, atEOF)
+		offset += int64(advance)
+		return
+	}
+	scanner.Split(scanLines)
+
+	for scanner.Scan() {
+		row := scanner.Text()
+
+		// scan row and map field values
+		fieldMap = scanRow(row, fieldMap)
+
+		// convert non-string values from original strings
+		tr, err := strconv.ParseFloat(fieldMap[5], 32)
+		if err != nil {
+			tr = 0
+		}
+		tfa, err := strconv.ParseFloat(fieldMap[6], 32)
+		if err != nil {
+			tfa = 0
+		}
+		td, err := strconv.ParseFloat(fieldMap[7], 32)
+		if err != nil {
+			td = 0
+		}
+		tta, err := strconv.ParseFloat(fieldMap[8], 32)
+		if err != nil {
+			tta = 0
+		}
+		bop, err := strconv.ParseFloat(fieldMap[9], 32)
+		if err != nil {
+			bop = 0
+		}
+		cop, err := strconv.ParseFloat(fieldMap[10], 32)
+		if err != nil {
+			cop = 0
+		}
+		cc, err := strconv.ParseFloat(fieldMap[11], 32)
+		if err != nil {
+			cc = 0
+		}
+		cl, err := strconv.ParseFloat(fieldMap[12], 32)
+		if err != nil {
+			cl = 0
+		}
+		ol, err := strconv.ParseFloat(fieldMap[13], 32)
+		if err != nil {
+			ol = 0
+		}
+		clr, err := strconv.ParseFloat(fieldMap[14], 32)
+		if err != nil {
+			clr = 0
+		}
+		olr, err := strconv.ParseFloat(fieldMap[15], 32)
+		if err != nil {
+			olr = 0
+		}
+		dob, err := strconv.ParseFloat(fieldMap[16], 32)
+		if err != nil {
+			dob = 0
+		}
+		tic, err := strconv.ParseFloat(fieldMap[17], 32)
+		if err != nil {
+			tic = 0
+		}
+		gep, err := strconv.ParseFloat(fieldMap[24], 32)
+		if err != nil {
+			gep = 0
+		}
+
+		pcc, err := strconv.ParseFloat(fieldMap[25], 32)
+		if err != nil {
+			pcc = 0
+		}
+
+		ppc, err := strconv.ParseFloat(fieldMap[26], 32)
+		if err != nil {
+			ppc = 0
+		}
+
+		ir, err := strconv.ParseFloat(fieldMap[28], 32)
+		if err != nil {
+			ir = 0
+		}
+
+		cr, err := strconv.ParseFloat(fieldMap[29], 32)
+		if err != nil {
+			cr = 0
+		}
+
+		// txDateFmt := "01/02/2006"
+		// ced, err := time.Parse(txDateFmt, fieldMap[24])
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
+
+		// create object to be stored in database
+		fin := &donations.CmpnFinancials{
+			CandID:         fieldMap[0],
+			Name:           fieldMap[1],
+			PartyCd:        fieldMap[3],
+			Party:          fieldMap[4],
+			TotalReceipts:  float32(tr),
+			TransFrAuth:    float32(tfa),
+			TotalDisbsmts:  float32(td),
+			TransToAuth:    float32(tta),
+			COHBOP:         float32(bop),
+			COHCOP:         float32(cop),
+			CandConts:      float32(cc),
+			CandLoans:      float32(cl),
+			OtherLoans:     float32(ol),
+			CandLoanRepay:  float32(clr),
+			OtherLoanRepay: float32(olr),
+			DebtsOwedBy:    float32(dob),
+			TotalIndvConts: float32(tic),
+			OfficeState:    fieldMap[18],
+			OfficeDistrict: fieldMap[19],
+			SpecElection:   fieldMap[20],
+			PrimElection:   fieldMap[21],
+			RunElection:    fieldMap[22],
+			GenElection:    fieldMap[23],
+			GenElectionPct: float32(gep),
+			OtherCmteConts: float32(pcc),
+			PtyConts:       float32(ppc),
+			IndvRefunds:    float32(ir),
+			CmteRefunds:    float32(cr),
+			// CovgEndDate:     ced,
+		}
+
+		// add donation to queue of items, stop at 25 items
+		queue = append(queue, fin)
+		if len(queue) == 10000 {
+			break
+		}
+		fieldMap = make(mapOfFields)
+	}
+	return queue, offset, nil
+}
+
 // ScanCmteFin scans 100 lines of a committee financials file
 // and returns 100 CmteFinancials objects per call
 func ScanCmteFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) {

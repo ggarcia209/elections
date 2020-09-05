@@ -125,6 +125,7 @@ func processNewRecords() error {
 	// input file paths - placeholders
 	root := filepath.Join(input, year)
 	candPath := filepath.Join(root, "cand", "cn.txt")
+	candFinPath := filepath.Join(root, "cmpn", "webl.txt")
 	cmtePath := filepath.Join(root, "cmte", "cm.txt")
 	icPath := filepath.Join(root, "indiv", "itcont.txt")
 	ccPath := filepath.Join(root, "ctx", "itoth.txt")
@@ -137,20 +138,25 @@ func processNewRecords() error {
 	// process candidates and committee objects first
 	err = processCandidates(year, candPath)
 	if err != nil {
-		fmt.Println("ProcessNewRecords failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
 	}
 
 	err = processCommittees(year, cmtePath)
 	if err != nil {
-		fmt.Println("ProcessNewRecords failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
 	}
 
 	if year >= "1996" { // no data prior to 1996
+		err = processCmpnFinancials(year, candFinPath)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("ProcessNewRecords failed: %v", err)
+		}
 		err = processCmteFinancials(year, cmteFinPath)
 		if err != nil {
-			fmt.Println("ProcessNewRecords failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("ProcessNewRecords failed: %v", err)
 		}
 	}
@@ -158,20 +164,20 @@ func processNewRecords() error {
 	// process transactions
 	err = processCmteContributions(year, ccPath)
 	if err != nil {
-		fmt.Println("ProcessNewRecords failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
 	}
 
 	err = processIndvContributions(year, icPath)
 	if err != nil {
-		fmt.Println("ProcessNewRecords failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("ProcessNewRecords failed: %v", err)
 	}
 
 	if year >= "2004" { // no data prior to 2004
 		err = processDisbursements(year, disbPath)
 		if err != nil {
-			fmt.Println("ProcessNewRecords failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("ProcessNewRecords failed: %v", err)
 		}
 	}
@@ -190,49 +196,57 @@ func processCandidates(year, filePath string) error {
 	// open file
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println("processCandidates failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCandidates failed: %v", err)
 	}
 	defer file.Close()
 
+	fi, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandidates failed: %v", err)
+	}
+	fs := fi.Size()
+
 	// get starting offset value; 0 if none
 	start, err := persist.GetOffset(year, "cand")
 	if err != nil {
-		fmt.Println("processCandidates failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCandidates failed: %v", err)
 	}
+	fmt.Println("got offset cand: ", start)
 
 	// parse file
 	for {
-		// parse 25 records per iteration
+		// parse 10000 records per iteration
 		objQueue, offset, err := parse.ScanCandidates(file, start)
 		if err != nil {
-			fmt.Println("processCandidates failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCandidates failed: %v", err)
 		}
 
 		// save objects to disk
 		err = persist.StoreObjects(year, objQueue)
 		if err != nil {
-			fmt.Println("processCandidates failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCandidates failed: %v", err)
 		}
 
 		// save offset value after objects persisted
 		err = persist.LogOffset(year, "cand", offset)
 		if err != nil {
-			fmt.Println("processCandidates failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCandidates failed: %v", err)
 		}
 		start = offset
-
 		j += len(objQueue)
+
 		// break if at end of file
-		if len(objQueue) < 100 {
+		if start >= fs {
 			break
 		}
 	}
-
+	fmt.Println("ending offset cands: ", start)
 	fmt.Println("Candidate records scanned: ", j)
 	fmt.Println("Candidates - DONE")
 
@@ -246,43 +260,51 @@ func processCommittees(year, filePath string) error {
 	// open file
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println("processCommittees failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCommittees failed: %v", err)
 	}
 	defer file.Close()
 
+	fi, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandidates failed: %v", err)
+	}
+	fs := fi.Size()
+
 	// get starting offset value; 0 if none
 	start, err := persist.GetOffset(year, "cmte")
 	if err != nil {
-		fmt.Println("processCommittees failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCommittees failed: %v", err)
 	}
+	fmt.Println("got offset cmte: ", start)
 
 	// parse file
 	for {
-		// parse 25 records per iteration
+		// parse 10000 records per iteration
 		objQueue, txDataQueue, offset, err := parse.ScanCommittees(file, start)
 		if err != nil {
-			fmt.Println("processCommittees failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCommittees failed: %v", err)
 		}
 
 		// save objects to disk
 		err = persist.StoreObjects(year, objQueue)
 		if err != nil {
-			fmt.Println("processCommittees failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCommittees failed: %v", err)
 		}
 		err = persist.StoreObjects(year, txDataQueue)
 		if err != nil {
-			fmt.Println("processCommittees failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCommittees failed: %v", err)
 		}
 
 		// save offset value after objects persisted
 		err = persist.LogOffset(year, "cmte", offset)
 		if err != nil {
-			fmt.Println("processCommittees failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCommittees failed: %v", err)
 		}
 		start = offset
@@ -291,14 +313,80 @@ func processCommittees(year, filePath string) error {
 		k += len(txDataQueue)
 
 		// break if at end of file
-		if len(objQueue) < 100 {
+		if start >= fs {
 			break
 		}
 	}
 
+	fmt.Println("ending offset cmte: ", start)
 	fmt.Println("Committee records scanned: ", j)
 	fmt.Println("CmteTxData objects created: ", k)
 	fmt.Println("Committees - DONE")
+	return nil
+}
+
+func processCmpnFinancials(year, filePath string) error {
+	// defer wg.Done()
+	j := 0
+
+	// open file
+	file, err := os.Open(filePath)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandFinancials failed: %v", err)
+	}
+	defer file.Close()
+
+	fi, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandidates failed: %v", err)
+	}
+	fs := fi.Size()
+
+	// get starting offset value; 0 if none
+	start, err := persist.GetOffset(year, "cmpn_fin")
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandFinancials failed: %v", err)
+	}
+	fmt.Println("got offset cmpn_fin: ", start)
+
+	// parse file
+	for {
+		// parse 10000 records per iteration
+		objQueue, offset, err := parse.ScanCmpnFin(file, start)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("processCandFinancials failed: %v", err)
+		}
+
+		// save objects to disk
+		err = persist.StoreObjects(year, objQueue)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("processCandFinancials failed: %v", err)
+		}
+
+		// save offset value after objects persisted
+		err = persist.LogOffset(year, "cmpn_fin", offset)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("processCandFinancials failed: %v", err)
+		}
+		start = offset
+		j += len(objQueue)
+
+		// break if at end of file
+		if start >= fs {
+			break
+		}
+	}
+
+	fmt.Println("ending offset cmpn_fin: ", start)
+	fmt.Println("CmpnFinancials records scanned: ", j)
+	fmt.Println("Candidates - DONE")
+
 	return nil
 }
 
@@ -309,86 +397,104 @@ func processCmteFinancials(year, filePath string) error {
 	// open file
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println("processCmteFinancials failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCmteFinancials failed: %v", err)
 	}
 	defer file.Close()
 
+	fi, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandidates failed: %v", err)
+	}
+	fs := fi.Size()
+
 	// get starting offset value; 0 if none
 	start, err := persist.GetOffset(year, "cmte_fin")
 	if err != nil {
-		fmt.Println("processCmteFinancials failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCmteFinancials failed: %v", err)
 	}
+	fmt.Println("got offset cmte_fin: ", start)
 
 	// parse file
 	for {
 		// parse 25 records per iteration
 		objQueue, offset, err := parse.ScanCmteFin(file, start)
 		if err != nil {
-			fmt.Println("processCmteFinancials failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteFinancials failed: %v", err)
 		}
 
 		// save objects to disk
 		err = persist.StoreObjects(year, objQueue)
 		if err != nil {
-			fmt.Println("processCmteFinancials failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteFinancials failed: %v", err)
 		}
 
 		// save offset value after objects persisted
 		err = persist.LogOffset(year, "cmte_fin", offset)
 		if err != nil {
-			fmt.Println("processCmteFinancials failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteFinancials failed: %v", err)
 		}
 		start = offset
 		j += len(objQueue)
 
 		// break if at end of file
-		if len(objQueue) < 100 {
+		if start >= fs {
 			break
 		}
 	}
 
+	fmt.Println("ending offset cmte_fins: ", start)
 	fmt.Println("CmteFinancials records scanned: ", j)
-	fmt.Println("Candidates - DONE")
+	fmt.Println("CmteFinancials - DONE")
 
 	return nil
 }
 
 func processCmteContributions(year, filepath string) error {
 	// defer wg.Done()
+	j := 0
 
 	// open file
 	file, err := os.Open(filepath)
 	if err != nil {
-		fmt.Println("processCmteContributions failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCmteContributions failed: %v", err)
 	}
 	defer file.Close()
 
+	fi, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandidates failed: %v", err)
+	}
+	fs := fi.Size()
+
 	// get starting offset value; 0 if none
 	start, err := persist.GetOffset(year, "cmte_cont")
 	if err != nil {
-		fmt.Println("processCmteContributions failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processCmteContributions failed: %v", err)
 	}
+	fmt.Println("got offset cmte cont ", start)
 
 	// parse file
 	for {
 		// parse records
 		txQueue, offset, err := parse.ScanContributions(year, file, start)
 		if err != nil {
-			fmt.Println("processCmteContributions failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteContributions failed: %v", err)
 		}
 
 		// create cache from record IDs
 		c, err := cache.CreateCache(year, txQueue)
 		if err != nil {
-			fmt.Println("processCmteContributions failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteContributions failed: %v", err)
 		}
 
@@ -401,7 +507,7 @@ func processCmteContributions(year, filepath string) error {
 		// update cached objects for each transaction
 		err = databuilder.TransactionUpdate(year, txQueue, c)
 		if err != nil {
-			fmt.Println("processCmteContributions failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteContributions failed: %v", err)
 		}
 
@@ -409,24 +515,28 @@ func processCmteContributions(year, filepath string) error {
 		ser := cache.SerializeCache(c)
 		err = persist.StoreObjects(year, ser)
 		if err != nil {
-			fmt.Println("processCmteContributions failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteContributions failed: %v", err)
 		}
 
 		// save offset value after objects persisted
 		err = persist.LogOffset(year, "cmte_cont", offset)
 		if err != nil {
-			fmt.Println("processCmteContributions failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processCmteContributions failed: %v", err)
 		}
 		start = offset
 
 		// break if at end of file
-		if len(txQueue) < 1000 {
+		if start >= fs {
+			j += len(txQueue)
 			break
 		}
+		j += 100000
 	}
 
+	fmt.Println("ending offset cmte_cont: ", start)
+	fmt.Println("Committee Contribution records scanned: ", j)
 	fmt.Println("Committee Contributions -  DONE")
 
 	return nil
@@ -440,45 +550,53 @@ func processIndvContributions(year, filepath string) error {
 	// open file
 	file, err := os.Open(filepath)
 	if err != nil {
-		fmt.Println("processIndvContributions faield: ", err)
-		os.Exit(1)
+		fmt.Println(err)
+		return fmt.Errorf("processIndvContributions faield: %v", err)
 	}
 	defer file.Close()
+
+	fi, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandidates failed: %v", err)
+	}
+	fs := fi.Size()
 
 	// get starting offset value; 0 if none
 	start, err := persist.GetOffset(year, "indv")
 	if err != nil {
-		fmt.Println("processIndvContributions faield: ", err)
-		return err
+		fmt.Println(err)
+		return fmt.Errorf("processIndvContributions faield: %v", err)
 	}
+	fmt.Println("got offset indv: ", start)
 
 	// parse file
 	for {
 		// parse records
 		txQueue, offset, err := parse.ScanContributions(year, file, start)
 		if err != nil {
-			fmt.Println("processIndvContributions faield: ", err)
-			return err
+			fmt.Println(err)
+			return fmt.Errorf("processIndvContributions faield: %v", err)
 		}
 
 		// create cache from record IDs
 		c, err := cache.CreateCache(year, txQueue)
 		if err != nil {
-			fmt.Println("processIndvContributions faield: ", err)
-			return err
+			fmt.Println(err)
+			return fmt.Errorf("processIndvContributions faield: %v", err)
 		}
 
 		// break if finsished
-		if len(c) == 0 {
-			fmt.Println("processIndvContributions DONE - no cache")
-			return nil
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("processIndvContributions faield: %v", err)
 		}
 
 		// update object data for each transaction
 		err = databuilder.TransactionUpdate(year, txQueue, c)
 		if err != nil {
-			fmt.Println("processIndvContributions faield: ", err)
-			return err
+			fmt.Println(err)
+			return fmt.Errorf("processIndvContributions faield: %v", err)
 		}
 
 		// persist objects in cache
@@ -486,25 +604,27 @@ func processIndvContributions(year, filepath string) error {
 		err = persist.StoreObjects(year, ser)
 		if err != nil {
 			fmt.Println(err)
-			return err
+			return fmt.Errorf("processIndvContributions faield: %v", err)
 		}
 
 		// save offset value after objects persisted
 		err = persist.LogOffset(year, "indv", offset)
 		if err != nil {
 			fmt.Println(err)
-			return err
+			return fmt.Errorf("processIndvContributions faield: %v", err)
 		}
 		start = offset
-		i += 100000
 
 		// break if at end of file
-		if len(txQueue) < 100000 {
+		if start >= fs {
 			i += len(txQueue)
 			break
 		}
+		i += 100000
 	}
 
+	fmt.Println("ending offset indv: ", start)
+	fmt.Println("Individual Contribution records scanned: ", i)
 	fmt.Println("Individual Contributions -  DONE")
 
 	return nil
@@ -516,30 +636,38 @@ func processDisbursements(year, filepath string) error {
 	// open file
 	file, err := os.Open(filepath)
 	if err != nil {
-		fmt.Println("processDisbursements failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processDisbursements failed: %v", err)
 	}
 	defer file.Close()
 
+	fi, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("processCandidates failed: %v", err)
+	}
+	fs := fi.Size()
+
 	// get starting offset value; 0 if none
 	start, err := persist.GetOffset(year, "disb")
 	if err != nil {
-		fmt.Println("processDisbursements failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("processDisbursements failed: %v", err)
 	}
+	fmt.Println("got offset disbs: ", start)
 
 	for {
 		// parse records
 		txQueue, offset, err := parse.ScanDisbursements(year, file, start)
 		if err != nil {
-			fmt.Println("processDisbursements failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 
 		// create cache from
 		c, err := cache.CreateCache(year, txQueue)
 		if err != nil {
-			fmt.Println("processDisbursements failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 
@@ -552,7 +680,7 @@ func processDisbursements(year, filepath string) error {
 		// update object data
 		err = databuilder.TransactionUpdate(year, txQueue, c)
 		if err != nil {
-			fmt.Println("processDisbursements failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 
@@ -560,26 +688,28 @@ func processDisbursements(year, filepath string) error {
 		ser := cache.SerializeCache(c)
 		err = persist.StoreObjects(year, ser)
 		if err != nil {
-			fmt.Println("processDisbursements failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 
 		// save offset value after objects persisted
 		err = persist.LogOffset(year, "disb", offset)
 		if err != nil {
-			fmt.Println("processDisbursements failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("processDisbursements failed: %v", err)
 		}
 		start = offset
 		i += 100000
 
 		// break if at end of file
-		if len(txQueue) < 100000 {
+		if start >= fs {
 			i += len(txQueue)
 			break
 		}
 	}
 
+	fmt.Println("ending offset disbs: ", start)
+	fmt.Println("Disbursements records scanned: ", i)
 	fmt.Println("Disbursements -  DONE")
 
 	return nil

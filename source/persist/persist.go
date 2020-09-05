@@ -12,7 +12,7 @@ import (
 )
 
 // OUTPUT_PATH sets the output path for all database & search index storage & retreiveal operations.
-var OUTPUT_PATH = "../.." // default value
+var OUTPUT_PATH = "." // default value
 
 // InitDiskCache creates the disk cache directory next to the admin app
 func InitDiskCache() {
@@ -420,7 +420,7 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		key := obj.(*donations.Individual).ID
 		data, err := encodeIndv(*obj.(*donations.Individual))
 		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
+			fmt.Println(err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
@@ -429,7 +429,7 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		key := obj.(*donations.Committee).ID
 		data, err := encodeCmte(*obj.(*donations.Committee))
 		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
+			fmt.Println(err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
@@ -438,7 +438,7 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		key := obj.(*donations.Candidate).ID
 		data, err := encodeCand(*obj.(*donations.Candidate))
 		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
+			fmt.Println(err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
@@ -447,7 +447,16 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		key := obj.(*donations.CmteTxData).CmteID
 		data, err := encodeCmteTxData(*obj.(*donations.CmteTxData))
 		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
+			fmt.Println(err)
+			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
+		}
+		return bucket, key, data, nil
+	case *donations.CmpnFinancials:
+		bucket := "cmpn_fin"
+		key := obj.(*donations.CmpnFinancials).CandID
+		data, err := encodeCmpnFinancials(*obj.(*donations.CmpnFinancials))
+		if err != nil {
+			fmt.Println(err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
@@ -456,7 +465,7 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		key := obj.(*donations.CmteFinancials).CmteID
 		data, err := encodeCmteFinancials(*obj.(*donations.CmteFinancials))
 		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
+			fmt.Println(err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
@@ -465,7 +474,7 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		key := obj.(*donations.TopOverallData).ID
 		data, err := encodeOverallData(*obj.(*donations.TopOverallData))
 		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
+			fmt.Println(err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
@@ -474,7 +483,7 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 		key := obj.(*donations.YearlyTotal).ID
 		data, err := encodeYrTotal(*obj.(*donations.YearlyTotal))
 		if err != nil {
-			fmt.Println("encodeToProto failed: ", err)
+			fmt.Println(err)
 			return "", "", nil, fmt.Errorf("encodeToProto failed: %v", err)
 		}
 		return bucket, key, data, nil
@@ -491,49 +500,56 @@ func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 	case "individuals":
 		data, err := decodeIndv(data)
 		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
+			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
 	case "committees":
 		data, err := decodeCmte(data)
 		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
+			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
 	case "candidates":
 		data, err := decodeCand(data)
 		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
+			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
 	case "cmte_tx_data":
 		data, err := decodeCmteTxData(data)
 		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
+			fmt.Println(err)
+			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
+		}
+		return &data, nil
+	case "cmpn_fin":
+		data, err := decodeCmpnFinancials(data)
+		if err != nil {
+			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
 	case "cmte_fin":
 		data, err := decodeCmteFinancials(data)
 		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
+			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
 	case "top_overall":
 		data, err := decodeOverallData(data)
 		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
+			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
 	case "yearly_totals":
 		data, err := decodeYrTotal(data)
 		if err != nil {
-			fmt.Println("decodeFromProto failed: ", err)
+			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
 		return &data, nil
@@ -554,7 +570,7 @@ func createDB() {
 }
 
 func createObjBuckets(year string) error {
-	buckets := []string{"individuals", "committees", "candidates", "cmte_tx_data", "cmte_fin", "top_overall", "yearly_totals"}
+	buckets := []string{"individuals", "committees", "candidates", "cmte_tx_data", "cmte_fin", "cmpn_fin", "top_overall", "yearly_totals"}
 	for _, bucket := range buckets {
 		err := createBucket(year, bucket)
 		if err != nil {

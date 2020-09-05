@@ -31,7 +31,7 @@ func LogOffset(year, key string, offset int64) error {
 			return fmt.Errorf("tx failed: %v", err)
 		}
 		y, err := b.CreateBucketIfNotExists([]byte(year))
-		if err := y.Put([]byte(key), util.Itob(int(offset))); err != nil { // serialize k,v
+		if err := y.Put([]byte(key), util.Itob(offset)); err != nil { // serialize k,v
 			fmt.Println(err)
 			return fmt.Errorf("tx failed: %v", err)
 		}
@@ -49,7 +49,7 @@ func GetOffset(year, key string) (int64, error) {
 	defer mu.Unlock()
 
 	db, err := bolt.Open("../db/disk_cache.db", 0644, nil)
-	var val int
+	var val int64
 	if err != nil {
 		fmt.Println(err)
 		return 0, fmt.Errorf("GetOffset failed: %v", err)
@@ -74,7 +74,7 @@ func GetOffset(year, key string) (int64, error) {
 		fmt.Println(err)
 		return 0, fmt.Errorf("GetOffset failed: %v", err)
 	}
-	return int64(val), nil
+	return val, nil
 }
 
 // LogKey logs the key of the last object uploaded to DynamoDB for the given year/bucket

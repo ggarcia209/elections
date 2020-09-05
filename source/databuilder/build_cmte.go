@@ -49,12 +49,14 @@ func contributionUpdate(year string, conts []*donations.Contribution, cache map[
 			err := incomingTxUpdate(cont, filer.(*donations.CmteTxData), other, transfer, memo)
 			if err != nil {
 				fmt.Println("contributionUpdate failed: ", err)
+				fmt.Println("tx: ", cont.TxID)
 				return fmt.Errorf("contributionUpdate failed: %v", err)
 			}
 		} else {
 			err := outgoingTxUpdate(cont, filer.(*donations.CmteTxData), other, transfer, memo)
 			if err != nil {
 				fmt.Println("contributionUpdate failed: ", err)
+				fmt.Println("tx: ", cont.TxID)
 				return fmt.Errorf("contributionUpdate failed: %v", err)
 			}
 		}

@@ -202,9 +202,11 @@ func queryData() error {
 				return fmt.Errorf("searchData failed: %v", err)
 			}
 
-			fmt.Println("RESULT: ")
-			fmt.Printf("%#v\n", obj)
-			fmt.Println()
+			err = printEntity(year, obj)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
+			}
 
 			fmt.Println("Return to results?")
 			yes := ui.Ask4confirm()
@@ -283,21 +285,10 @@ func lookupByID() error {
 				fmt.Println(err)
 				return fmt.Errorf("searchData failed: %v", err)
 			}
-			if bucket == "committees" {
-				// get tx data for committee
-				txData, err := persist.GetObject(year, "cmte_tx_data", objID)
-				if err != nil {
-					fmt.Println(err)
-					return fmt.Errorf("searchData failed: %v", err)
-				}
-				fmt.Println("RESULT: ")
-				fmt.Printf("%#v\n", obj)
-				fmt.Printf("%#v\n", txData)
-				fmt.Println()
-			} else {
-				fmt.Println("RESULT: ")
-				fmt.Printf("%#v\n", obj)
-				fmt.Println()
+			err = printEntity(year, obj)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("searchData failed: %v", err)
 			}
 			fmt.Println("Return to results?")
 			yes := ui.Ask4confirm()
@@ -603,6 +594,200 @@ func printResults(res []indexing.SearchData) {
 		)
 	}
 	fmt.Println()
+}
+
+func printEntity(year string, ent interface{}) error {
+	switch t := ent.(type) {
+	case *donations.Individual:
+		err := printIndividual(ent.(*donations.Individual))
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("printEntity failed: %v", err)
+		}
+	case *donations.Committee:
+		err := printCommittee(year, ent.(*donations.Committee))
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("printEntity failed: %v", err)
+		}
+	case *donations.Candidate:
+		err := printCandidate(ent.(*donations.Candidate))
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("printEntity failed: %v", err)
+		}
+	default:
+		_ = t
+		return fmt.Errorf("wrong interface type")
+	}
+	return nil
+}
+
+func printIndividual(indv *donations.Individual) error {
+	fmt.Println("Viewing data for Individual: ", indv.ID)
+	fmt.Println("Name: ", indv.Name)
+	fmt.Println("City: ", indv.City)
+	fmt.Println("State: ", indv.State)
+	fmt.Println("Zip: ", indv.Zip)
+	fmt.Println("Occupation: ", indv.Occupation)
+	fmt.Println("Employer: ", indv.Employer)
+	fmt.Println()
+	fmt.Println("Total Outgoing $: ", indv.TotalOutAmt)
+	fmt.Println("Total Outgoing Txs: ", indv.TotalOutTxs)
+	fmt.Println("Avg. Outgoing Tx: ", indv.AvgTxOut)
+	fmt.Println("Total Incoming $: ", indv.TotalInAmt)
+	fmt.Println("Total Incoming Txs: ", indv.TotalInTxs)
+	fmt.Println("Avg. Incoming Tx: ", indv.AvgTxIn)
+	fmt.Println()
+	fmt.Println("Recipients: ")
+	recSrt := util.SortMapObjectTotals(indv.RecipientsAmt)
+	err := printSortedEntities(recSrt, indv.RecipientsAmt, indv.RecipientsTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printIndvidual failed: %v", err)
+	}
+	fmt.Println("Senders: ")
+	sendSrt := util.SortMapObjectTotals(indv.SendersAmt)
+	err = printSortedEntities(sendSrt, indv.SendersAmt, indv.SendersTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printIndvidual failed: %v", err)
+	}
+	fmt.Println()
+	return nil
+}
+
+func printCandidate(cand *donations.Candidate) error {
+	fmt.Println("Viewing data for Candidate: ", cand.ID)
+	fmt.Println("Name: ", cand.Name)
+	fmt.Println("Party: ", cand.Party)
+	fmt.Println("Election Year: ", cand.ElectnYr)
+	fmt.Println("Office: ", cand.Office)
+	fmt.Println("Office State: ", cand.OfficeState)
+	fmt.Println("Primary Committee ID: ", cand.PCC)
+	fmt.Println("City: ", cand.City)
+	fmt.Println("State: ", cand.State)
+	fmt.Println("Zip: ", cand.Zip)
+	fmt.Println()
+	fmt.Println("Total Direct Outgoing $: ", cand.TotalDirectOutAmt)
+	fmt.Println("Total Direct Outgoing Txs: ", cand.TotalDirectOutTxs)
+	fmt.Println("Avg. Direct Outgoing Tx: ", cand.AvgDirectOut)
+	fmt.Println("Total Direct Incoming $: ", cand.TotalDirectInAmt)
+	fmt.Println("Total Direct Incoming Txs: ", cand.TotalDirectInTxs)
+	fmt.Println("Avg. Direct Incoming Tx: ", cand.AvgDirectIn)
+	fmt.Println()
+	fmt.Println("Recipients: ")
+	recSrt := util.SortMapObjectTotals(cand.DirectRecipientsAmts)
+	err := printSortedEntities(recSrt, cand.DirectRecipientsAmts, cand.DirectRecipientsTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printCandidate failed: %v", err)
+	}
+	fmt.Println("Senders: ")
+	sendSrt := util.SortMapObjectTotals(cand.DirectSendersAmts)
+	err = printSortedEntities(sendSrt, cand.DirectSendersAmts, cand.DirectSendersTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printCandidate failed: %v", err)
+	}
+	fmt.Println()
+	return nil
+}
+
+func printCommittee(year string, obj *donations.Committee) error {
+	intf, err := persist.GetObject(year, "cmte_tx_data", obj.ID)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printCommittee failed: %v", err)
+	}
+	txd := intf.(*donations.CmteTxData)
+	fmt.Println("Viewing data for Committee: ", obj.ID)
+	fmt.Println("Name: ", obj.Name)
+	fmt.Println("Party: ", obj.Party)
+	fmt.Println("Designation: ", obj.Designation)
+	fmt.Println("Type: ", obj.Type)
+	fmt.Println("Treasurer Name: ", obj.TresName)
+	fmt.Println("City: ", obj.City)
+	fmt.Println("State: ", obj.State)
+	fmt.Println("Zip: ", obj.Zip)
+	fmt.Println("Filing Frequency: ", obj.FilingFreq)
+	fmt.Println("Organization Type: ", obj.OrgType)
+	fmt.Println("Connected Organization: ", obj.ConnectedOrg)
+	fmt.Println("Candidate ID: ", obj.CandID)
+	fmt.Println()
+	fmt.Println("Contributions $: ", txd.ContributionsInAmt)
+	fmt.Println("Contributions Txs: ", txd.ContributionsInTxs)
+	fmt.Println("Avg. Contribution: ", txd.AvgContributionIn)
+	fmt.Println("Other Receipts $: ", txd.OtherReceiptsInAmt)
+	fmt.Println("Other Receipts Txs: ", txd.OtherReceiptsInTxs)
+	fmt.Println("Avg. Other: ", txd.AvgOtherIn)
+	fmt.Println("Total Incoming $: ", txd.TotalIncomingAmt)
+	fmt.Println("Total Incoming Txs: ", txd.TotalIncomingTxs)
+	fmt.Println("Avg. Incoming: ", txd.AvgIncoming)
+	fmt.Println()
+	fmt.Println("Transfers $: ", txd.TransfersAmt)
+	fmt.Println("Transfers Txs: ", txd.TransfersTxs)
+	fmt.Println("Avg. Transfer: ", txd.AvgTransfer)
+	fmt.Println("Expenditures $: ", txd.ExpendituresAmt)
+	fmt.Println("Expenditures Txs: ", txd.ExpendituresTxs)
+	fmt.Println("Avg. Expenditure: ", txd.AvgExpenditure)
+	fmt.Println("Total Outgoing $: ", txd.TotalOutgoingAmt)
+	fmt.Println("Total Outgoing Txs: ", txd.TotalOutgoingTxs)
+	fmt.Println("Avg. Outgoing: ", txd.AvgOutgoing)
+	fmt.Println()
+	fmt.Println("Top Indvidual Contributors: ")
+	indvSrt := util.SortMapObjectTotals(txd.TopIndvContributorsAmt)
+	err = printSortedEntities(indvSrt, txd.TopIndvContributorsAmt, txd.TopIndvContributorsTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printCommittee failed: %v", err)
+	}
+	fmt.Println("Top Committee Contributors: ")
+	cmteSrt := util.SortMapObjectTotals(txd.TopCmteOrgContributorsAmt)
+	err = printSortedEntities(cmteSrt, txd.TopCmteOrgContributorsAmt, txd.TopCmteOrgContributorsTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printCommittee failed: %v", err)
+	}
+	fmt.Println("Transfer Recipients: ")
+	trsSrt := util.SortMapObjectTotals(txd.TransferRecsAmt)
+	err = printSortedEntities(trsSrt, txd.TransferRecsAmt, txd.TransferRecsTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printCommittee failed: %v", err)
+	}
+	fmt.Println("Top Expenditure Recipients: ")
+	expSrt := util.SortMapObjectTotals(txd.TopExpRecipientsAmt)
+	err = printSortedEntities(expSrt, txd.TopExpRecipientsAmt, txd.TopExpRecipientsTxs)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printCommittee failed: %v", err)
+	}
+	fmt.Println()
+	return nil
+}
+
+// lookup corresponding SearchData object for each ID in rankings and print data
+func printSortedEntities(sorted util.SortedTotalsMap, orig, txs map[string]float32) error {
+	ids := []string{}
+	for _, e := range sorted {
+		ids = append(ids, e.ID)
+	}
+	sds, err := indexing.LookupSearchData(ids)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("printSortedEntities failed: %v", err)
+	}
+	for i, sd := range sds {
+		ID := sd.ID
+		amt := orig[ID]
+		tx := txs[ID]
+		avg := amt / tx
+		fmt.Printf("Rank %d)  %s - %s (%s, %s):\n\tTotal $: %.2f\t# Txs: %f\tAvg Tx $: %.2f\n", i+1, ID, sd.Name, sd.City, sd.State, amt, tx, avg)
+	}
+	fmt.Println()
+
+	return nil
 }
 
 // sort rankings map by vale

@@ -45,18 +45,36 @@ func DeleteYear(year string) error {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
-		fmt.Println("DeleteYear failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("DeleteYear failed: %v", err)
 	}
 	// tx
 	if err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(year))
-		if err := b.DeleteBucket([]byte(year)); err != nil { // serialize k,v
+		if err := tx.DeleteBucket([]byte(year)); err != nil {
 			return fmt.Errorf("tx failed: %v", err)
 		}
 		return nil
 	}); err != nil {
-		fmt.Println("DeleteYear failed: ", err)
+		fmt.Println(err)
+		return fmt.Errorf("DeleteYear failed: %v", err)
+	}
+
+	// delete corresponding offsets
+	db, err = bolt.Open("../db/disk_cache.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("DeleteYear failed: %v", err)
+	}
+	// tx
+	if err := db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("offsets"))
+		if err := b.DeleteBucket([]byte(year)); err != nil {
+			return fmt.Errorf("tx failed: %v", err)
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
 		return fmt.Errorf("DeleteYear failed: %v", err)
 	}
 	return nil

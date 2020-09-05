@@ -1,5 +1,7 @@
 package donations
 
+import "time"
+
 // Candidate represents a candidate
 type Candidate struct {
 	ID                   string
@@ -41,4 +43,38 @@ type CmteLink struct {
 	CmteType string
 	CmteDsgn string // Committee Designation
 	LinkID   string
+}
+
+// CmpnFinancials contains financial data reported by a candidate's campaign
+type CmpnFinancials struct {
+	CandID         string
+	Name           string
+	ici            string
+	PartyCd        string
+	Party          string
+	TotalReceipts  float32
+	TransFrAuth    float32
+	TotalDisbsmts  float32
+	TransToAuth    float32
+	COHBOP         float32
+	COHCOP         float32
+	CandConts      float32
+	CandLoans      float32
+	OtherLoans     float32
+	CandLoanRepay  float32
+	OtherLoanRepay float32
+	DebtsOwedBy    float32
+	TotalIndvConts float32
+	OfficeState    string
+	OfficeDistrict string
+	SpecElection   string
+	PrimElection   string
+	RunElection    string
+	GenElection    string
+	GenElectionPct float32
+	OtherCmteConts float32
+	PtyConts       float32
+	CvgEndDate     time.Time
+	IndvRefunds    float32
+	CmteRefunds    float32
 }
