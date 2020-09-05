@@ -66,6 +66,15 @@ func createSecondaryDatasets() error {
 
 	// derive data
 	fmt.Println("Creating Top Overall Rankings and Yearly Totals...")
+	if year == "all_time" {
+		err := getAllTime(odMap, ytMap)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("createSecondaryDatasets failed: %v", err)
+		}
+		return nil
+	}
+
 	for _, b := range buckets {
 		fmt.Println("Processing bucket: ", b)
 		err := deriveDatabyBucket(year, b, odMap, ytMap)
@@ -76,6 +85,31 @@ func createSecondaryDatasets() error {
 	}
 	fmt.Println("Top Overall Rankings  and Yearly Totals complete!")
 
+	return nil
+}
+
+func getAllTime(odMap odMapping, ytMap ytMapping) error {
+	offset, err := persist.GetOffset("all_time", "all-time-rankings")
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("getAllTime failed: %v", err)
+	}
+	years := getRemainingYrs(int(offset))
+	buckets := []string{"individuals", "cmte_tx_data", "candidates"}
+	for i, yr := range years {
+		for _, b := range buckets {
+			err := deriveDatabyBucket(yr, b, odMap, ytMap)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("getAllTime failed: %v", err)
+			}
+		}
+		err = persist.LogOffset("all_time", "all-time-rankings", int64(i))
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("getAllTime failed: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -281,4 +315,110 @@ func getParty(pty string) string {
 	default:
 		return "OTH"
 	}
+}
+
+func getRemainingYrs(year int) []string {
+	years := map[int][]string{
+		0: []string{
+			"2020", "2018", "2016", "2014", "2012",
+			"2010", "2008", "2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		1: []string{
+			"2018", "2016", "2014", "2012",
+			"2010", "2008", "2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		2: []string{
+			"2016", "2014", "2012",
+			"2010", "2008", "2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		3: []string{
+			"2014", "2012",
+			"2010", "2008", "2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		4: []string{
+			"2012",
+			"2010", "2008", "2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		5: []string{
+			"2010", "2008", "2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		6: []string{
+			"2008", "2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		7: []string{
+			"2006", "2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		8: []string{
+			"2004", "2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		9: []string{
+			"2002",
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		10: []string{
+			"2000", "1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		11: []string{
+			"1998", "1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		12: []string{
+			"1996", "1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		13: []string{
+			"1994", "1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		14: []string{
+			"1992",
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		15: []string{
+			"1990", "1988", "1986", "1984", "1982",
+			"1980",
+		},
+		16: []string{"1988", "1986", "1984", "1982", "1980"},
+		17: []string{"1986", "1984", "1982", "1980"},
+		18: []string{"1984", "1982", "1980"},
+		19: []string{"1982", "1980"},
+		20: []string{"1980"},
+	}
+
+	return years[year]
 }
