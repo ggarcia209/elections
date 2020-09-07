@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strconv"
@@ -147,7 +148,7 @@ func GetYear() string {
 		"2010": true, "2008": true, "2006": true, "2004": true, "2002": true,
 		"2000": true, "1998": true, "1996": true, "1994": true, "1992": true,
 		"1990": true, "1988": true, "1986": true, "1984": true, "1982": true,
-		"1980": true, "cancel": true,
+		"1980": true, "all-time": true, "cancel": true,
 	}
 
 	var s string
@@ -172,16 +173,15 @@ func GetYear() string {
 
 // GetQuery gets unformatted query input from user
 func GetQuery() string {
-	var s string
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Enter search query: ")
-	_, err := fmt.Scan(&s)
-	if err != nil {
-		panic(err)
-	}
+	text, _ := reader.ReadString('\n')
+	// convert CRLF to LF
+	text = strings.Replace(text, "\n", "", -1)
 
-	fmt.Println("Query: ", s)
+	fmt.Println("Query: ", text)
 	fmt.Println()
-	return s
+	return text
 }
 
 // GetDynamoQuery gets a user-input sort, partition key pair

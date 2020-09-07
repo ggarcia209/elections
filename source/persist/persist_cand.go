@@ -60,7 +60,7 @@ func decodeCand(data []byte) (donations.Candidate, error) {
 	cand := &protobuf.Candidate{}
 	err := proto.Unmarshal(data, cand)
 	if err != nil {
-		fmt.Println("decodeCand failed: ", err)
+		fmt.Println(err)
 		return donations.Candidate{}, fmt.Errorf("decodeCand failed: %v", err)
 	}
 
@@ -102,4 +102,82 @@ func decodeCandThreshold(es []*protobuf.CandEntry) []interface{} {
 		entries = append(entries, &entry)
 	}
 	return entries
+}
+
+func encodeCmpnFinancials(cf donations.CmpnFinancials) ([]byte, error) {
+	entry := &protobuf.CmpnFinancials{
+		CandID:         cf.CandID,
+		Name:           cf.Name,
+		PartyCd:        cf.PartyCd,
+		Party:          cf.Party,
+		TotalReceipts:  cf.TotalReceipts,
+		TransFrAuth:    cf.TransFrAuth,
+		TotalDisbsmts:  cf.TotalDisbsmts,
+		TransToAuth:    cf.TransToAuth,
+		COHBOP:         cf.COHBOP,
+		COHCOP:         cf.COHCOP,
+		CandConts:      cf.CandConts,
+		CandLoans:      cf.CandLoans,
+		OtherLoans:     cf.OtherLoans,
+		CandLoanRepay:  cf.CandLoanRepay,
+		OtherLoanRepay: cf.OtherLoanRepay,
+		DebtsOwedBy:    cf.DebtsOwedBy,
+		TotalIndvConts: cf.TotalIndvConts,
+		SpecElection:   cf.SpecElection,
+		PrimElection:   cf.PrimElection,
+		RunElection:    cf.RunElection,
+		GenElection:    cf.GenElection,
+		GenElectionPct: cf.GenElectionPct,
+		OtherCmteConts: cf.OtherCmteConts,
+		PtyConts:       cf.PtyConts,
+		// CvgEndDate: cf.CvgEndDate,
+		IndvRefunds: cf.IndvRefunds,
+		CmteRefunds: cf.CmteRefunds,
+	}
+	data, err := proto.Marshal(entry)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("encodeCmpnFinancials failed: %v", err)
+	}
+	return data, nil
+}
+
+func decodeCmpnFinancials(data []byte) (donations.CmpnFinancials, error) {
+	cf := &protobuf.CmpnFinancials{}
+	err := proto.Unmarshal(data, cf)
+	if err != nil {
+		fmt.Println(err)
+		return donations.CmpnFinancials{}, fmt.Errorf("decodeCmpnFinancials failed: %v", err)
+	}
+
+	cmpn := donations.CmpnFinancials{
+		CandID:         cf.GetCandID(),
+		Name:           cf.GetName(),
+		PartyCd:        cf.GetPartyCd(),
+		Party:          cf.GetParty(),
+		TransFrAuth:    cf.GetTransFrAuth(),
+		TotalDisbsmts:  cf.GetTotalDisbsmts(),
+		TransToAuth:    cf.GetTransToAuth(),
+		COHBOP:         cf.GetCOHBOP(),
+		COHCOP:         cf.GetCOHCOP(),
+		CandConts:      cf.GetCandConts(),
+		CandLoans:      cf.GetCandLoans(),
+		OtherLoans:     cf.GetOtherLoans(),
+		CandLoanRepay:  cf.GetCandLoanRepay(),
+		OtherLoanRepay: cf.GetOtherLoanRepay(),
+		DebtsOwedBy:    cf.GetDebtsOwedBy(),
+		TotalIndvConts: cf.GetTotalIndvConts(),
+		SpecElection:   cf.GetSpecElection(),
+		PrimElection:   cf.GetPrimElection(),
+		RunElection:    cf.GetRunElection(),
+		GenElection:    cf.GetGenElection(),
+		GenElectionPct: cf.GetGenElectionPct(),
+		OtherCmteConts: cf.GetOtherCmteConts(),
+		PtyConts:       cf.GetPtyConts(),
+		// CvgEndDate: cf.GetCvgEndDate(),
+		IndvRefunds: cf.GetIndvRefunds(),
+		CmteRefunds: cf.GetCmteRefunds(),
+	}
+
+	return cmpn, nil
 }

@@ -19,7 +19,7 @@ func InitDiskCache() {
 	// metadata - store in /admin_app
 	if _, err := os.Stat("../db"); os.IsNotExist(err) {
 		os.Mkdir("../db", 0744)
-		fmt.Printf("CreateDB successful: '../db' directory created\n")
+		fmt.Printf("InitDiskCache successful: '../db' directory created\n")
 	}
 }
 

@@ -422,36 +422,36 @@ func uploadFromDisk(db *dynamo.DbInfo, year, bucket string, n int) error {
 // initTableObjs creates dynamo.Table objects for given year in memory only and
 // adds them to the db.Tables field. See InitDynamoTables description for TableName format.
 func initTableObjs(db *dynamo.DbInfo, year string) {
-	indv := "cf-" + year + "-individuals"        // pk = State
-	cand := "cf-" + year + "-candidates"         // pk = State
-	cmte := "cf-" + year + "-committees"         // pk = State
-	cmteData := "cf-" + year + "-cmte_tx_data"   // pk = Name
-	cmteFin := "cf-" + year + "-cmte_financials" // pk = Name
-	topOverall := "cf-" + year + "-top_overall"  // pk = SizeLimit
-	yrTotals := "cf-" + year + "-yearly_totals"  // pk = SizeLimit
+	indv := "cf-" + year + "-individuals"        // pk = First Letter of Name
+	cand := "cf-" + year + "-candidates"         // pk = First Letter of Name
+	cmte := "cf-" + year + "-committees"         // pk = First Letter of Name
+	cmteData := "cf-" + year + "-cmte_tx_data"   // pk = First Letter of Name
+	cmteFin := "cf-" + year + "-cmte_financials" // pk = First Letter of Name
+	topOverall := "cf-" + year + "-top_overall"  // pk = Bucket
+	yrTotals := "cf-" + year + "-yearly_totals"  // pk = Category
 
 	// create object tables
-	t := dynamo.CreateNewTableObj(indv, "State", "string", "ID", "string")
+	t := dynamo.CreateNewTableObj(indv, "Initial", "string", "ID", "string")
 	db.AddTable(t)
 
 	// create object tables
-	t = dynamo.CreateNewTableObj(cand, "State", "string", "ID", "string")
+	t = dynamo.CreateNewTableObj(cand, "Initial", "string", "ID", "string")
 	db.AddTable(t)
 
 	// create object tables
-	t = dynamo.CreateNewTableObj(cmte, "State", "string", "ID", "string")
+	t = dynamo.CreateNewTableObj(cmte, "Initial", "string", "ID", "string")
 	db.AddTable(t)
 
 	// create object tables
-	t = dynamo.CreateNewTableObj(cmteData, "Name", "string", "ID", "string")
+	t = dynamo.CreateNewTableObj(cmteData, "Initial", "string", "ID", "string")
 	db.AddTable(t)
 
 	// create object tables
-	t = dynamo.CreateNewTableObj(cmteFin, "Name", "string", "ID", "string")
+	t = dynamo.CreateNewTableObj(cmteFin, "Initial", "string", "ID", "string")
 	db.AddTable(t)
 
 	// create TopOverall table
-	t = dynamo.CreateNewTableObj(topOverall, "Category", "int", "ID", "string")
+	t = dynamo.CreateNewTableObj(topOverall, "Bucket", "int", "ID", "string")
 	db.AddTable(t)
 
 	// create TopOverall table

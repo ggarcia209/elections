@@ -44,6 +44,16 @@ func contributionUpdate(year string, conts []*donations.Contribution, cache map[
 		// get sender/receiver objects
 		other := cache[bucket][cont.OtherID]
 
+		// account for data entry errors in source data resulting in non-existing objects
+		if other == nil {
+			fmt.Println("WARNING: NIL INTERFACE (OTHER) - TRANSACTION SKIPPED: ", cont.TxID)
+			return nil
+		}
+		if filer == nil {
+			fmt.Println("WARNING: NIL INTERFACE (FILER) - TRANSACTION SKIPPED: ", cont.TxID)
+			return nil
+		}
+
 		// update incoming/outgoing tx data
 		if incoming {
 			err := incomingTxUpdate(cont, filer.(*donations.CmteTxData), other, transfer, memo)

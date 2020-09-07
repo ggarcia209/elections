@@ -145,27 +145,17 @@ func queryData() error {
 			return fmt.Errorf("searchData failed: %v", err)
 		}
 		resMap := make(map[string]indexing.SearchData)
-		printResults(res)
 
 		// crate submenus for selecting dataset from search results
-		ids := []string{}
-		for _, r := range res {
-			ids = append(ids, r.ID)
-			resMap[r.ID] = r
-		}
-		sds, err := indexing.LookupSearchData(ids)
-		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("searchData failed: %v", err)
-		}
-		options := []string{}
-		for _, sd := range sds {
+		options := []string{"exit"}
+		for _, sd := range res {
+			resMap[sd.ID] = sd
 			optn := sd.ID + " " + sd.Name + " " + sd.City + ", " + sd.State
 			options = append(options, optn)
 		}
-		options = append(options, "exit")
 		idsSubmenu := ui.CreateMenu("admin-search-results", options)
 		for {
+			printResults(res)
 			fmt.Println("Choose an ID from the list to view more info or choose 'exit' to return")
 			chID, err := ui.Ask4MenuChoice(idsSubmenu)
 			if err != nil {
@@ -173,6 +163,8 @@ func queryData() error {
 				return fmt.Errorf("searchData failed: %v", err)
 			}
 			objID := idsSubmenu.OptionsMap[chID]
+			ss := strings.Split(objID, " ")
+			objID = strings.TrimSpace(ss[0])
 			if objID == "exit" {
 				fmt.Println("Returning to menu...")
 				return nil
@@ -324,14 +316,14 @@ func viewRankings() error {
 	}
 	catMenu := ui.CreateMenu("admin-rankings-cats", cats)
 	ptyMap := map[string][]string{
-		"Individual Donors":     []string{"ALL", "cancel"},
-		"Individual Recipients": []string{"ALL", "cancel"},
-		"Committee Donors":      []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
-		"Committee Recipients":  []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
-		"Committee Spenders":    []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
-		"Candidate Recipients":  []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
-		"Candidate Donors":      []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
-		"Candidate Spenders":    []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK", "cancel"},
+		"Individual Donors":     []string{"cancel", "ALL"},
+		"Individual Recipients": []string{"cancel", "ALL"},
+		"Committee Donors":      []string{"cancel", "ALL", "DEM", "REP", "IND", "OTH", "UNK"},
+		"Committee Recipients":  []string{"cancel", "ALL", "DEM", "REP", "IND", "OTH", "UNK"},
+		"Committee Spenders":    []string{"cancel", "ALL", "DEM", "REP", "IND", "OTH", "UNK"},
+		"Candidate Recipients":  []string{"cancel", "ALL", "DEM", "REP", "IND", "OTH", "UNK"},
+		"Candidate Donors":      []string{"cancel", "ALL", "DEM", "REP", "IND", "OTH", "UNK"},
+		"Candidate Spenders":    []string{"cancel", "ALL", "DEM", "REP", "IND", "OTH", "UNK"},
 	}
 
 	for {
@@ -415,13 +407,13 @@ func viewYrTotals() error {
 	catMenu := ui.CreateMenu("admin-rankings-cats", cats)
 	ptys := []string{"All", "Democrat", "Republican", "Independent/Non-Affiliated", "Other", "Unknown", "cancel"}
 	ptyMap := map[string]string{
+		"cancel":                     "cancel",
 		"All":                        "ALL",
 		"Democrat":                   "DEM",
 		"Republican":                 "REP",
 		"Independent/Non-Affiliated": "IND",
 		"Other":                      "OTH",
 		"Unknown":                    "UNK",
-		"cancel":                     "cancel",
 	}
 
 	for {
@@ -590,7 +582,7 @@ func printResults(res []indexing.SearchData) {
 	for i, r := range res {
 		fmt.Printf(
 			"%d)  ID: %s\n\tName: %s\n\tCit: %s\n\tState: %s\n\tBucket: %s\n\tYears: %s\n",
-			i, r.ID, r.Name, r.City, r.State, r.Bucket, r.Years,
+			i+1, r.ID, r.Name, r.City, r.State, r.Bucket, r.Years,
 		)
 	}
 	fmt.Println()

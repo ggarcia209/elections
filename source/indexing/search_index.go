@@ -86,14 +86,19 @@ func GetResults(q Query) ([]SearchData, error) {
 		return nil, fmt.Errorf("GetResults failed: %v", err)
 	}
 
+	// results not found for 1+ more terms
+	if len(resMap) < len(terms) {
+		return []SearchData{}, nil
+	}
+
 	// Sort lists by smallest to largest
 	sorted := sortMap(resMap)
 
 	// Compare and find all common IDs in all terms
 	// Start by finding the common IDs in the 2 smallest lists
 	// then compare the next list to the previous comparison's intersection
-	s1, s2 := sorted[0].Value, sorted[1].Value
-	common := intersection(s1, s2)
+	s0, s1 := sorted[0].Value, sorted[1].Value
+	common := intersection(s0, s1)
 	for i := 2; i < len(sorted); i++ {
 		common = intersection(common, sorted[i].Value)
 	}
@@ -190,6 +195,7 @@ func ViewIndex() error {
 func getRefs(q []string) (map[string][]string, error) {
 	var resultMap = make(map[string][]string)
 	var result []string
+	var noIDs bool
 
 	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	if err != nil {
@@ -212,12 +218,21 @@ func getRefs(q []string) (map[string][]string, error) {
 			if err != nil {
 				return fmt.Errorf("tx failed: %v", err)
 			}
+			if len(ids) == 0 {
+				fmt.Println("no IDs found for term: ", v)
+				noIDs = true
+				return nil
+			}
 			result = ids
 			return nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("getRefs failed: %s", err)
 		}
+		if noIDs {
+			continue
+		}
+
 		resultMap[v] = result
 	}
 	return resultMap, nil
@@ -248,7 +263,7 @@ func sortIDs(lu []string) []string {
 
 // intersection returns the intersection of two integer slices
 func intersection(s1, s2 []string) []string {
-	checkMap := map[string]bool{}
+	checkMap := make(map[string]bool)
 	common := []string{}
 	for _, v := range s1 {
 		checkMap[v] = true
@@ -257,7 +272,7 @@ func intersection(s1, s2 []string) []string {
 		if v > s1[len(s1)-1] {
 			break // break if v.ID > largest ID value in smaller slice
 		}
-		if _, ok := checkMap[v]; ok { // common to both Entries
+		if checkMap[v] { // common to both Entries
 			common = append(common, v)
 		}
 	}
