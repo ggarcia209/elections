@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package protobuf;
+
+import "google/protobuf/timestamp.proto";
+
+message CmpnFinancials {
+    string CandID = 1;         
+	string Name = 2;
+	string PartyCd = 3;
+	string Party = 4;
+	float TotalReceipts = 5;
+    float TransFrAuth = 6;
+    float TotalDisbsmts = 7;
+    float TransToAuth = 8;
+	float COHBOP = 9;
+	float COHCOP = 10;
+	float CandConts = 11; 
+	float CandLoans = 12;
+	float OtherLoans = 13;
+	float CandLoanRepay = 14;
+	float OtherLoanRepay = 15;
+	float DebtsOwedBy = 16;
+	float TotalIndvConts = 17;
+	string OfficeState = 18;
+	string OfficeDistrict = 19;
+	string SpecElection = 20; 
+    string PrimElection = 21;
+    string RunElection = 22;
+	string GenElection = 23;
+	float GenElectionPct = 24;
+	float OtherCmteConts = 25;
+	float PtyConts = 26;
+	google.protobuf.Timestamp CvgEndDate = 27;
+	float IndvRefunds = 28;
+	float CmteRefunds = 29;
+}

@@ -72,6 +72,9 @@ func GetResults(q Query) ([]SearchData, error) {
 	if len(terms) == 1 {
 		results, err := getSearchEntry(terms[0])
 		if err != nil {
+			if err.Error() == "MAX_LENGTH" {
+				return []SearchData{}, err
+			}
 			fmt.Println(err)
 			return nil, fmt.Errorf("GetResults failed: %v", err)
 		}

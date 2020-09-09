@@ -159,6 +159,10 @@ func getSearchEntry(term string) ([]SearchData, error) {
 		return []SearchData{}, fmt.Errorf("getSearchEntry failed: %v", err)
 	}
 
+	if len(ids) > 200 {
+		return []SearchData{}, fmt.Errorf("MAX_LENGTH")
+	}
+
 	// get SeachData objects from IDS
 	results, err := getSearchData(db, ids)
 	if err != nil {
