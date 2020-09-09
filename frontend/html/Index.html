@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cash Flow FEC</title>
 <!-- Bootstrap -->
-<link href="css/bootstrap-4.4.1.css" rel="stylesheet">
-<link href="css/site_styles.css" rel="stylesheet" type="text/css">
+<link href="../css/bootstrap-4.4.1.css" rel="stylesheet">
+<link href="../css/site_styles.css" rel="stylesheet" type="text/css">
 </head>
 <body class="body-main" style="padding-top: 70px">
 <!-- body code goes here --> 
@@ -16,9 +16,9 @@
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent1" aria-controls="navbarSupportedContent1" aria-expanded="false" aria-label="Toggle navigation"> <span class="navbar-toggler-icon"></span> </button>
   <div class="collapse navbar-collapse" id="navbarSupportedContent1">
     <ul class="navbar-nav mr-auto">
-      <li class="nav-item active"> <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a> </li>
-      <li class="nav-item"> <a class="nav-link" href="#">Rankings</a> </li>
-      <li class="nav-item"> <a class="nav-link" href="#">About</a> </li>
+      <li class="nav-item active"> <a class="nav-link" href="http://localhost:8000/">Home <span class="sr-only">(current)</span></a> </li>
+      <li class="nav-item"> <a class="nav-link" href="http://localhost:8000/rankings">Rankings</a> </li>
+      <li class="nav-item"> <a class="nav-link" href="http://localhost:8000/about">About</a> </li>
     </ul>
     <form class="form-inline my-2 my-lg-0">
       <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
@@ -32,7 +32,7 @@
     <p class="p-welcome">Welcome to Cash Flow FEC! We are are a website dedicated to providing objective and unbiased data derived from political spending and contribution records filed with the United States Federal Election Commission. Our datasets for each election cycle have been derived directly from the bulk data files available at FEC.gov. You can read more about our methodology in the "About" tab, or by clicking "Learn More" below.&nbsp; &nbsp;</p>
     <p class="p-welcome">We have found the top contributors, recipients, and spenders in each election cycle by processing every transaction recorded by the FEC during that election cycle. You can view some of the rankings below or continue further to search for a specific candidate, committee, individual, or organization to view it's data as well as the top contributors and receivers of the given entity's funds.&nbsp;</p>
     <p class="p-welcome">We are 100% independent and are not affiliated with any non-profit, for-profit, or political organizations, nor do we endorse any political ideology. Our information is for educational purposes only. Enjoy!&nbsp;</p>
-    <div class="view-more-div"> <a class="view-more-link" href="#">
+    <div class="view-more-div"> <a class="view-more-link" href="http://localhost:8000/about">
       <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">Learn More</button>
       </a> </div>
   </div>
@@ -72,7 +72,7 @@
         </ul>
       </div>
     </div>
-    <div class="view-more-div"> <a class="view-more-link" href="#">
+    <div class="view-more-div"> <a class="view-more-link" href="http://localhost:8000/rankings">
       <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View More</button>
       </a> </div>
   </div>
@@ -81,10 +81,10 @@
   <h1 class="header-rankings">Search</h1>
   <p class="p-welcome">Search by name, employer, city, or state. Search results will include candidates, committees, individuals, or businesses &amp; organizations with any criteria that matches each of the given terms in the search query.&nbsp; &nbsp; &nbsp;</p>
   <p class="p-welcome">Results for individuals &amp; organizations are limited to the top 100,000 individuals &amp; organizations by funds contributed and the top 100,000 individuals &amp; organizations by funds received for a total of 200,000 records per election cycle.</p>
-  <form class="search-bar-div">
+  <form action="/search-results/" class="search-bar-div" method="GET">
     <div class="searchbar"> 
       <!--<button onclick="myFunction()" class="dropbtn">Dropdown</button> -->
-      <input type="text" class="search-bar-main" id="myInput" placeholder="Search.." onkeyup="filterFunction()">
+      <input required name="q" type="search" class="search-bar-main" id="search-results-main" placeholder="Search.." onkeyup="filterFunction()">
     </div>
     <button class="btn btn-outline-success my-2 my-sm-0 search-btn" type="submit">Search</button>
   </form>
@@ -92,12 +92,13 @@
 <footer class="footer">
   <p class="footer-text">&#169; Gilberto Garcia</p>
 </footer>
-<script src="js/scripts.js"></script> 
+<script src="../js/scripts.js"></script> 
 <!-- jQuery (necessary for Bootstrap's JavaScript plugins) --> 
-<script src="js/jquery-3.4.1.min.js"></script> 
+<script src="../js/jquery-3.4.1.min.js"></script> 
 
 <!-- Include all compiled plugins (below), or include individual files as needed --> 
-<script src="js/popper.min.js"></script> 
-<script src="js/bootstrap-4.4.1.js"></script>
+<script src="../js/popper.min.js"></script> 
+<script src="../js/bootstrap-4.4.1.js"></script>
+<script src="../js/dist/main.js"></script>
 </body>
 </html>

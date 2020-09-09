@@ -8,8 +8,8 @@ import (
 
 	"github.com/elections/source/donations"
 	"github.com/elections/source/dynamo"
-
 	"github.com/elections/source/indexing"
+	"github.com/elections/source/util"
 )
 
 // RankingsMap stores references to each rankings list by year
@@ -39,9 +39,13 @@ func InitDynamo() (*dynamo.DbInfo, error) {
 // finds the results matching each word in query.
 func SearchData(txt string) ([]indexing.SearchData, error) {
 	// get query from user / return & print results
+	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
 	q := indexing.CreateQuery(txt, "user")
 	res, err := indexing.GetResults(q)
 	if err != nil {
+		if err.Error() == "MAX_LENGTH" {
+			return []indexing.SearchData{}, err
+		}
 		fmt.Println(err)
 		return []indexing.SearchData{}, fmt.Errorf("QueryData failed: %v", err)
 	}
@@ -128,6 +132,88 @@ func GetRankingsFromDynamo(db *dynamo.DbInfo) (RankingsMap, error) {
 		}
 	}
 	return rankings, nil
+}
+
+// GetRankingsFromDynamo retrieves the TopOvearll datasets
+// for the given year from Dynamo to store in memory
+// TEST ONLY
+func GetRankingsFromDisk() (RankingsMap, error) {
+	persist.OUTPUT_PATH = "/Volumes/T7/processed"
+	rankings := make(RankingsMap)
+	years := []string{
+		"2020", "2018", "2016", "2014", "2012", "2010", "2008", "2006", "2004", "2002",
+		"2000", "1998", "1996", "1994", "1992", "1990", "1988", "1986", "1984", "1982",
+		"1980",
+	}
+
+	for _, yr := range years {
+		fmt.Printf("getting rankings for %s...\n", yr)
+		// get list of object IDs for the year,
+		odl, err := persist.GetTopOverall(yr)
+		if err != nil {
+			fmt.Println(err)
+			return rankings, fmt.Errorf("GetRankingsFromDisk failed: %v", err)
+		}
+		for _, od := range odl {
+			full := od.(*donations.TopOverallData)
+			// add rankiings list to map
+			if full.Bucket == "individuals" {
+				// clip individuals lists to 500 entries
+				sorted := util.SortMapObjectTotals(full.Amts)
+				clip := make(map[string]float32)
+				for i, e := range sorted {
+					if i == 500 {
+						break
+					}
+					clip[e.ID] = e.Total
+				}
+				full.Amts = clip
+			}
+			if rankings[yr] == nil {
+				rankings[yr] = make(map[string]donations.TopOverallData)
+			}
+			rankings[yr][full.ID] = *full
+
+			// create preview list and add preview object to map
+			pre := createRankingsPreview(full)
+			rankings[yr][pre.ID] = pre
+		}
+	}
+	return rankings, nil
+}
+
+// GetRankingsFromDynamo retrieves the TopOvearll datasets
+// for the given year from Dynamo to store in memory
+// TEST ONLY
+func GetYrTotalsFromDisk() (YrTotalsMap, error) {
+	persist.OUTPUT_PATH = "/Volumes/T7/processed"
+	totals := make(YrTotalsMap)
+	years := []string{
+		"2020", "2018", "2016", "2014", "2012", "2010", "2008", "2006", "2004", "2002",
+		"2000", "1998", "1996", "1994", "1992", "1990", "1988", "1986", "1984", "1982",
+		"1980",
+	}
+	cats := []string{"rec", "donor", "exp"}
+
+	for _, yr := range years {
+		fmt.Printf("getting yearly totals for %s...\n", yr)
+		for _, cat := range cats {
+			// get list of object IDs for the year,
+			ytl, err := persist.GetYearlyTotals(yr, cat)
+			if err != nil {
+				fmt.Println(err)
+				return totals, fmt.Errorf("GetRankingsFromDisk failed: %v", err)
+			}
+			for _, yt := range ytl {
+				// add rankiings list to map
+				if totals[yr] == nil {
+					totals[yr] = make(map[string]donations.YearlyTotal)
+				}
+				totals[yr][yt.(*donations.YearlyTotal).ID] = *yt.(*donations.YearlyTotal)
+			}
+		}
+	}
+	return totals, nil
 }
 
 // initDynamoDbDefault initializes a dynamo.DbInfo object with default DynamoDB session settings
@@ -266,4 +352,26 @@ func createRankingsNames(year string) []string {
 	}
 
 	return names
+}
+
+func createRankingsPreview(full *donations.TopOverallData) donations.TopOverallData {
+	// create preview object
+	pre := donations.TopOverallData{
+		ID:       full.ID + "-pre",
+		Year:     full.Year,
+		Bucket:   full.Bucket,
+		Category: full.Category,
+		Party:    full.Party,
+		Amts:     make(map[string]float32),
+	}
+
+	// sort map and get top 10 results
+	sorted := util.SortMapObjectTotals(full.Amts)
+	for i, e := range sorted {
+		if i == 10 {
+			break
+		}
+		pre.Amts[e.ID] = e.Total
+	}
+	return pre
 }
