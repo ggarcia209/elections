@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package proto;
+
+import "google/protobuf/timestamp.proto";
+
+message Empty {}
+
+// Encode Requests in Javascript
+// Decode Requests in Go
+
+// Encode Responses in Go
+// Decode Responses in Javascript
+
+message SearchRequest{
+    string UID = 1;
+    string Text = 2;
+    google.protobuf.Timestamp Timestamp = 3;
+    string Msg = 4;
+}
+
+message SearchResponse{
+    string UID = 1;
+    repeated SearchResult Results = 2;
+    google.protobuf.Timestamp Timestamp = 3;
+    string Msg = 4;
+}
+
+message SearchResult {
+    string ID = 1;
+    string Name = 2;
+    string City = 3;
+    string State = 4;
+    repeated string Years = 5;
+}
+
+message RankingsRequest{
+    string UID = 1;
+    string Year = 2;
+    string Bucket = 3;
+    string Category = 4;
+    string Party = 5;
+    google.protobuf.Timestamp Timestamp = 6;
+    string Msg = 7;
+}
+
+message RankingsResponse{
+    string UID = 1;
+    RankingsResult Rankings = 2;
+    google.protobuf.Timestamp Timestamp = 3;
+    string Msg = 8;
+}
+
+message RankingsResult{
+    string ID = 1;
+    string Year = 2;
+    string Bucket = 3;
+    string Category = 4;
+    string Party = 5;
+    map<string, float> RankingsList = 6;
+}
+
+message YrTotalRequest{
+    string UID = 1;
+    string Year = 2;
+    string Category = 3;
+    string Party = 4;
+    google.protobuf.Timestamp Timestamp = 5;
+    string Msg = 6;
+}
+
+message YrTotalResponse{
+    string UID = 1;
+    YrTotalResult YearlyTotal = 2;
+    google.protobuf.Timestamp Timestamp = 3;
+    string Msg = 7;
+}
+
+message YrTotalResult{
+    string ID = 1;
+    string Year = 2;
+    string Category = 3;
+    string Party = 4;
+    float Total = 5;
+}
+
+message GetObjRequest{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    repeated string Years = 4;
+    google.protobuf.Timestamp Timestamp = 5;
+    string Msg = 6;
+}
+
+message GetObjResponse{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    // datasets for each year in request aggregated 
+    // into singular object encoded on server prior
+    // to encoding response
+    bytes Object = 4;
+    google.protobuf.Timestamp Timestamp = 5;
+    string Msg = 6;
+}
+
+service View {
+    // take user-input search query and return a list of matching results
+    rpc SearchQuery(SearchRequest) returns (SearchResponse) {}
+
+    // retrieve rankings list matching specified criteria
+    rpc  ViewRankings(RankingsRequest) returns (RankingsResponse) {}
+
+    // retrieve yearly total matching specified criteria
+    rpc ViewYrTotals(YrTotalRequest) returns (YrTotalResponse) {}
+
+    // retrieve object from cache/DynamoDB
+    rpc ViewObject(GetObjRequest) returns (GetObjResponse) {}
+
+    // One empty request, ZERO processing, followed by one empty response
+    // (minimum effort to do message serialization).
+    rpc NoOp(Empty) returns (Empty);
+}
