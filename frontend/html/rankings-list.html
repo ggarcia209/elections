@@ -9,7 +9,7 @@
 <link href="css/bootstrap-4.4.1.css" rel="stylesheet">
 <link href="css/site_styles.css" rel="stylesheet" type="text/css">
 </head>
-<body class="body-main rankings-page" style="padding-top: 70px">
+<body id="main" class="body-main rankings-page" style="padding-top: 70px">
 <!-- body code goes here --> 
 <!-- The fixed navbar will overlay your other content, unless you add padding to the bottom of the <body>. Tip: By default, the navbar is 50px high.  -->
 <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark"> <img class="nav-logo" src="img/cf-logo.png">
@@ -20,8 +20,8 @@
       <li class="nav-item"> <a class="nav-link" href="#">Rankings</a> </li>
       <li class="nav-item"> <a class="nav-link" href="#">About</a> </li>
     </ul>
-    <form class="form-inline my-2 my-lg-0">
-      <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
+    <form action="/search-results/" class="form-inline my-2 my-lg-0" method="GET">
+      <input name="q" class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
       <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
     </form>
   </div>

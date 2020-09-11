@@ -140,11 +140,12 @@ func GetRankingsFromDynamo(db *dynamo.DbInfo) (RankingsMap, error) {
 func GetRankingsFromDisk() (RankingsMap, error) {
 	persist.OUTPUT_PATH = "/Volumes/T7/processed"
 	rankings := make(RankingsMap)
-	years := []string{
+	years := []string{"2020"}
+	/*years := []string{
 		"2020", "2018", "2016", "2014", "2012", "2010", "2008", "2006", "2004", "2002",
 		"2000", "1998", "1996", "1994", "1992", "1990", "1988", "1986", "1984", "1982",
 		"1980",
-	}
+	} */
 
 	for _, yr := range years {
 		fmt.Printf("getting rankings for %s...\n", yr)
@@ -188,11 +189,12 @@ func GetRankingsFromDisk() (RankingsMap, error) {
 func GetYrTotalsFromDisk() (YrTotalsMap, error) {
 	persist.OUTPUT_PATH = "/Volumes/T7/processed"
 	totals := make(YrTotalsMap)
-	years := []string{
+	years := []string{"2020"}
+	/* years := []string{
 		"2020", "2018", "2016", "2014", "2012", "2010", "2008", "2006", "2004", "2002",
 		"2000", "1998", "1996", "1994", "1992", "1990", "1988", "1986", "1984", "1982",
 		"1980",
-	}
+	} */
 	cats := []string{"rec", "donor", "exp"}
 
 	for _, yr := range years {

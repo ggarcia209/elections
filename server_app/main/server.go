@@ -28,9 +28,6 @@ var (
 	key = "../cert/server.key"
 )
 
-var rankingsCache server.RankingsMap
-var yrTotalsCache server.YrTotalsMap
-
 func main() {
 	fmt.Println("initializing disk cache...")
 	server.InitServerDiskCache()
@@ -50,13 +47,15 @@ func main() {
 	yrTotalsCache = totals
 
 	// create http server and handler functions
-	fmt.Println("initializing http server...")
-	srv := server.InitHTTPServer("http://localhost:8000")
-	fmt.Printf("server address: %v\nread timeout: %v\nwrite timeout: %v\n",
-		srv.Addr, srv.ReadTimeout, srv.WriteTimeout)
-	fmt.Printf("listening at: '%v'...\n", srv.Addr)
-	server.RegisterHandlers()
-	log.Fatal(srv.ListenAndServe())
+	go func() {
+		fmt.Println("initializing http server...")
+		srv := server.InitHTTPServer("localhost:8081")
+		fmt.Printf("server address: %v\nread timeout: %v\nwrite timeout: %v\n",
+			srv.Addr, srv.ReadTimeout, srv.WriteTimeout)
+		fmt.Printf("listening at: '%v'...\n", srv.Addr)
+		server.RegisterHandlers()
+		log.Fatal(srv.ListenAndServe())
+	}()
 
 	// create gRPC server
 	port := 9090
@@ -84,6 +83,7 @@ func main() {
 	pb.RegisterViewServer(grpcServer, newRPCServer())
 	fmt.Println("now serving!")
 	grpcServer.Serve(lis)
+
 }
 
 func newRPCServer() *viewServer {
@@ -126,11 +126,18 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 		}
 		results = append(results, res)
 	}
+	out.Msg = "SUCCESS"
 	out.Results = results
+	if len(results) == 0 {
+		out.Msg = "NO_RESULTS"
+	}
 	fmt.Println("Returning results...")
 
 	return out, nil
 }
+
+var rankingsCache server.RankingsMap
+var yrTotalsCache server.YrTotalsMap
 
 func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (*pb.RankingsResponse, error) {
 	fmt.Println("called method ViewRankings")
@@ -151,6 +158,7 @@ func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (
 	fmt.Println("getting object from cache...")
 	year, bucket, cat, pty := in.GetYear(), in.GetBucket(), in.GetCategory(), in.GetParty()
 	ID := fmt.Sprintf("%s-%s-%s-%s", year, bucket, cat, pty)
+	fmt.Println("ID in: ", ID)
 	cache := rankingsCache[year][ID]
 
 	// encode result
@@ -163,6 +171,7 @@ func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (
 		Party:        cache.Party,
 		RankingsList: cache.Amts,
 	}
+	fmt.Println("ID: ", res.ID)
 
 	out.Rankings = &res
 

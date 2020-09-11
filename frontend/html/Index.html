@@ -9,19 +9,19 @@
 <link href="../css/bootstrap-4.4.1.css" rel="stylesheet">
 <link href="../css/site_styles.css" rel="stylesheet" type="text/css">
 </head>
-<body class="body-main" style="padding-top: 70px">
+<body id="main" class="body-main" style="padding-top: 70px">
 <!-- body code goes here --> 
 <!-- The fixed navbar will overlay your other content, unless you add padding to the bottom of the <body>. Tip: By default, the navbar is 50px high.  -->
 <nav class="navbar fixed-top navbar-expand-lg navbar-dark bg-dark"> <img class="nav-logo" src="img/cf-logo.png">
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent1" aria-controls="navbarSupportedContent1" aria-expanded="false" aria-label="Toggle navigation"> <span class="navbar-toggler-icon"></span> </button>
   <div class="collapse navbar-collapse" id="navbarSupportedContent1">
     <ul class="navbar-nav mr-auto">
-      <li class="nav-item active"> <a class="nav-link" href="http://localhost:8000/">Home <span class="sr-only">(current)</span></a> </li>
-      <li class="nav-item"> <a class="nav-link" href="http://localhost:8000/rankings">Rankings</a> </li>
-      <li class="nav-item"> <a class="nav-link" href="http://localhost:8000/about">About</a> </li>
+      <li class="nav-item active"> <a class="nav-link" href="http://localhost:8081/">Home <span class="sr-only">(current)</span></a> </li>
+      <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/rankings">Rankings</a> </li>
+      <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/about">About</a> </li>
     </ul>
-    <form class="form-inline my-2 my-lg-0">
-      <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
+    <form action="/search-results/" class="form-inline my-2 my-lg-0" method="GET">
+      <input name="q" class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
       <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
     </form>
   </div>
@@ -32,7 +32,7 @@
     <p class="p-welcome">Welcome to Cash Flow FEC! We are are a website dedicated to providing objective and unbiased data derived from political spending and contribution records filed with the United States Federal Election Commission. Our datasets for each election cycle have been derived directly from the bulk data files available at FEC.gov. You can read more about our methodology in the "About" tab, or by clicking "Learn More" below.&nbsp; &nbsp;</p>
     <p class="p-welcome">We have found the top contributors, recipients, and spenders in each election cycle by processing every transaction recorded by the FEC during that election cycle. You can view some of the rankings below or continue further to search for a specific candidate, committee, individual, or organization to view it's data as well as the top contributors and receivers of the given entity's funds.&nbsp;</p>
     <p class="p-welcome">We are 100% independent and are not affiliated with any non-profit, for-profit, or political organizations, nor do we endorse any political ideology. Our information is for educational purposes only. Enjoy!&nbsp;</p>
-    <div class="view-more-div"> <a class="view-more-link" href="http://localhost:8000/about">
+    <div class="view-more-div"> <a class="view-more-link" href="http://localhost:8081/about">
       <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">Learn More</button>
       </a> </div>
   </div>
@@ -43,36 +43,18 @@
     <div class="row">
       <div class="col-md-6 rankings-column">
         <h3 class="title-rankings">Top Individual Contributors&nbsp;</h3>
-        <ul class="rank-list">
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
+        <ul class="rank-list" id="ranks-pre-main-1">
+          <!---- main.getRankingsPrev() runs here and populates list ---->
         </ul>
       </div>
       <div class="col-md-6 rankings-column">
         <h3 class="title-rankings">Top Candidates</h3>
-        <ul class="rank-list">
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
-          <li class="rank-item"><a href="#" class="rank-link">Content goes here</a></li>
+        <ul class="rank-list" id="ranks-pre-main-2">
+          <!---- main.getRankingsPrev() runs here and populates list ---->
         </ul>
       </div>
     </div>
-    <div class="view-more-div"> <a class="view-more-link" href="http://localhost:8000/rankings">
+    <div class="view-more-div"> <a class="view-more-link" href="http://localhost:8081/rankings">
       <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View More</button>
       </a> </div>
   </div>
@@ -83,8 +65,7 @@
   <p class="p-welcome">Results for individuals &amp; organizations are limited to the top 100,000 individuals &amp; organizations by funds contributed and the top 100,000 individuals &amp; organizations by funds received for a total of 200,000 records per election cycle.</p>
   <form action="/search-results/" class="search-bar-div" method="GET">
     <div class="searchbar"> 
-      <!--<button onclick="myFunction()" class="dropbtn">Dropdown</button> -->
-      <input required name="q" type="search" class="search-bar-main" id="search-results-main" placeholder="Search.." onkeyup="filterFunction()">
+      <input name="q" type="search" class="search-bar-main" placeholder="Search.." onkeyup="filterFunction()">
     </div>
     <button class="btn btn-outline-success my-2 my-sm-0 search-btn" type="submit">Search</button>
   </form>
