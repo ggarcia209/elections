@@ -395,6 +395,86 @@ proto.proto.ViewPromiseClient.prototype.viewObject =
 /**
  * @const
  * @type {!grpc.web.MethodDescriptor<
+ *   !proto.proto.LookupRequest,
+ *   !proto.proto.LookupResponse>}
+ */
+const methodDescriptor_View_LookupObjByID = new grpc.web.MethodDescriptor(
+  '/proto.View/LookupObjByID',
+  grpc.web.MethodType.UNARY,
+  proto.proto.LookupRequest,
+  proto.proto.LookupResponse,
+  /**
+   * @param {!proto.proto.LookupRequest} request
+   * @return {!Uint8Array}
+   */
+  function(request) {
+    return request.serializeBinary();
+  },
+  proto.proto.LookupResponse.deserializeBinary
+);
+
+
+/**
+ * @const
+ * @type {!grpc.web.AbstractClientBase.MethodInfo<
+ *   !proto.proto.LookupRequest,
+ *   !proto.proto.LookupResponse>}
+ */
+const methodInfo_View_LookupObjByID = new grpc.web.AbstractClientBase.MethodInfo(
+  proto.proto.LookupResponse,
+  /**
+   * @param {!proto.proto.LookupRequest} request
+   * @return {!Uint8Array}
+   */
+  function(request) {
+    return request.serializeBinary();
+  },
+  proto.proto.LookupResponse.deserializeBinary
+);
+
+
+/**
+ * @param {!proto.proto.LookupRequest} request The
+ *     request proto
+ * @param {?Object<string, string>} metadata User defined
+ *     call metadata
+ * @param {function(?grpc.web.Error, ?proto.proto.LookupResponse)}
+ *     callback The callback function(error, response)
+ * @return {!grpc.web.ClientReadableStream<!proto.proto.LookupResponse>|undefined}
+ *     The XHR Node Readable Stream
+ */
+proto.proto.ViewClient.prototype.lookupObjByID =
+    function(request, metadata, callback) {
+  return this.client_.rpcCall(this.hostname_ +
+      '/proto.View/LookupObjByID',
+      request,
+      metadata || {},
+      methodDescriptor_View_LookupObjByID,
+      callback);
+};
+
+
+/**
+ * @param {!proto.proto.LookupRequest} request The
+ *     request proto
+ * @param {?Object<string, string>} metadata User defined
+ *     call metadata
+ * @return {!Promise<!proto.proto.LookupResponse>}
+ *     A native promise that resolves to the response
+ */
+proto.proto.ViewPromiseClient.prototype.lookupObjByID =
+    function(request, metadata) {
+  return this.client_.unaryCall(this.hostname_ +
+      '/proto.View/LookupObjByID',
+      request,
+      metadata || {},
+      methodDescriptor_View_LookupObjByID);
+};
+
+
+/**
+ * @const
+ * @type {!grpc.web.MethodDescriptor<
  *   !proto.proto.Empty,
  *   !proto.proto.Empty>}
  */

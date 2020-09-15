@@ -18,7 +18,7 @@
   <div class="collapse navbar-collapse" id="navbarSupportedContent1">
     <ul class="navbar-nav mr-auto">
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/">Home</a> </li>
-      <li class="nav-item active"> <a class="nav-link" href="http://localhost:8081/rankings">Rankings<span class="sr-only">(current)</span></a> </li>
+      <li class="nav-item active"> <a class="nav-link" href="http://localhost:8081/rankings/?year=2020&category=cmte_tx_data-rec">Rankings<span class="sr-only">(current)</span></a> </li>
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/about">About</a> </li>
     </ul>
     <form action="/search-results/" class="form-inline my-2 my-lg-0" method="GET">
@@ -32,11 +32,11 @@
   <p class="p-welcome">Here you fill find the rankings for different categories. Categories are broken down into the Top 100 Individuals, Committees, and Candidates by  total funds received and total funds contributed and/or  spent. The Committee and Candidate categories are broken down further by political party, including Democrat,  Republican, Independent/Non-Affiliated, and Other. View the rankings for each election cycle, or view the Top 100 of All Time. Results will appear below after making a selection and clicking Go.&nbsp; &nbsp;&nbsp;</p>
   <div class="rankings-selectors">
     <h3 class="selectors-header">Select Year and Category</h3>
-    <form class="rankings-input">
+    <form action="/rankings/" method="GET" class="rankings-input">
       <fieldset class="rankings-fields">
         <div class="selector">
           <label for="yr-select" class="selector-component">Year:</label>
-          <select name="year" id="yr-selectr">
+          <select name="year" id="rnk-sel-years">
             <option value="2020">2020</option>
             <option value="2018">2018</option>
             <option value="2016">2016</option>
@@ -48,21 +48,31 @@
             <option value="2004">2004</option>
             <option value="2002">2002</option>
             <option value="2000">2000</option>
+            <option value="1998">1998</option>
+            <option value="1996">1996</option>
+            <option value="1994">1994</option>
+            <option value="1992">1992</option>
+            <option value="1990">1990</option>
+            <option value="1988">1988</option>
+            <option value="1986">1986</option>
+            <option value="1984">1984</option>
+            <option value="1982">1982</option>
+            <option value="1980">1980</option>
           </select>
         </div>
       </fieldset>
       <fieldset class="rankings-fields">
         <div class="selector">
           <label for="category" class="selector-component">Category:</label>
-          <select name="category" id="category">
-            <option value="Indv. Conts.">Top Individual Contributors</option>
-            <option value="Indv. Recs.">Top Individual Recipients</option>
-            <option value="Cmte. Conts.">Top Committee Contributors</option>
-            <option value="Cmte. Recs.">Top Committee Recipients</option>
-            <option value="Cmte.Spnd.">Top Committee Spenders</option>
-            <option value="Cand. Conts.">Top Candidate Contribtors</option>
-            <option value="Cand.Recs">Top Candidate Recipients</option>
-            <option value="Cand. Spnd.">Top Candidate Spenders</option>
+          <select name="category" id="rnk-sel-cats">
+            <option value="individuals-donor">Top Individual Contributors</option>
+            <option value="individuals-rec">Top Individual Recipients</option>
+            <option value="cmte_tx_data-rec">Top Committee Recipients</option>
+            <option value="cmte_tx_data-donor">Top Committee Contributors</option>
+            <option value="cmte_tx_data-exp">Top Committee Spenders</option>
+            <option value="candidates-rec">Top Candidate Recipients</option>
+            <option value="canidates-donor">Top Candidate Contribtors</option>
+            <option value="candidates-exp">Top Candidate Spenders</option>
           </select>
         </div>
       </fieldset>
@@ -74,103 +84,69 @@
   <div class="results-div">
     <h3 class="results-header"> Results</h3>
     <div class="results">
-      <div class="result-single">
+      <div class="result-single" id="ranks-single-1">
         <div class="title-div">
-          <h3 class="title-rankings title-rankings-results">"{Category} - Overall - {Year}"</h3>
+          <h3 class="title-rankings title-rankings-results" id="ranks-title-1"><!--- client.displayRankingsTitle() -----></h3>
         </div>
-        <ul class="rank-list rank-page-list">
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
+        <ul class="rank-list rank-page-list" id="ranks-page-1">
+          <!---- populated by client.loadRankingsDefault() ----->
         </ul>
-        <div class="view-more-div rank-page-btn"> <a class="view-more-link" href="#">
+        <div class="view-more-div rank-page-btn"> <a class="view-more-link" id="ranks-btn-1" href="#">
           <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View All</button>
           </a> </div>
       </div>
-      <div class="result-single">
+      <div class="result-single" id="ranks-single-2">
         <div class="title-div">
-          <h3 class="title-rankings title-rankings-results">"Committee Spenders - Democrat - {Year}"</h3>
+          <h3 class="title-rankings title-rankings-results" id="ranks-title-2"></h3>
         </div>
-        <ul class="rank-list rank-page-list">
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
+        <ul class="rank-list rank-page-list" id="ranks-page-2">
+          <!---- populated by client.loadRankingsDefault() ----->
         </ul>
-        <div class="view-more-div rank-page-btn"> <a class="view-more-link" href="#">
+        <div class="view-more-div rank-page-btn"> <a class="view-more-link" id="ranks-btn-2" href="#">
           <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View All</button>
           </a> </div>
       </div>
-      <div class="result-single">
+      <div class="result-single" id="ranks-single-3">
         <div class="title-div">
-          <h3 class="title-rankings title-rankings-results">"{Category} - Republican - {Year}"</h3>
+          <h3 class="title-rankings title-rankings-results" id="ranks-title-3"></h3>
         </div>
-        <ul class="rank-list rank-page-list">
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
+        <ul class="rank-list rank-page-list" id="ranks-page-3">
+             <!---- populated by client.loadRankingsDefault() ----->
         </ul>
-        <div class="view-more-div rank-page-btn"> <a class="view-more-link" href="#">
+        <div class="view-more-div rank-page-btn"> <a class="view-more-link" id="ranks-btn-3" href="#">
           <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View All</button>
           </a> </div>
       </div>
-      <div class="result-single">
+      <div class="result-single" id="ranks-single-4">
         <div class="title-div">
-          <h3 class="title-rankings title-rankings-results">"Committee Contributors&nbsp; - Independent - {Year}"</h3>
+          <h3 class="title-rankings title-rankings-results" id="ranks-title-4"></h3>
         </div>
-        <ul class="rank-list rank-page-list">
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
+        <ul class="rank-list rank-page-list" id="ranks-page-4">
+           <!---- populated by client.loadRankingsDefault() ----->
         </ul>
-        <div class="view-more-div rank-page-btn"> <a class="view-more-link" href="#">
+        <div class="view-more-div rank-page-btn"> <a class="view-more-link" id="ranks-btn-4" href="#">
           <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View All</button>
           </a> </div>
       </div>
-      <div class="result-single">
+      <div class="result-single" id="ranks-single-5">
         <div class="title-div">
-          <h3 class="title-rankings title-rankings-results">"{Category} - Other - {Year}"</h3>
+          <h3 class="title-rankings title-rankings-results" id="ranks-title-5"></h3>
         </div>
-        <ul class="rank-list rank-page-list">
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
-          <li class ="rank-item"><a href="#" class="rank-link rank-page-link">Last Name, First - City, State</a></li>
+        <ul class="rank-list rank-page-list" id="ranks-page-5">
+           <!---- populated by client.loadRankingsDefault() ----->
         </ul>
-        <div class="view-more-div rank-page-btn"> <a class="view-more-link" href="#">
+        <div class="view-more-div rank-page-btn"> <a class="view-more-link" id="ranks-btn-5" href="#">
+          <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View All</button>
+          </a> </div>
+      </div>
+      <div class="result-single" id="ranks-single-6">
+        <div class="title-div">
+          <h3 class="title-rankings title-rankings-results" id="ranks-title-6"></h3>
+        </div>
+        <ul class="rank-list rank-page-list" id="ranks-page-6">
+           <!---- populated by client.loadRankingsDefault() ----->
+        </ul>
+        <div class="view-more-div rank-page-btn"><a class="view-more-link" id="ranks-btn-6" href="#"></a>
           <button class="btn btn-outline-success my-2 my-sm-0 btn-view-more" type="submit">View All</button>
           </a> </div>
       </div>

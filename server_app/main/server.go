@@ -13,6 +13,7 @@ import (
 
 	"github.com/elections/source/server"
 	pb "github.com/elections/source/svc/proto"
+	"github.com/elections/source/util"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -91,7 +92,6 @@ func newRPCServer() *viewServer {
 }
 
 func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb.SearchResponse, error) {
-	fmt.Println("called method SearchQuery...")
 	// intitialize response object
 	out := &pb.SearchResponse{
 		UID: in.GetUID(),
@@ -118,11 +118,12 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 	var results []*pb.SearchResult
 	for _, sd := range sds {
 		res := &pb.SearchResult{
-			ID:    sd.ID,
-			Name:  sd.Name,
-			City:  sd.City,
-			State: sd.State,
-			Years: sd.Years,
+			ID:     sd.ID,
+			Bucket: sd.Bucket,
+			Name:   sd.Name,
+			City:   sd.City,
+			State:  sd.State,
+			Years:  sd.Years,
 		}
 		results = append(results, res)
 	}
@@ -131,7 +132,7 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 	if len(results) == 0 {
 		out.Msg = "NO_RESULTS"
 	}
-	fmt.Println("Returning results...")
+	fmt.Println()
 
 	return out, nil
 }
@@ -142,7 +143,6 @@ var yrTotalsCache server.YrTotalsMap
 func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (*pb.RankingsResponse, error) {
 	fmt.Println("called method ViewRankings")
 	// intitialize response object
-	fmt.Println("creating response...")
 	out := &pb.RankingsResponse{
 		UID: in.GetUID(),
 	}
@@ -155,7 +155,6 @@ func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (
 	out.Timestamp = ts
 
 	// get object from cache
-	fmt.Println("getting object from cache...")
 	year, bucket, cat, pty := in.GetYear(), in.GetBucket(), in.GetCategory(), in.GetParty()
 	ID := fmt.Sprintf("%s-%s-%s-%s", year, bucket, cat, pty)
 	fmt.Println("ID in: ", ID)
@@ -164,14 +163,34 @@ func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (
 	// encode result
 	fmt.Println("encoding result...")
 	res := pb.RankingsResult{
-		ID:           cache.ID,
-		Year:         cache.Year,
-		Bucket:       cache.Bucket,
-		Category:     cache.Category,
-		Party:        cache.Party,
-		RankingsList: cache.Amts,
+		ID:       cache.ID,
+		Year:     cache.Year,
+		Bucket:   cache.Bucket,
+		Category: cache.Category,
+		Party:    cache.Party,
 	}
-	fmt.Println("ID: ", res.ID)
+	// sort IDs
+	srt := util.SortMapObjectTotals(cache.Amts)
+	IDs := []string{}
+	for _, e := range srt {
+		IDs = append(IDs, e.ID)
+	}
+	// lookup SearchData
+	sds, err := server.LookupByID(IDs)
+	rankings := []*pb.RankingEntry{}
+	for _, sd := range sds {
+		ranking := pb.RankingEntry{
+			ID:     sd.ID,
+			Name:   sd.Name,
+			City:   sd.City,
+			State:  sd.State,
+			Years:  sd.Years,
+			Amount: cache.Amts[sd.ID],
+		}
+		rankings = append(rankings, &ranking)
+	}
+	res.RankingsList = rankings
+	fmt.Println()
 
 	out.Rankings = &res
 
@@ -218,6 +237,47 @@ func (s *viewServer) ViewYrTotals(ctx context.Context, in *pb.YrTotalRequest) (*
 // retrieve object from cache/DynamoDB
 func (s *viewServer) ViewObject(ctx context.Context, in *pb.GetObjRequest) (*pb.GetObjResponse, error) {
 	return nil, nil
+}
+
+func (s *viewServer) LookupObjByID(ctx context.Context, in *pb.LookupRequest) (*pb.LookupResponse, error) {
+	// intitialize response object
+	out := &pb.LookupResponse{
+		UID: in.GetUID(),
+	}
+	ts, err := ptypes.TimestampProto(time.Now())
+	if err != nil {
+		errMsg := fmt.Errorf("LookupObjByID failed: %v\tUID: %s\tTimeStamp: %v", err, out.UID, out.Timestamp)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	out.Timestamp = ts
+
+	// find matching search results
+	ID := in.GetObjectID()
+	fmt.Printf("Looking up '%s'...\n", ID)
+	sds, err := server.LookupByID([]string{ID})
+	sd := sds[0]
+	if err != nil {
+		out.Msg = err.Error()
+		fmt.Println("LookupObjByID (server) error: ", err.Error())
+		return out, err
+	}
+
+	// convert to SearchResult message
+	res := &pb.SearchResult{
+		ID:    sd.ID,
+		Name:  sd.Name,
+		City:  sd.City,
+		State: sd.State,
+		Years: sd.Years,
+	}
+
+	out.Msg = "SUCCESS"
+	out.Result = res
+
+	fmt.Println()
+
+	return out, nil
 }
 
 // One empty request, ZERO processing, followed by one empty response

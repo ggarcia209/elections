@@ -16,9 +16,9 @@
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent1" aria-controls="navbarSupportedContent1" aria-expanded="false" aria-label="Toggle navigation"> <span class="navbar-toggler-icon"></span> </button>
   <div class="collapse navbar-collapse" id="navbarSupportedContent1">
     <ul class="navbar-nav mr-auto">
-      <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/">Home</a> </li>
+      <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/">Home</a></li>
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/rankings/?year=2020&category=cmte_tx_data-rec">Rankings</a> </li>
-      <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/yearly-totals">Totals</a> </li>
+		<li class="nav-item"> <a class="nav-link" href="http://localhost:8081/yearly-totals">Totals</a> </li>
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/about">About</a> </li>
     </ul>
     <form action="/search-results/" class="form-inline my-2 my-lg-0" method="GET">
@@ -28,11 +28,18 @@
   </div>
 </nav>
 <div class="content-main">
-  <h1 class="header-about">Search Results</h1>
+  <h1 class="header-about">Object Name - Year</h1>
+	<h3 class="header-sub-about">Object ID Code/Hash</h3>
   <div class="list-full-div">
-    <ol id="search-list" class="list-full">
-      <!---- main.search() runs here and returns search results ----->
-    </ol>
+	<p>City, State</p>
+	  <p>Employer, Occupation</p>
+	  <p>Cash In: $x    Transactions: y    Avg. Incoming Tx: $z</p>
+	  <p>Cash Out: $x    Transactions: y    Avg. Outgoing Tx: $z</p>
+  <h4 class="header-sub-about">Recipients</h4>
+	  <ul></ul>  
+  <h4 class="header-sub-about">Senders</h4>
+	  <ul></ul>
+
   </div>
 </div>
 <footer class="footer">
@@ -44,6 +51,5 @@
 <!-- Include all compiled plugins (below), or include individual files as needed --> 
 <script src="../js/popper.min.js"></script> 
 <script src="../js/bootstrap-4.4.1.js"></script>
-<script src="../js/dist/main.js"></script>
 </body>
 </html>

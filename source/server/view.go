@@ -52,6 +52,17 @@ func SearchData(txt string) ([]indexing.SearchData, error) {
 	return res, nil
 }
 
+// LookupByID finds an entity by ID
+func LookupByID(IDs []string) ([]indexing.SearchData, error) {
+	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
+	sds, err := indexing.LookupSearchData(IDs)
+	if err != nil {
+		fmt.Println(err)
+		return []indexing.SearchData{}, fmt.Errorf("LookupByID failed: %v", err)
+	}
+	return sds, nil
+}
+
 // GetObjectFromDynamo returns the yearly datasets
 // for the queried object and the given years
 func GetObjectFromDynamo(db *dynamo.DbInfo, query *dynamo.Query, bucket string, years []string) ([]interface{}, error) {

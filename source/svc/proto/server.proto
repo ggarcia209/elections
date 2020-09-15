@@ -28,10 +28,11 @@ message SearchResponse{
 
 message SearchResult {
     string ID = 1;
-    string Name = 2;
-    string City = 3;
-    string State = 4;
-    repeated string Years = 5;
+    string Bucket = 2;
+    string Name = 3;
+    string City = 4;
+    string State = 5;
+    repeated string Years = 6;
 }
 
 message RankingsRequest{
@@ -57,7 +58,16 @@ message RankingsResult{
     string Bucket = 3;
     string Category = 4;
     string Party = 5;
-    map<string, float> RankingsList = 6;
+    repeated RankingEntry RankingsList = 6;
+}
+
+message RankingEntry {
+    string ID = 1;
+    string Name = 2;
+    string City = 3;
+    string State = 4;
+    repeated string Years = 5;
+    float Amount = 6;
 }
 
 message YrTotalRequest{
@@ -105,18 +115,38 @@ message GetObjResponse{
     string Msg = 6;
 }
 
+message LookupRequest{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    google.protobuf.Timestamp Timestamp = 4;
+    string Msg = 5;
+}
+
+message LookupResponse{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    SearchResult Result = 4;
+    google.protobuf.Timestamp Timestamp = 5;
+    string Msg = 6;
+}
+
 service View {
     // take user-input search query and return a list of matching results
     rpc SearchQuery(SearchRequest) returns (SearchResponse) {}
 
     // retrieve rankings list matching specified criteria
-    rpc  ViewRankings(RankingsRequest) returns (RankingsResponse) {}
+    rpc ViewRankings(RankingsRequest) returns (RankingsResponse) {}
 
     // retrieve yearly total matching specified criteria
     rpc ViewYrTotals(YrTotalRequest) returns (YrTotalResponse) {}
 
     // retrieve object from cache/DynamoDB
     rpc ViewObject(GetObjRequest) returns (GetObjResponse) {}
+
+    // lookup object by ID
+    rpc LookupObjByID(LookupRequest) returns (LookupResponse) {}
 
     // One empty request, ZERO processing, followed by one empty response
     // (minimum effort to do message serialization).

@@ -12,8 +12,11 @@ import (
 var TmplMap = map[string]string{
 	"Index":          "../../frontend/html/Index.html",
 	"rankings":       "../../frontend/html/rankings.html",
+	"totals":         "../../frontend/html/totals.html",
 	"about":          "../../frontend/html/about.html",
 	"search-results": "../../frontend/html/search-results.html",
+	"rankings-list":  "../../frontend/html/rankings-list.html",
+	"view-object":    "../../frontend/html/view-object.html",
 }
 
 // InitHTTPServer initializes an http server at the provided address
@@ -35,9 +38,14 @@ func InitHTTPServer(addr string) *http.Server {
 // and creates file servers for the css, js, and img files.
 func RegisterHandlers() {
 	http.HandleFunc("/", Home)
-	http.HandleFunc("/rankings", Rankings)
+	http.HandleFunc("/rankings/", Rankings)
+	http.HandleFunc("/totals/", Totals)
 	http.HandleFunc("/about", About)
 	http.HandleFunc("/search-results/", SearchResults)
+	http.HandleFunc("/rankings-list/", RankingsList)
+	http.HandleFunc("/view-object/", ViewObject)
+
+	// static files
 	if _, err := os.Stat("../../frontend/css"); os.IsNotExist(err) {
 		fmt.Printf("WARNING: css files not found at '../../frontend/css'\n")
 	}
@@ -48,6 +56,11 @@ func RegisterHandlers() {
 	}
 	jsHandler := http.StripPrefix("/js/", http.FileServer(http.Dir("../../frontend/js")))
 	http.Handle("/js/", jsHandler)
+	if _, err := os.Stat("../../frontend/img"); os.IsNotExist(err) {
+		fmt.Printf("WARNING: img files not found at '../../frontend/img'\n")
+	}
+	imgHandler := http.StripPrefix("/img/", http.FileServer(http.Dir("../../frontend/img")))
+	http.Handle("/img/", imgHandler)
 }
 
 // Home displays home page
@@ -72,6 +85,17 @@ func Rankings(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// Totals displays totals page
+func Totals(w http.ResponseWriter, r *http.Request) {
+	if err := templExe(TmplMap["totals"], w, nil); err != nil {
+		// util.FailLog(err)
+		fmt.Fprintf(w, "html template failed to execute: %s", err)
+		fmt.Printf("html template failed to execute: %s", err)
+		return
+	}
+	return
+}
+
 // About displays About page
 func About(w http.ResponseWriter, r *http.Request) {
 	if err := templExe(TmplMap["about"], w, nil); err != nil {
@@ -86,6 +110,28 @@ func About(w http.ResponseWriter, r *http.Request) {
 // SearchResults displays the search results page
 func SearchResults(w http.ResponseWriter, r *http.Request) {
 	if err := templExe(TmplMap["search-results"], w, nil); err != nil {
+		// util.FailLog(err)
+		fmt.Fprintf(w, "html template failed to execute: %s", err)
+		fmt.Printf("html template failed to execute: %s", err)
+		return
+	}
+	return
+}
+
+// RankingsList displays the RankingsList page
+func RankingsList(w http.ResponseWriter, r *http.Request) {
+	if err := templExe(TmplMap["rankings-list"], w, nil); err != nil {
+		// util.FailLog(err)
+		fmt.Fprintf(w, "html template failed to execute: %s", err)
+		fmt.Printf("html template failed to execute: %s", err)
+		return
+	}
+	return
+}
+
+// ViewObject displays view object page
+func ViewObject(w http.ResponseWriter, r *http.Request) {
+	if err := templExe(TmplMap["view-object"], w, nil); err != nil {
 		// util.FailLog(err)
 		fmt.Fprintf(w, "html template failed to execute: %s", err)
 		fmt.Printf("html template failed to execute: %s", err)
