@@ -18,12 +18,13 @@ import (
 // Used to return basic data to user from local machine
 // instead of making API call to DynamoDB table.
 type SearchData struct {
-	ID     string
-	Name   string
-	City   string
-	State  string
-	Bucket string
-	Years  []string
+	ID       string
+	Name     string
+	City     string
+	State    string
+	Employer string
+	Bucket   string
+	Years    []string
 }
 
 // IndexData type stores data related to the Index
@@ -32,6 +33,7 @@ type IndexData struct {
 	LastUpdated    time.Time
 	Completed      map[string]bool // track categories completed in event of failure
 	YearsCompleted []string
+	Shards         map[string]float32
 }
 
 // inverted index
@@ -168,7 +170,7 @@ func indvRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 	index := make(indexMap)
 	lookup := make(lookupPairs)
 
-	err := getTopIndvData(year, bucket, index, lookup)
+	err := getObjData(year, bucket, index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("indvRtn failed: %v", err)
@@ -176,12 +178,12 @@ func indvRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, err := saveIndex(index, lookup)
+	newWrites, shards, err := saveIndex(index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("indvRtn failed: %v", err)
 	}
-	updateIndexData(id, bucket, newWrites)
+	updateIndexData(id, bucket, newWrites, shards)
 	err = saveIndexData(id)
 	if err != nil {
 		fmt.Println(err)
@@ -208,12 +210,12 @@ func cmteRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, err := saveIndex(index, lookup)
+	newWrites, shards, err := saveIndex(index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("cmteRtn failed: %v", err)
 	}
-	updateIndexData(id, bucket, newWrites)
+	updateIndexData(id, bucket, newWrites, shards)
 	err = saveIndexData(id)
 	if err != nil {
 		fmt.Println(err)
@@ -240,12 +242,12 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, err := saveIndex(index, lookup)
+	newWrites, shards, err := saveIndex(index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("candRtn failed: %v", err)
 	}
-	updateIndexData(id, bucket, newWrites)
+	updateIndexData(id, bucket, newWrites, shards)
 	err = saveIndexData(id)
 	if err != nil {
 		fmt.Println(err)
@@ -528,10 +530,11 @@ func getPartition(term string) string {
 }
 
 // update IndexData object
-func updateIndexData(id *IndexData, bucket string, newWrites int) {
+func updateIndexData(id *IndexData, bucket string, newWrites int, shards map[string]float32) {
 	id.Size += newWrites
 	id.Completed[bucket] = true
 	id.LastUpdated = time.Now()
+	id.Shards = shards
 	return
 }
 

@@ -43,7 +43,7 @@ func RegisterHandlers() {
 	http.HandleFunc("/about", About)
 	http.HandleFunc("/search-results/", SearchResults)
 	http.HandleFunc("/rankings-list/", RankingsList)
-	http.HandleFunc("/view-object/", ViewObject)
+	http.HandleFunc("/view-object/", GetObject)
 
 	// static files
 	if _, err := os.Stat("../../frontend/css"); os.IsNotExist(err) {
@@ -129,8 +129,8 @@ func RankingsList(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// ViewObject displays view object page
-func ViewObject(w http.ResponseWriter, r *http.Request) {
+// GetObject displays view object page
+func GetObject(w http.ResponseWriter, r *http.Request) {
 	if err := templExe(TmplMap["view-object"], w, nil); err != nil {
 		// util.FailLog(err)
 		fmt.Fprintf(w, "html template failed to execute: %s", err)

@@ -7,7 +7,6 @@ import (
 	"github.com/elections/source/protobuf"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 )
 
 // ecnodeCmte/decodeCmte encodes/decodes Committee structs as protocol buffers
@@ -204,12 +203,12 @@ func encodeCmteFinancials(cmte donations.CmteFinancials) ([]byte, error) { // mo
 		PartyExp:        cmte.PartyExp,
 		NonFedSharedExp: cmte.NonFedSharedExp,
 	}
-	ts, err := ptypes.TimestampProto(cmte.CovgEndDate)
+	/* ts, err := ptypes.TimestampProto(cmte.CovgEndDate)
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("encodeCmteFinancials failed: %v", err)
 	}
-	entry.CovgEndDate = ts
+	entry.CovgEndDate = ts */
 	data, err := proto.Marshal(entry)
 	if err != nil {
 		fmt.Println("encodeCmteFinancials failed: ", err)
@@ -248,12 +247,12 @@ func decodeCmteFinancials(data []byte) (donations.CmteFinancials, error) {
 		PartyExp:        cmte.GetPartyExp(),
 		NonFedSharedExp: cmte.GetNonFedSharedExp(),
 	}
-	ts, err := ptypes.Timestamp(cmte.GetCovgEndDate())
+	/* ts, err := ptypes.Timestamp(cmte.GetCovgEndDate())
 	if err != nil {
 		fmt.Println(err)
 		return donations.CmteFinancials{}, fmt.Errorf("decodeCmteFinancials failed: %v", err)
 	}
-	entry.CovgEndDate = ts
+	entry.CovgEndDate = ts */
 
 	return entry, nil
 }

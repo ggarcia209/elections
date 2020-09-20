@@ -29,6 +29,10 @@ var (
 	key = "../cert/server.key"
 )
 
+var rankingsCache server.RankingsMap
+var yrTotalsCache server.YrTotalsMap
+var searchDataCache server.SearchDataMap
+
 func main() {
 	fmt.Println("initializing disk cache...")
 	server.InitServerDiskCache()
@@ -46,6 +50,14 @@ func main() {
 		os.Exit(1)
 	}
 	yrTotalsCache = totals
+
+	fmt.Println("initializing search cache...")
+	sds, err := server.CreateSearchCache(rankingsCache)
+	if err != nil {
+		fmt.Println("failed to load yearly totals: ", err)
+		os.Exit(1)
+	}
+	searchDataCache = sds
 
 	// create http server and handler functions
 	go func() {
@@ -98,7 +110,8 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 	}
 	ts, err := ptypes.TimestampProto(time.Now())
 	if err != nil {
-		errMsg := fmt.Errorf("SearchQuery failed: %v\tUID: %s\tTimeStamp: %v", err, out.UID, out.Timestamp)
+		errMsg := fmt.Errorf("%v\tSearchQuery failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(err)
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
@@ -106,12 +119,19 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 
 	// find matching search results
 	txt := in.GetText()
-	fmt.Printf("Getting search results for '%s'...\n", txt)
-	sds, err := server.SearchData(txt)
+	common, err := server.SearchData(txt)
 	if err != nil {
-		out.Msg = err.Error()
-		fmt.Println("SearchQuery (server) error: ", err.Error())
-		return out, err
+		errMsg := fmt.Errorf("%v\tSearchQuery failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(err)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	sds, err := server.GetSearchResults(common, searchDataCache)
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tSearchQuery failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(err)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
 	}
 
 	// convert to SearchResult message
@@ -132,23 +152,19 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 	if len(results) == 0 {
 		out.Msg = "NO_RESULTS"
 	}
-	fmt.Println()
 
 	return out, nil
 }
 
-var rankingsCache server.RankingsMap
-var yrTotalsCache server.YrTotalsMap
-
 func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (*pb.RankingsResponse, error) {
-	fmt.Println("called method ViewRankings")
 	// intitialize response object
 	out := &pb.RankingsResponse{
 		UID: in.GetUID(),
 	}
 	ts, err := ptypes.TimestampProto(time.Now())
 	if err != nil {
-		errMsg := fmt.Errorf("SearchQuery failed: %v\tUID: %s\tTimeStamp: %v", err, out.UID, out.Timestamp)
+		errMsg := fmt.Errorf("%v\tViewRankings failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
@@ -157,126 +173,467 @@ func (s *viewServer) ViewRankings(ctx context.Context, in *pb.RankingsRequest) (
 	// get object from cache
 	year, bucket, cat, pty := in.GetYear(), in.GetBucket(), in.GetCategory(), in.GetParty()
 	ID := fmt.Sprintf("%s-%s-%s-%s", year, bucket, cat, pty)
-	fmt.Println("ID in: ", ID)
-	cache := rankingsCache[year][ID]
+	rCache := rankingsCache[year][ID]
 
 	// encode result
-	fmt.Println("encoding result...")
 	res := pb.RankingsResult{
-		ID:       cache.ID,
-		Year:     cache.Year,
-		Bucket:   cache.Bucket,
-		Category: cache.Category,
-		Party:    cache.Party,
+		ID:       rCache.ID,
+		Year:     rCache.Year,
+		Bucket:   rCache.Bucket,
+		Category: rCache.Category,
+		Party:    rCache.Party,
 	}
+
 	// sort IDs
-	srt := util.SortMapObjectTotals(cache.Amts)
-	IDs := []string{}
-	for _, e := range srt {
-		IDs = append(IDs, e.ID)
-	}
-	// lookup SearchData
-	sds, err := server.LookupByID(IDs)
+	srt := util.SortMapObjectTotals(rCache.Amts)
 	rankings := []*pb.RankingEntry{}
-	for _, sd := range sds {
+	for _, e := range srt {
+		sd := searchDataCache[e.ID]
 		ranking := pb.RankingEntry{
 			ID:     sd.ID,
 			Name:   sd.Name,
 			City:   sd.City,
 			State:  sd.State,
 			Years:  sd.Years,
-			Amount: cache.Amts[sd.ID],
+			Amount: rCache.Amts[sd.ID],
 		}
 		rankings = append(rankings, &ranking)
 	}
 	res.RankingsList = rankings
-	fmt.Println()
-
 	out.Rankings = &res
+	out.Msg = "SUCCESS"
 
 	return out, nil
 }
 
 // retrieve yearly total matching specified criteria
 func (s *viewServer) ViewYrTotals(ctx context.Context, in *pb.YrTotalRequest) (*pb.YrTotalResponse, error) {
-	fmt.Println("called method ViewYrTotals")
 	// intitialize response object
-	fmt.Println("creating response...")
 	out := &pb.YrTotalResponse{
 		UID: in.GetUID(),
 	}
 	ts, err := ptypes.TimestampProto(time.Now())
 	if err != nil {
-		errMsg := fmt.Errorf("ViewYrTotals failed: %v\tUID: %s\tTimeStamp: %v", err, out.UID, out.Timestamp)
+		errMsg := fmt.Errorf("%v\tViewYrTotals failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
 	out.Timestamp = ts
 
 	// get object from cache
-	fmt.Println("getting object from cache...")
-	year, cat, pty := in.GetYear(), in.GetCategory(), in.GetParty()
-	ID := fmt.Sprintf("%s-%s-%s", year, cat, pty)
-	cache := yrTotalsCache[year][ID]
+	year, cat := in.GetYear(), in.GetCategory()
+	totals := []*pb.YrTotalResult{}
+	ptys := []string{"ALL", "DEM", "REP", "IND", "OTH", "UNK"}
 
-	// encode result
-	fmt.Println("encoding result...")
-	res := pb.YrTotalResult{
-		ID:       cache.ID,
-		Year:     cache.Year,
-		Category: cache.Category,
-		Party:    cache.Party,
-		Total:    cache.Total,
+	for _, pty := range ptys {
+		ID := fmt.Sprintf("%s-%s-%s", year, cat, pty)
+		cache := yrTotalsCache[year][ID]
+		// encode result
+		res := pb.YrTotalResult{
+			ID:       cache.ID,
+			Year:     cache.Year,
+			Category: cache.Category,
+			Party:    cache.Party,
+			Total:    cache.Total,
+		}
+		totals = append(totals, &res)
 	}
 
-	out.YearlyTotal = &res
+	out.YearlyTotal = totals
+	out.Msg = "SUCCESS"
 
 	return out, nil
 }
 
 // retrieve object from cache/DynamoDB
-func (s *viewServer) ViewObject(ctx context.Context, in *pb.GetObjRequest) (*pb.GetObjResponse, error) {
-	return nil, nil
+func (s *viewServer) ViewIndividual(ctx context.Context, in *pb.GetIndvRequest) (*pb.GetIndvResponse, error) {
+	fmt.Println("called ViewIndividualt...")
+	out := &pb.GetIndvResponse{
+		UID:      in.GetUID(),
+		ObjectID: in.GetObjectID(),
+		Bucket:   in.GetBucket(),
+	}
+	ts, err := ptypes.TimestampProto(time.Now())
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewIndividual failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	out.Timestamp = ts
+
+	// Get object binary and return in response
+	/* support for multiple years and aggregated datasets will be available in future version */
+	years := in.GetYears()
+	if len(years) == 0 {
+		err := "NO_YEAR_SET"
+		errMsg := fmt.Errorf("%v\tViewIndividual failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	year := years[0]
+
+	obj, err := server.GetObjectFromDisk(year, in.GetObjectID(), in.GetBucket())
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewIndividual failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	indv := obj.(server.Individual)
+	recAmtsSrt := util.SortMapObjectTotals(indv.RecipientsAmt)
+	recAmts := []*pb.TotalsMap{}
+	for _, e := range recAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		recAmts = append(recAmts, entry)
+	}
+	senAmtsSrt := util.SortMapObjectTotals(indv.SendersAmt)
+	senAmts := []*pb.TotalsMap{}
+	for _, e := range senAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		senAmts = append(senAmts, entry)
+	}
+
+	indvPb := pb.Individual{
+		ID:            indv.ID,
+		Name:          indv.Name,
+		City:          indv.City,
+		State:         indv.State,
+		Occupation:    indv.Occupation,
+		Employer:      indv.Employer,
+		TotalOutAmt:   indv.TotalOutAmt,
+		TotalOutTxs:   indv.TotalOutTxs,
+		AvgTxOut:      indv.AvgTxOut,
+		TotalInAmt:    indv.TotalInAmt,
+		TotalInTxs:    indv.TotalInTxs,
+		AvgTxIn:       indv.AvgTxIn,
+		NetBalance:    indv.NetBalance,
+		RecipientsAmt: recAmts,
+		RecipientsTxs: indv.RecipientsTxs,
+		SendersAmt:    senAmts,
+		SendersTxs:    indv.SendersTxs,
+	}
+
+	out.Individual = &indvPb
+	out.Msg = "SUCCESS"
+
+	return out, nil
+}
+
+// retrieve object from cache/DynamoDB
+func (s *viewServer) ViewCommittee(ctx context.Context, in *pb.GetCmteRequest) (*pb.GetCmteResponse, error) {
+	fmt.Println("called ViewCommittee...")
+	out := &pb.GetCmteResponse{
+		UID:      in.GetUID(),
+		ObjectID: in.GetObjectID(),
+		Bucket:   in.GetBucket(),
+	}
+	ts, err := ptypes.TimestampProto(time.Now())
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCommittee failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	out.Timestamp = ts
+
+	// Get object binary and return in response
+	/* support for multiple years and aggregated datasets will be available in future version */
+	years := in.GetYears()
+	year := years[0]
+
+	obj, err := server.GetObjectFromDisk(year, in.GetObjectID(), "committees")
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCommittee failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	cmte := obj.(server.Committee)
+	cmtePb := pb.Committee{
+		ID:           cmte.ID,
+		Name:         cmte.Name,
+		TresName:     cmte.TresName,
+		City:         cmte.City,
+		State:        cmte.State,
+		Zip:          cmte.Zip,
+		Designation:  cmte.Designation,
+		Type:         cmte.Type,
+		Party:        cmte.Party,
+		FilingFreq:   cmte.FilingFreq,
+		OrgType:      cmte.OrgType,
+		ConnectedOrg: cmte.ConnectedOrg,
+		CandID:       cmte.CandID,
+	}
+	out.Committee = &cmtePb
+
+	obj, err = server.GetObjectFromDisk(year, in.GetObjectID(), "cmte_tx_data")
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCommittee failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	cmteTx := obj.(server.CmteTxData)
+	indvAmtsSrt := util.SortMapObjectTotals(cmteTx.TopIndvContributorsAmt)
+	indvAmts := []*pb.TotalsMap{}
+	for _, e := range indvAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		indvAmts = append(indvAmts, entry)
+	}
+	cmteAmtsSrt := util.SortMapObjectTotals(cmteTx.TopCmteOrgContributorsAmt)
+	cmteAmts := []*pb.TotalsMap{}
+	for _, e := range cmteAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		cmteAmts = append(cmteAmts, entry)
+	}
+	trAmtsSrt := util.SortMapObjectTotals(cmteTx.TransferRecsAmt)
+	trAmts := []*pb.TotalsMap{}
+	for _, e := range trAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		trAmts = append(trAmts, entry)
+	}
+	expAmtsSrt := util.SortMapObjectTotals(cmteTx.TopExpRecipientsAmt)
+	expAmts := []*pb.TotalsMap{}
+	for _, e := range expAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		expAmts = append(expAmts, entry)
+	}
+
+	cmteTxPb := pb.CmteTxData{
+		CmteID:                    cmteTx.CmteID,
+		CandID:                    cmteTx.CandID,
+		ContributionsInAmt:        cmteTx.ContributionsInAmt,
+		ContributionsInTxs:        cmteTx.ContributionsInTxs,
+		AvgContributionIn:         cmteTx.AvgContributionIn,
+		OtherReceiptsInAmt:        cmteTx.OtherReceiptsInAmt,
+		OtherReceiptsInTxs:        cmteTx.OtherReceiptsInTxs,
+		AvgOtherIn:                cmteTx.AvgOtherIn,
+		TotalIncomingAmt:          cmteTx.TotalIncomingAmt,
+		TotalIncomingTxs:          cmteTx.TotalIncomingTxs,
+		AvgIncoming:               cmteTx.AvgIncoming,
+		TransfersAmt:              cmteTx.TransfersAmt,
+		TransfersTxs:              cmteTx.TransfersTxs,
+		AvgTransfer:               cmteTx.AvgTransfer,
+		ExpendituresAmt:           cmteTx.ExpendituresAmt,
+		ExpendituresTxs:           cmteTx.ExpendituresTxs,
+		AvgExpenditure:            cmteTx.AvgExpenditure,
+		TotalOutgoingAmt:          cmteTx.TotalOutgoingAmt,
+		TotalOutgoingTxs:          cmteTx.TotalOutgoingTxs,
+		AvgOutgoing:               cmteTx.AvgOutgoing,
+		NetBalance:                cmteTx.NetBalance,
+		TopIndvContributorsAmt:    indvAmts,
+		TopIndvContributorsTxs:    cmteTx.TopIndvContributorsTxs,
+		TopCmteOrgContributorsAmt: cmteAmts,
+		TopCmteOrgContributorsTxs: cmteTx.TopCmteOrgContributorsTxs,
+		TransferRecsAmt:           trAmts,
+		TransferRecsTxs:           cmteTx.TransferRecsTxs,
+		TopExpRecipientsAmt:       expAmts,
+		TopExpRecipientsTxs:       cmteTx.TopExpRecipientsTxs,
+	}
+	out.TxData = &cmteTxPb
+
+	obj, err = server.GetObjectFromDisk(year, in.GetObjectID(), "cmte_fin")
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCommittee failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	cmteFin := obj.(server.CmteFinancials)
+	if cmteFin.CmteID != "" { // object exists
+		cmteFinPb := pb.CmteFinancials{
+			CmteID:          cmteFin.CmteID,
+			TotalReceipts:   cmteFin.TotalReceipts,
+			TxsFromAff:      cmteFin.TxsFromAff,
+			IndvConts:       cmteFin.IndvConts,
+			OtherConts:      cmteFin.OtherConts,
+			CandCont:        cmteFin.CandCont,
+			TotalLoans:      cmteFin.TotalLoans,
+			TotalDisb:       cmteFin.TotalDisb,
+			TxToAff:         cmteFin.TxToAff,
+			IndvRefunds:     cmteFin.IndvRefunds,
+			OtherRefunds:    cmteFin.OtherRefunds,
+			LoanRepay:       cmteFin.LoanRepay,
+			CashBOP:         cmteFin.CashBOP,
+			CashCOP:         cmteFin.CashCOP,
+			DebtsOwed:       cmteFin.DebtsOwed,
+			NonFedTxsRecvd:  cmteFin.NonFedTxsRecvd,
+			ContToOtherCmte: cmteFin.ContToOtherCmte,
+			IndExp:          cmteFin.IndExp,
+			PartyExp:        cmteFin.PartyExp,
+			NonFedSharedExp: cmteFin.NonFedSharedExp,
+		}
+		out.Financials = &cmteFinPb
+		out.Msg = "SUCCESS"
+	} else { // record does not exist for specified committee
+		out.Msg = "SUCCESS_NO_FIN"
+	}
+
+	return out, nil
+}
+
+// retrieve object from cache/DynamoDB
+func (s *viewServer) ViewCandidate(ctx context.Context, in *pb.GetCandRequest) (*pb.GetCandResponse, error) {
+	fmt.Println("called ViewCandidate...")
+	out := &pb.GetCandResponse{
+		UID:      in.GetUID(),
+		ObjectID: in.GetObjectID(),
+		Bucket:   in.GetBucket(),
+	}
+	ts, err := ptypes.TimestampProto(time.Now())
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCandidate failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	out.Timestamp = ts
+
+	// Get object binary and return in response
+	/* support for multiple years and aggregated datasets will be available in future version */
+	years := in.GetYears()
+	year := years[0]
+
+	obj, err := server.GetObjectFromDisk(year, in.GetObjectID(), "candidates")
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCandidate failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	cand := obj.(server.Candidate)
+	recAmtsSrt := util.SortMapObjectTotals(cand.DirectRecipientsAmts)
+	recAmts := []*pb.TotalsMap{}
+	for _, e := range recAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		recAmts = append(recAmts, entry)
+	}
+	senAmtsSrt := util.SortMapObjectTotals(cand.DirectSendersAmts)
+	senAmts := []*pb.TotalsMap{}
+	for _, e := range senAmtsSrt {
+		entry := &pb.TotalsMap{ID: e.ID, Total: e.Total}
+		senAmts = append(senAmts, entry)
+	}
+
+	candPb := pb.Candidate{
+		ID:                   cand.ID,
+		Name:                 cand.Name,
+		Party:                cand.Party,
+		OfficeState:          cand.OfficeState,
+		Office:               cand.Office,
+		PCC:                  cand.PCC,
+		City:                 cand.City,
+		State:                cand.State,
+		Zip:                  cand.Zip,
+		OtherAffiliates:      cand.OtherAffiliates,
+		TransactionsList:     cand.TransactionsList,
+		TotalDirectInAmt:     cand.TotalDirectInAmt,
+		TotalDirectInTxs:     cand.TotalDirectInTxs,
+		AvgDirectIn:          cand.AvgDirectIn,
+		TotalDirectOutAmt:    cand.TotalDirectOutAmt,
+		TotalDirectOutTxs:    cand.TotalDirectOutTxs,
+		AvgDirectOut:         cand.AvgDirectOut,
+		NetBalanceDirectTx:   cand.NetBalanceDirectTx,
+		DirectRecipientsAmts: recAmts,
+		DirectRecipientsTxs:  cand.DirectRecipientsTxs,
+		DirectSendersAmts:    senAmts,
+		DirectSendersTxs:     cand.DirectSendersTxs,
+	}
+	out.Candidate = &candPb
+
+	obj, err = server.GetObjectFromDisk(year, in.GetObjectID(), "cmpn_fin")
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCandidate failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	cf := obj.(server.CmpnFinancials)
+	if cf.CandID != "" { // object exists
+		cfPb := pb.CmpnFinancials{
+			CandID:         cf.CandID,
+			Name:           cf.Name,
+			PartyCd:        cf.PartyCd,
+			Party:          cf.Party,
+			TotalReceipts:  cf.TotalReceipts,
+			TransFrAuth:    cf.TransFrAuth,
+			TotalDisbsmts:  cf.TotalDisbsmts,
+			TransToAuth:    cf.TransToAuth,
+			COHBOP:         cf.COHBOP,
+			COHCOP:         cf.COHCOP,
+			CandConts:      cf.CandConts,
+			CandLoans:      cf.CandLoans,
+			OtherLoans:     cf.OtherLoans,
+			CandLoanRepay:  cf.CandLoanRepay,
+			OtherLoanRepay: cf.OtherLoanRepay,
+			DebtsOwedBy:    cf.DebtsOwedBy,
+			TotalIndvConts: cf.TotalIndvConts,
+			SpecElection:   cf.SpecElection,
+			PrimElection:   cf.PrimElection,
+			RunElection:    cf.RunElection,
+			GenElection:    cf.GenElection,
+			GenElectionPct: cf.GenElectionPct,
+			OtherCmteConts: cf.OtherCmteConts,
+			PtyConts:       cf.PtyConts,
+			IndvRefunds:    cf.IndvRefunds,
+			CmteRefunds:    cf.CmteRefunds,
+		}
+		out.Financials = &cfPb
+		out.Msg = "SUCCESS"
+	} else { // record does not exist for specified committee
+		out.Msg = "SUCCESS_NO_FIN"
+	}
+
+	return out, nil
 }
 
 func (s *viewServer) LookupObjByID(ctx context.Context, in *pb.LookupRequest) (*pb.LookupResponse, error) {
+	fmt.Println("called LookupObjByID...")
 	// intitialize response object
 	out := &pb.LookupResponse{
 		UID: in.GetUID(),
 	}
 	ts, err := ptypes.TimestampProto(time.Now())
 	if err != nil {
-		errMsg := fmt.Errorf("LookupObjByID failed: %v\tUID: %s\tTimeStamp: %v", err, out.UID, out.Timestamp)
+		errMsg := fmt.Errorf("%v\tLookupObjByID failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
 	out.Timestamp = ts
 
 	// find matching search results
-	ID := in.GetObjectID()
-	fmt.Printf("Looking up '%s'...\n", ID)
-	sds, err := server.LookupByID([]string{ID})
-	sd := sds[0]
+	IDs := in.GetObjectIds()
+	sds, err := server.LookupByID(IDs)
 	if err != nil {
-		out.Msg = err.Error()
-		fmt.Println("LookupObjByID (server) error: ", err.Error())
-		return out, err
+		errMsg := fmt.Errorf("%v\tLookupObjByID failed: %v", time.Now(), err.Error())
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
 	}
+	results := []*pb.SearchResult{}
 
 	// convert to SearchResult message
-	res := &pb.SearchResult{
-		ID:    sd.ID,
-		Name:  sd.Name,
-		City:  sd.City,
-		State: sd.State,
-		Years: sd.Years,
+	for _, sd := range sds {
+		res := &pb.SearchResult{
+			ID:       sd.ID,
+			Bucket:   sd.Bucket,
+			Name:     sd.Name,
+			City:     sd.City,
+			State:    sd.State,
+			Employer: sd.Employer,
+			Years:    sd.Years,
+		}
+		results = append(results, res)
 	}
 
+	out.Results = results
 	out.Msg = "SUCCESS"
-	out.Result = res
 
-	fmt.Println()
-
+	fmt.Println("returning results...")
 	return out, nil
 }
 

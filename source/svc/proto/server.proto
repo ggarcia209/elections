@@ -32,7 +32,8 @@ message SearchResult {
     string Name = 3;
     string City = 4;
     string State = 5;
-    repeated string Years = 6;
+    string Employer = 6;
+    repeated string Years = 7;
 }
 
 message RankingsRequest{
@@ -81,7 +82,7 @@ message YrTotalRequest{
 
 message YrTotalResponse{
     string UID = 1;
-    YrTotalResult YearlyTotal = 2;
+    repeated YrTotalResult YearlyTotal = 2;
     google.protobuf.Timestamp Timestamp = 3;
     string Msg = 7;
 }
@@ -115,21 +116,244 @@ message GetObjResponse{
     string Msg = 6;
 }
 
-message LookupRequest{
+message GetIndvRequest{
     string UID = 1;
     string ObjectID = 2;
     string Bucket = 3;
-    google.protobuf.Timestamp Timestamp = 4;
-    string Msg = 5;
-}
-
-message LookupResponse{
-    string UID = 1;
-    string ObjectID = 2;
-    string Bucket = 3;
-    SearchResult Result = 4;
+    repeated string Years = 4;
     google.protobuf.Timestamp Timestamp = 5;
     string Msg = 6;
+}
+
+message GetIndvResponse{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    // datasets for each year in request aggregated 
+    // into singular object encoded on server prior
+    // to encoding response
+    Individual Individual = 4;
+    google.protobuf.Timestamp Timestamp = 5;
+    string Msg = 6;
+}
+
+message TotalsMap{
+    string ID = 1;
+    float Total = 2;
+}
+
+message Individual{
+    string ID = 1;
+	string Name = 2;
+	string City = 3;
+	string State = 4;
+	string Zip = 5;
+	string Occupation = 6;
+	string Employer = 7;
+	repeated string Transactions = 8;
+	float TotalOutAmt = 9;
+	float TotalOutTxs = 10;
+	float AvgTxOut = 11;
+	float TotalInAmt = 12;
+	float TotalInTxs = 13;
+	float AvgTxIn = 14;
+	float NetBalance = 15;
+	repeated TotalsMap RecipientsAmt = 16;
+	map<string, float>  RecipientsTxs = 17;
+	repeated TotalsMap SendersAmt = 18;
+	map<string, float>  SendersTxs = 19;
+}
+
+message GetCandRequest{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    repeated string Years = 4;
+    google.protobuf.Timestamp Timestamp = 5;
+    string Msg = 6;
+}
+
+message GetCandResponse{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    // datasets for each year in request aggregated 
+    // into singular object encoded on server prior
+    // to encoding response
+    Candidate Candidate = 4;
+    CmpnFinancials Financials = 5;
+    google.protobuf.Timestamp Timestamp = 6;
+    string Msg = 7;
+}
+
+message Candidate {
+	string ID = 1;     
+	string Name = 2; 
+	string Party = 3;
+	int32 ElectnYr = 4;   
+	string OfficeState = 5; 
+	string Office = 6;     
+	string PCC = 7;    
+	string City = 8;       
+	string State = 9; 
+	string Zip = 10;    
+	repeated string OtherAffiliates = 11;
+	repeated string TransactionsList = 12;
+	float TotalDirectInAmt = 13;
+	float TotalDirectInTxs = 14;
+	float AvgDirectIn = 15;
+	float TotalDirectOutAmt = 16;
+	float TotalDirectOutTxs = 17;
+	float AvgDirectOut = 18;
+	float NetBalanceDirectTx = 19;
+	repeated TotalsMap DirectRecipientsAmts = 20;
+	map<string, float>  DirectRecipientsTxs = 21;
+	repeated TotalsMap DirectSendersAmts = 22;
+	map<string, float>  DirectSendersTxs = 23;
+}
+
+message CmpnFinancials {
+    string CandID = 1;         
+	string Name = 2;
+	string PartyCd = 3;
+	string Party = 4;
+	float TotalReceipts = 5;
+    float TransFrAuth = 6;
+    float TotalDisbsmts = 7;
+    float TransToAuth = 8;
+	float COHBOP = 9;
+	float COHCOP = 10;
+	float CandConts = 11; 
+	float CandLoans = 12;
+	float OtherLoans = 13;
+	float CandLoanRepay = 14;
+	float OtherLoanRepay = 15;
+	float DebtsOwedBy = 16;
+	float TotalIndvConts = 17;
+	string OfficeState = 18;
+	string OfficeDistrict = 19;
+	string SpecElection = 20; 
+    string PrimElection = 21;
+    string RunElection = 22;
+	string GenElection = 23;
+	float GenElectionPct = 24;
+	float OtherCmteConts = 25;
+	float PtyConts = 26;
+	google.protobuf.Timestamp CvgEndDate = 27;
+	float IndvRefunds = 28;
+	float CmteRefunds = 29;
+}
+
+message GetCmteRequest{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    repeated string Years = 4;
+    google.protobuf.Timestamp Timestamp = 5;
+    string Msg = 6;
+}
+
+message GetCmteResponse{
+    string UID = 1;
+    string ObjectID = 2;
+    string Bucket = 3;
+    // datasets for each year in request aggregated 
+    // into singular object encoded on server prior
+    // to encoding response
+    Committee Committee = 4;
+    CmteTxData TxData = 5;
+    CmteFinancials Financials = 6;
+    google.protobuf.Timestamp Timestamp = 7;
+    string Msg = 8;
+}
+
+message Committee {
+	string ID = 1;
+    string Name = 2;
+    string TresName = 3;
+	string City = 4;
+    string State = 5;
+    string Zip = 6;
+	string Designation = 7;
+    string Type = 8;
+    string Party = 9;
+    string FilingFreq = 10;
+    string OrgType = 11;
+    string ConnectedOrg = 12;
+    string CandID = 13;
+}
+
+message CmteFinancials {
+    string CmteID = 1;
+    float TotalReceipts = 2;
+	float TxsFromAff = 3;
+	float IndvConts = 4;
+	float OtherConts = 5;
+	float CandCont = 6;
+	float CandLoans = 7;
+	float TotalLoans = 8;
+	float TotalDisb = 9;
+	float TxToAff = 10;
+	float IndvRefunds = 11; 
+	float OtherRefunds = 12;
+	float LoanRepay = 13;
+	float CashBOP = 14;
+	float CashCOP = 15;
+	float DebtsOwed = 16;
+	float NonFedTxsRecvd = 17;
+	float ContToOtherCmte = 18;
+	float IndExp = 19;
+	float PartyExp = 20;
+	float NonFedSharedExp = 21;
+    google.protobuf.Timestamp CovgEndDate = 22;
+}
+
+message CmteTxData {
+	string CmteID = 1;
+	string CandID  = 2;
+	string Party = 3; 
+	float ContributionsInAmt = 4;
+	float ContributionsInTxs = 5;
+	float AvgContributionIn = 6;
+	float OtherReceiptsInAmt = 7;
+	float OtherReceiptsInTxs = 8;
+	float AvgOtherIn = 9;
+	float TotalIncomingAmt = 10;
+	float TotalIncomingTxs = 11; 
+	float AvgIncoming = 12;
+	float TransfersAmt = 13;
+	float TransfersTxs = 14;
+	float AvgTransfer = 15;
+	repeated string TransfersList = 16;
+	float ExpendituresAmt = 17;
+	float ExpendituresTxs = 18;
+	float AvgExpenditure = 19;
+	float TotalOutgoingAmt = 20;
+	float TotalOutgoingTxs = 21;
+	float AvgOutgoing = 22;
+	float NetBalance = 23;
+	repeated TotalsMap TopIndvContributorsAmt = 24;
+	map<string, float> TopIndvContributorsTxs = 25;
+	repeated TotalsMap TopCmteOrgContributorsAmt = 26;
+	map<string, float>  TopCmteOrgContributorsTxs = 27;
+	repeated TotalsMap TransferRecsAmt = 28; 
+	map<string, float>  TransferRecsTxs = 29;
+	repeated TotalsMap TopExpRecipientsAmt = 30;
+	map<string, float>  TopExpRecipientsTxs = 31;
+}
+
+message LookupRequest {
+    string UID = 1;
+    repeated string ObjectIds = 2;
+    google.protobuf.Timestamp Timestamp = 3;
+    string Msg = 4;
+}
+
+message LookupResponse {
+    string UID = 1;
+    repeated SearchResult Results = 2;
+    google.protobuf.Timestamp Timestamp = 3;
+    string Msg = 4;
 }
 
 service View {
@@ -142,8 +366,14 @@ service View {
     // retrieve yearly total matching specified criteria
     rpc ViewYrTotals(YrTotalRequest) returns (YrTotalResponse) {}
 
-    // retrieve object from cache/DynamoDB
-    rpc ViewObject(GetObjRequest) returns (GetObjResponse) {}
+    // retrieve Individual data from cache/DynamoDB
+    rpc ViewIndividual(GetIndvRequest) returns (GetIndvResponse) {}
+
+    // retrieve Committee data from cache/DynamoDB
+    rpc ViewCommittee(GetCmteRequest) returns (GetCmteResponse) {}
+
+    // retrieve Candidate data from cache/DynamoDB
+    rpc ViewCandidate(GetCandRequest) returns (GetCandResponse) {}
 
     // lookup object by ID
     rpc LookupObjByID(LookupRequest) returns (LookupResponse) {}

@@ -18,6 +18,7 @@
     <ul class="navbar-nav mr-auto">
       <li class="nav-item active"> <a class="nav-link" href="http://localhost:8081/">Home <span class="sr-only">(current)</span></a> </li>
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/rankings/?year=2020&category=cmte_tx_data-rec">Rankings</a> </li>
+      <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/totals/?year=2020&category=rec">Totals</a> </li>
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/about">About</a> </li>
     </ul>
     <form action="/search-results/" class="form-inline my-2 my-lg-0" method="GET">
@@ -65,7 +66,7 @@
   <p class="p-welcome">Results for individuals &amp; organizations are limited to the top 100,000 individuals &amp; organizations by funds contributed and the top 100,000 individuals &amp; organizations by funds received for a total of 200,000 records per election cycle.</p>
   <form action="/search-results/" class="search-bar-div" method="GET">
     <div class="searchbar"> 
-      <input name="q" type="search" class="search-bar-main" placeholder="Search.." onkeyup="filterFunction()">
+      <input name="q" type="search" class="search-bar-main" placeholder="Search..">
     </div>
     <button class="btn btn-outline-success my-2 my-sm-0 search-btn" type="submit">Search</button>
   </form>

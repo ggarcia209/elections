@@ -60,38 +60,39 @@ func CreateQuery(text, UID string) Query {
 }
 
 // GetResults returns search results to user from user query.
-func GetResults(q Query) ([]SearchData, error) {
+func GetResults(q Query) ([]string, error) {
 	if q.Text == "" {
-		return nil, nil
+		return []string{}, nil
 	}
 
 	// find corresponding SearchData objects
 	terms := formatTerms(strings.Split(q.Text, " "))
 
-	// get IDs for single term
-	if len(terms) == 1 {
-		results, err := getSearchEntry(terms[0])
-		if err != nil {
-			if err.Error() == "MAX_LENGTH" {
-				return []SearchData{}, err
-			}
-			fmt.Println(err)
-			return nil, fmt.Errorf("GetResults failed: %v", err)
-		}
-
-		return results, nil
-	}
-
 	// get IDs for multiple terms
-	resMap, err := getRefs(terms)
+	resMap, x, err := getRefs(terms)
 	if err != nil {
 		fmt.Println(err)
-		return nil, fmt.Errorf("GetResults failed: %v", err)
+		return []string{}, fmt.Errorf("GetResults failed: %v", err)
 	}
 
 	// results not found for 1+ more terms
-	if len(resMap) < len(terms) {
-		return []SearchData{}, nil
+	if x > 0 {
+		return []string{}, nil
+	}
+
+	// get IDs for single term
+	if len(terms) == 1 {
+		common := []string{}
+		for _, ss := range resMap {
+			for i, ID := range ss {
+				common = append(common, ID)
+				if i > 200 {
+					fmt.Println("GetResults failed: MAX_LENGTH exceeded")
+					return []string{}, fmt.Errorf("MAX_LENGTH")
+				}
+			}
+		}
+		return common, nil
 	}
 
 	// Sort lists by smallest to largest
@@ -103,20 +104,38 @@ func GetResults(q Query) ([]SearchData, error) {
 	s0, s1 := sorted[0].Value, sorted[1].Value
 	common := intersection(s0, s1)
 	for i := 2; i < len(sorted); i++ {
+		if len(common) == 0 {
+			return common, nil
+		}
 		common = intersection(common, sorted[i].Value)
 	}
-
-	// Get data for the common IDs
-	results, err := LookupSearchData(common)
-	if err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("GetResults failed: %v", err)
+	fmt.Println("len(common): ", len(common))
+	if len(common) > 200 {
+		fmt.Println("GetResults failed: MAX_LENGTH exceeded")
+		return []string{}, fmt.Errorf("MAX_LENGTH")
 	}
 
-	return results, nil
+	return common, nil
 }
 
-// LookupSearchData Retreives corresponding SearchData obj for ID
+// LookupSearchDataFromCache retreives SearchData objects from in memory cache
+func LookupSearchDataFromCache(ids []string, cache map[string]SearchData) ([]string, []SearchData) {
+	sds := []SearchData{}
+	nilIDs := []string{}
+
+	for _, ID := range ids {
+		sd := cache[ID]
+		if sd.ID != "" {
+			sds = append(sds, sd)
+		} else {
+			nilIDs = append(nilIDs, ID)
+		}
+	}
+
+	return nilIDs, sds
+}
+
+// LookupSearchData Retreives corresponding SearchData obj for ID from disk
 func LookupSearchData(ids []string) ([]SearchData, error) {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
@@ -132,6 +151,22 @@ func LookupSearchData(ids []string) ([]SearchData, error) {
 	}
 
 	return results, nil
+}
+
+// ConsolidateSearchData consolidates SearchData lists from cache and disk in their original order.
+func ConsolidateSearchData(origIDs []string, frmCache, frmDisk []SearchData) []SearchData {
+	sds := make(map[string]SearchData)
+	agg := []SearchData{}
+	for _, sd := range frmCache {
+		sds[sd.ID] = sd
+	}
+	for _, sd := range frmDisk {
+		sds[sd.ID] = sd
+	}
+	for _, ID := range origIDs {
+		agg = append(agg, sds[ID])
+	}
+	return agg
 }
 
 // ViewIndex displays the index
@@ -195,15 +230,16 @@ func ViewIndex() error {
 }
 
 // getRefs finds the references for each term in query
-func getRefs(q []string) (map[string][]string, error) {
+func getRefs(q []string) (map[string][]string, int, error) {
 	var resultMap = make(map[string][]string)
 	var result []string
 	var noIDs bool
+	x := 0
 
 	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	if err != nil {
 		fmt.Println(err)
-		return nil, fmt.Errorf("getRefs failed: %v", err)
+		return nil, 0, fmt.Errorf("getRefs failed: %v", err)
 	}
 	defer db.Close()
 
@@ -226,19 +262,21 @@ func getRefs(q []string) (map[string][]string, error) {
 				noIDs = true
 				return nil
 			}
+			fmt.Printf("ids found for '%s': %d\n", v, len(ids))
 			result = ids
 			return nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("getRefs failed: %s", err)
+			return nil, 0, fmt.Errorf("getRefs failed: %s", err)
 		}
 		if noIDs {
+			x++
 			continue
 		}
 
 		resultMap[v] = result
 	}
-	return resultMap, nil
+	return resultMap, x, nil
 }
 
 // sortMap converts k:v pairs to struct, adds and sorts by len(v)

@@ -9,8 +9,9 @@ message SearchResult {
     string Name = 2;
     string City = 3;
     string State = 4;
-    string Bucket = 5;
-    repeated string Years = 6;
+    string Employer = 5;
+    string Bucket = 6;
+    repeated string Years = 7;
 }
 
 message ResultList {
@@ -26,6 +27,7 @@ message IndexData {
     float Size = 1;
     google.protobuf.Timestamp LastUpdated = 2;
     map<string, bool> Completed = 3;
+    map<string, float> Shards = 4;
 }
 
 message PartitionMap {

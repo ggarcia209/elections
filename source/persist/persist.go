@@ -53,7 +53,7 @@ func StoreObjects(year string, objs []interface{}) error {
 	if err := db.Update(func(tx *bolt.Tx) error {
 		for _, obj := range objs {
 			// encode object
-			bucket, key, data, err := encodeToProto(obj)
+			bucket, key, data, err := EncodeToProto(obj)
 			if err != nil {
 				fmt.Println(err)
 				fmt.Println("obj: ", obj)
@@ -78,7 +78,7 @@ func StoreObjects(year string, objs []interface{}) error {
 // PutObject puts an object by year:bucket:key
 func PutObject(year string, object interface{}) error {
 	// encode object
-	bucket, key, data, err := encodeToProto(object)
+	bucket, key, data, err := EncodeToProto(object)
 	if err != nil {
 		fmt.Println("PutObject failed: ", err)
 		return fmt.Errorf("PutObject failed: %v", err)
@@ -127,7 +127,7 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
 
-	obj, err := decodeFromProto(bucket, data) // change to decode
+	obj, err := DecodeFromProto(bucket, data) // change to decode
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
@@ -160,7 +160,7 @@ func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, st
 		}
 
 		for k, v := c.Seek([]byte(startKey)); k != nil; k, v = c.Next() {
-			obj, err := decodeFromProto(bucket, v)
+			obj, err := DecodeFromProto(bucket, v)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -206,7 +206,7 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 				nilIDs = append(nilIDs, id)
 				continue
 			}
-			obj, err := decodeFromProto(bucket, data)
+			obj, err := DecodeFromProto(bucket, data)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -244,7 +244,7 @@ func GetTopOverall(year string) ([]interface{}, error) {
 				fmt.Printf("nil object: %s\n", string(k))
 				continue
 			}
-			obj, err := decodeFromProto("top_overall", v)
+			obj, err := DecodeFromProto("top_overall", v)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -274,7 +274,7 @@ func SaveTopOverall(year, bucket string, ods []interface{}) error {
 		b := tx.Bucket([]byte(year)).Bucket([]byte("top_overall"))
 
 		for _, od := range ods {
-			_, key, data, err := encodeToProto(od)
+			_, key, data, err := EncodeToProto(od)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed %v", err)
@@ -309,7 +309,7 @@ func GetYearlyTotals(year, cat string) ([]interface{}, error) {
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			obj, err := decodeFromProto("yearly_totals", v)
+			obj, err := DecodeFromProto("yearly_totals", v)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -339,7 +339,7 @@ func SaveYearlyTotals(year, cat string, yts []interface{}) error {
 		b := tx.Bucket([]byte(year)).Bucket([]byte("yearly_totals"))
 
 		for _, yt := range yts {
-			_, key, data, err := encodeToProto(yt)
+			_, key, data, err := EncodeToProto(yt)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed %v", err)
@@ -406,8 +406,9 @@ func ViewDataByBucket(year, bucket, start string) (string, error) {
 	return curr, nil
 }
 
-// encodeToProto encodes an object interface to protobuf
-func encodeToProto(obj interface{}) (string, string, []byte, error) {
+// EncodeToProto encodes an object interface to protobuf
+// Returns bucket, key (ID), serialized data, and err
+func EncodeToProto(obj interface{}) (string, string, []byte, error) {
 	if obj == nil {
 		fmt.Println("empty object passed to encodeProto")
 		return "", "", nil, nil
@@ -492,8 +493,9 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 	}
 }
 
-// decodeFromProto encodes an object interface to protobuf
-func decodeFromProto(bucket string, data []byte) (interface{}, error) {
+// DecodeFromProto encodes an object interface to protobuf
+// Returns pointer to deserialized object as interface{}
+func DecodeFromProto(bucket string, data []byte) (interface{}, error) {
 	switch bucket {
 	case "":
 		return nil, fmt.Errorf("decodeFromProto failed: nil bucket")

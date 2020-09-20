@@ -18,7 +18,7 @@
     <ul class="navbar-nav mr-auto">
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/">Home</a></li>
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/rankings/?year=2020&category=cmte_tx_data-rec">Rankings</a> </li>
-		<li class="nav-item"> <a class="nav-link" href="http://localhost:8081/yearly-totals">Totals</a> </li>
+		<li class="nav-item"> <a class="nav-link" href="http://localhost:8081/totals/?year=2020&category=rec">Totals</a> </li>
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/about">About</a> </li>
     </ul>
     <form action="/search-results/" class="form-inline my-2 my-lg-0" method="GET">
@@ -27,20 +27,93 @@
     </form>
   </div>
 </nav>
-<div class="content-main">
-  <h1 class="header-about">Object Name - Year</h1>
-	<h3 class="header-sub-about">Object ID Code/Hash</h3>
-  <div class="list-full-div">
-	<p>City, State</p>
-	  <p>Employer, Occupation</p>
-	  <p>Cash In: $x    Transactions: y    Avg. Incoming Tx: $z</p>
-	  <p>Cash Out: $x    Transactions: y    Avg. Outgoing Tx: $z</p>
-  <h4 class="header-sub-about">Recipients</h4>
-	  <ul></ul>  
-  <h4 class="header-sub-about">Senders</h4>
-	  <ul></ul>
-
+<div class="content-main" id="view-obj-main">
+	<div class="summary-div" id="obj-summary-div">
+	
   </div>
+
+  <!----- Individuals ------>
+  <div class="view-obj-list-div" id="indv-senders">
+	<h4 class="header-sub-about">Senders</h4>
+	<div class="list-full-div">
+		<ul class="list-full" id="senders-list">
+
+    </ul>
+  </div>
+  </div>
+  
+  <div class="view-obj-list-div" id="indv-recipients">
+	<h4 class="header-sub-about">Recipients</h4>
+	<div class="list-full-div">
+		<ul class="list-full" id="recipients-list">
+		
+		</ul>
+	</div>
+</div>
+
+<!----- Committees ------>
+<div class="view-obj-list-div" id="cmte-top-indv">
+	<h4 class="header-sub-about">Top Individual Contributors</h4>
+	<div class="list-full-div">
+		<ul class="list-full" id="top-indv-list">
+    </ul>
+  </div>
+  </div>
+  
+  <div class="view-obj-list-div" id="cmte-top-cmte">
+	<h4 class="header-sub-about">Top Committee Contributors</h4>
+	<div class="list-full-div">
+		<ul class="list-full" id="top-cmte-list">
+		</ul>
+  </div>
+</div>
+
+  <div class="view-obj-list-div" id="cmte-transfer-recs">
+    <h4 class="header-sub-about">Transfer Recipients</h4>
+    <div class="list-full-div">
+      <ul class="list-full" id="tr-rec-list">
+      </ul>
+    </div>
+  </div>
+
+  <div class="view-obj-list-div" id="cmte-exp-recs">
+  <h4 class="header-sub-about">Top Expenditure Recipients</h4>
+  <div class="list-full-div">
+    <ul class="list-full" id="exp-rec-list">
+    </ul>
+  </div>
+</div>
+
+  <div id="cmte-data-div" class="summary-div">
+    <h4 class="header-sub-about">FEC Financial Data</h4>
+    <p class="p-welcome">Not available for this committee - see FEC link for more info.</p>
+  </div>
+
+  <!----- Candidates ------>
+<div class="view-obj-list-div" id="cand-cont">
+	<h4 class="header-sub-about">Contributors</h4>
+	<div class="list-full-div">
+		<ul class="list-full" id="senders-list">
+    </ul>
+  </div>
+  </div>
+
+  <div class="view-obj-list-div" id="cand-rec">
+    <h4 class="header-sub-about">Recipients</h4>
+    <div class="list-full-div">
+      <ul class="list-full" id="senders-list">
+      </ul>
+    </div>
+  </div>
+
+
+
+  <div id="cand-data-div" class="summary-div">
+    <h4 class="header-sub-about">FEC Financial Data</h4>
+    <p class="p-welcome">Not available for this committee - see FEC link for more info.</p>
+  </div>
+
+
 </div>
 <footer class="footer">
   <p class="footer-text"> &#169; Gilberto Garcia</p>
@@ -51,5 +124,7 @@
 <!-- Include all compiled plugins (below), or include individual files as needed --> 
 <script src="../js/popper.min.js"></script> 
 <script src="../js/bootstrap-4.4.1.js"></script>
+<script src="../js/dist/main.js"></script>
+
 </body>
 </html>

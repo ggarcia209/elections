@@ -315,80 +315,240 @@ proto.proto.ViewPromiseClient.prototype.viewYrTotals =
 /**
  * @const
  * @type {!grpc.web.MethodDescriptor<
- *   !proto.proto.GetObjRequest,
- *   !proto.proto.GetObjResponse>}
+ *   !proto.proto.GetIndvRequest,
+ *   !proto.proto.GetIndvResponse>}
  */
-const methodDescriptor_View_ViewObject = new grpc.web.MethodDescriptor(
-  '/proto.View/ViewObject',
+const methodDescriptor_View_ViewIndividual = new grpc.web.MethodDescriptor(
+  '/proto.View/ViewIndividual',
   grpc.web.MethodType.UNARY,
-  proto.proto.GetObjRequest,
-  proto.proto.GetObjResponse,
+  proto.proto.GetIndvRequest,
+  proto.proto.GetIndvResponse,
   /**
-   * @param {!proto.proto.GetObjRequest} request
+   * @param {!proto.proto.GetIndvRequest} request
    * @return {!Uint8Array}
    */
   function(request) {
     return request.serializeBinary();
   },
-  proto.proto.GetObjResponse.deserializeBinary
+  proto.proto.GetIndvResponse.deserializeBinary
 );
 
 
 /**
  * @const
  * @type {!grpc.web.AbstractClientBase.MethodInfo<
- *   !proto.proto.GetObjRequest,
- *   !proto.proto.GetObjResponse>}
+ *   !proto.proto.GetIndvRequest,
+ *   !proto.proto.GetIndvResponse>}
  */
-const methodInfo_View_ViewObject = new grpc.web.AbstractClientBase.MethodInfo(
-  proto.proto.GetObjResponse,
+const methodInfo_View_ViewIndividual = new grpc.web.AbstractClientBase.MethodInfo(
+  proto.proto.GetIndvResponse,
   /**
-   * @param {!proto.proto.GetObjRequest} request
+   * @param {!proto.proto.GetIndvRequest} request
    * @return {!Uint8Array}
    */
   function(request) {
     return request.serializeBinary();
   },
-  proto.proto.GetObjResponse.deserializeBinary
+  proto.proto.GetIndvResponse.deserializeBinary
 );
 
 
 /**
- * @param {!proto.proto.GetObjRequest} request The
+ * @param {!proto.proto.GetIndvRequest} request The
  *     request proto
  * @param {?Object<string, string>} metadata User defined
  *     call metadata
- * @param {function(?grpc.web.Error, ?proto.proto.GetObjResponse)}
+ * @param {function(?grpc.web.Error, ?proto.proto.GetIndvResponse)}
  *     callback The callback function(error, response)
- * @return {!grpc.web.ClientReadableStream<!proto.proto.GetObjResponse>|undefined}
+ * @return {!grpc.web.ClientReadableStream<!proto.proto.GetIndvResponse>|undefined}
  *     The XHR Node Readable Stream
  */
-proto.proto.ViewClient.prototype.viewObject =
+proto.proto.ViewClient.prototype.viewIndividual =
     function(request, metadata, callback) {
   return this.client_.rpcCall(this.hostname_ +
-      '/proto.View/ViewObject',
+      '/proto.View/ViewIndividual',
       request,
       metadata || {},
-      methodDescriptor_View_ViewObject,
+      methodDescriptor_View_ViewIndividual,
       callback);
 };
 
 
 /**
- * @param {!proto.proto.GetObjRequest} request The
+ * @param {!proto.proto.GetIndvRequest} request The
  *     request proto
  * @param {?Object<string, string>} metadata User defined
  *     call metadata
- * @return {!Promise<!proto.proto.GetObjResponse>}
+ * @return {!Promise<!proto.proto.GetIndvResponse>}
  *     A native promise that resolves to the response
  */
-proto.proto.ViewPromiseClient.prototype.viewObject =
+proto.proto.ViewPromiseClient.prototype.viewIndividual =
     function(request, metadata) {
   return this.client_.unaryCall(this.hostname_ +
-      '/proto.View/ViewObject',
+      '/proto.View/ViewIndividual',
       request,
       metadata || {},
-      methodDescriptor_View_ViewObject);
+      methodDescriptor_View_ViewIndividual);
+};
+
+
+/**
+ * @const
+ * @type {!grpc.web.MethodDescriptor<
+ *   !proto.proto.GetCmteRequest,
+ *   !proto.proto.GetCmteResponse>}
+ */
+const methodDescriptor_View_ViewCommittee = new grpc.web.MethodDescriptor(
+  '/proto.View/ViewCommittee',
+  grpc.web.MethodType.UNARY,
+  proto.proto.GetCmteRequest,
+  proto.proto.GetCmteResponse,
+  /**
+   * @param {!proto.proto.GetCmteRequest} request
+   * @return {!Uint8Array}
+   */
+  function(request) {
+    return request.serializeBinary();
+  },
+  proto.proto.GetCmteResponse.deserializeBinary
+);
+
+
+/**
+ * @const
+ * @type {!grpc.web.AbstractClientBase.MethodInfo<
+ *   !proto.proto.GetCmteRequest,
+ *   !proto.proto.GetCmteResponse>}
+ */
+const methodInfo_View_ViewCommittee = new grpc.web.AbstractClientBase.MethodInfo(
+  proto.proto.GetCmteResponse,
+  /**
+   * @param {!proto.proto.GetCmteRequest} request
+   * @return {!Uint8Array}
+   */
+  function(request) {
+    return request.serializeBinary();
+  },
+  proto.proto.GetCmteResponse.deserializeBinary
+);
+
+
+/**
+ * @param {!proto.proto.GetCmteRequest} request The
+ *     request proto
+ * @param {?Object<string, string>} metadata User defined
+ *     call metadata
+ * @param {function(?grpc.web.Error, ?proto.proto.GetCmteResponse)}
+ *     callback The callback function(error, response)
+ * @return {!grpc.web.ClientReadableStream<!proto.proto.GetCmteResponse>|undefined}
+ *     The XHR Node Readable Stream
+ */
+proto.proto.ViewClient.prototype.viewCommittee =
+    function(request, metadata, callback) {
+  return this.client_.rpcCall(this.hostname_ +
+      '/proto.View/ViewCommittee',
+      request,
+      metadata || {},
+      methodDescriptor_View_ViewCommittee,
+      callback);
+};
+
+
+/**
+ * @param {!proto.proto.GetCmteRequest} request The
+ *     request proto
+ * @param {?Object<string, string>} metadata User defined
+ *     call metadata
+ * @return {!Promise<!proto.proto.GetCmteResponse>}
+ *     A native promise that resolves to the response
+ */
+proto.proto.ViewPromiseClient.prototype.viewCommittee =
+    function(request, metadata) {
+  return this.client_.unaryCall(this.hostname_ +
+      '/proto.View/ViewCommittee',
+      request,
+      metadata || {},
+      methodDescriptor_View_ViewCommittee);
+};
+
+
+/**
+ * @const
+ * @type {!grpc.web.MethodDescriptor<
+ *   !proto.proto.GetCandRequest,
+ *   !proto.proto.GetCandResponse>}
+ */
+const methodDescriptor_View_ViewCandidate = new grpc.web.MethodDescriptor(
+  '/proto.View/ViewCandidate',
+  grpc.web.MethodType.UNARY,
+  proto.proto.GetCandRequest,
+  proto.proto.GetCandResponse,
+  /**
+   * @param {!proto.proto.GetCandRequest} request
+   * @return {!Uint8Array}
+   */
+  function(request) {
+    return request.serializeBinary();
+  },
+  proto.proto.GetCandResponse.deserializeBinary
+);
+
+
+/**
+ * @const
+ * @type {!grpc.web.AbstractClientBase.MethodInfo<
+ *   !proto.proto.GetCandRequest,
+ *   !proto.proto.GetCandResponse>}
+ */
+const methodInfo_View_ViewCandidate = new grpc.web.AbstractClientBase.MethodInfo(
+  proto.proto.GetCandResponse,
+  /**
+   * @param {!proto.proto.GetCandRequest} request
+   * @return {!Uint8Array}
+   */
+  function(request) {
+    return request.serializeBinary();
+  },
+  proto.proto.GetCandResponse.deserializeBinary
+);
+
+
+/**
+ * @param {!proto.proto.GetCandRequest} request The
+ *     request proto
+ * @param {?Object<string, string>} metadata User defined
+ *     call metadata
+ * @param {function(?grpc.web.Error, ?proto.proto.GetCandResponse)}
+ *     callback The callback function(error, response)
+ * @return {!grpc.web.ClientReadableStream<!proto.proto.GetCandResponse>|undefined}
+ *     The XHR Node Readable Stream
+ */
+proto.proto.ViewClient.prototype.viewCandidate =
+    function(request, metadata, callback) {
+  return this.client_.rpcCall(this.hostname_ +
+      '/proto.View/ViewCandidate',
+      request,
+      metadata || {},
+      methodDescriptor_View_ViewCandidate,
+      callback);
+};
+
+
+/**
+ * @param {!proto.proto.GetCandRequest} request The
+ *     request proto
+ * @param {?Object<string, string>} metadata User defined
+ *     call metadata
+ * @return {!Promise<!proto.proto.GetCandResponse>}
+ *     A native promise that resolves to the response
+ */
+proto.proto.ViewPromiseClient.prototype.viewCandidate =
+    function(request, metadata) {
+  return this.client_.unaryCall(this.hostname_ +
+      '/proto.View/ViewCandidate',
+      request,
+      metadata || {},
+      methodDescriptor_View_ViewCandidate);
 };
 
 

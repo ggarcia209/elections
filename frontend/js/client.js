@@ -2,14 +2,14 @@ const { SearchRequest, SearchResult, SearchResponse } = require('./server_pb.js'
 const { RankingsRequest, RankingsResult, RankingsResponse } = require('./server_pb.js');
 const { LookupRequest, LookupResponse } = require('./server_pb.js');
 const { YrTotalRequest, YrTotalResult, YrTotalResponse } = require('./server_pb.js');
-const { GetObjRequest, GetObjResponse } = require('./server_pb.js');
+const { GetIndvRequest, GetCmteRequest, GetCandRequest } = require('./server_pb.js');
 const { Empty } = require('./server_pb.js');
 const { ViewClient } = require('./server_grpc_web_pb.js');
 
 var viewSvc = new ViewClient('http://localhost:8080');
 
 // call on load functions for each page
-let data = document.getElementById("#main").onload = load()
+let data = document.querySelector("#main").onload = load()
 function load() {
     let path = window.location.pathname
     console.log(path)
@@ -25,6 +25,12 @@ function load() {
             break;
         case "/rankings-list/":
             getRankings()
+            break;
+        case "/totals/":
+            getYrTotals()
+            break;
+        case "/view-object/":
+            getEntity()
             break;
     }
 }
@@ -200,7 +206,7 @@ function displayRankings(resp, ulId, year, bucket) {
     rnkList.forEach(function (r) {
         let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+r.getId()
         resultsString += "<li class='rank-item'>";
-        resultsString +=   "<a class='rank-link' href='"+link+"'>" + i +")  " + r.getName() + " - " + r.getCity() + ", " + r.getState() + " - " + "$" + r.getAmount() + "</a>";
+        resultsString +=   "<a class='rank-link' href='"+link+"'>" + i +".  " + r.getName() + " - " + r.getCity() + ", " + r.getState() + " - " + "$" + r.getAmount().toLocaleString() + "</a>";
         resultsString += "</li>"
         i++
     });
@@ -307,7 +313,7 @@ function displayRankingsAll(resp, year, bucket) {
     rnkList.forEach(function (r) {
         let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+r.getId()
         resultsString += "<li class='list-full-item'>";
-        resultsString +=   "<a class='list-full-link' href='"+link+"'>" + r.getName() + " - " + r.getCity() + ", " + r.getState() + " - " + "$" + r.getAmount() + "</a>";
+        resultsString +=  "<p>" + i + ".  " + "<a class='list-full-link' href='"+link+"'>" + r.getName() + " - " + r.getCity() + ", " + r.getState() + " - " + "$" + r.getAmount().toLocaleString() + "</a></p>";
         resultsString += "</li>"
         i++
     });
@@ -317,21 +323,605 @@ function displayRankingsAll(resp, year, bucket) {
 
 // YEARLY TOTAL OPERATIONS
 function newYrTotalRequest(year, category, party) {
-    let request = new YrTotalRequest;
-    request.setUID = "test007";
-    request.setYear = year;
-    request.setCategory = category;
-    request.setParty = party;
+    let request = new YrTotalRequest();
+    request.setUid("test007");
+    request.setYear(year);
+    request.setCategory(category);
+    request.setParty(party);
     return request
 }
 
-function getYrTotal(year, category, party) {
-    let req = newYrTotalRequest(year, category, party);
-    let resp = viewSvc.viewYrTotals(req);
-    return resp
+function getYrTotals() {
+    let params = (new URL(document.location)).searchParams;
+    let year = params.get("year")
+    let category = params.get("category")
+    let req = newYrTotalRequest(year, category, "ALL")
+    viewSvc.viewYrTotals(req, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+
+       displayYrTotals(resp, year, category)
+    })
+    return 
+}
+
+function displayYrTotals(resp, year, category) {
+    let i = 1
+    let cats = {"rec": "Funds Received", "donor": "Funds Contributed", "exp": "Funds Expensed"}
+    let ptys = {"ALL": "Overall", "DEM": "Democrat", "REP": "Republican", "IND": "Independent", "OTH": "Other", "UNK": "Unknown"}
+    let yt = resp.getYearlytotalList()
+    let resultsString = ""
+    resultsString += year + " - " + cats[category];
+    document.querySelector("#yt-list-hdr").innerHTML = resultsString
+    resultsString = ""
+    yt.forEach(function (r) {
+        resultsString += "<li class='list-full-item'>";
+        resultsString +=   i + ".  " + ptys[r.getParty()] + ": " + "$" + r.getTotal().toLocaleString();
+        resultsString += "</li>";
+        i++
+    });
+
+    // console.log("resultsString: ", resultsString)
+    document.querySelector("#yt-list").innerHTML = resultsString
+    return
 }
 // END YEARLY TOTAL OPERATIONS
 
+// VIEW OBJECT OPERATIONS
+function newGetIndvRequest(year, bucket, ID) {
+    let request = new GetIndvRequest();
+    let years = [year];
+    request.setUid("test007");
+    request.setObjectid(ID)
+    request.setBucket(bucket);
+    request.setYearsList(years);
+
+    return request
+}
+
+function newGetCmteRequest(year, bucket, ID) {
+    let request = new GetCmteRequest();
+    let years = [year];
+    request.setUid("test007");
+    request.setObjectid(ID)
+    request.setBucket(bucket);
+    request.setYearsList(years);
+
+    return request
+}
+
+function newGetCandRequest(year, bucket, ID) {
+    let request = new GetCandRequest();
+    let years = [year];
+    request.setUid("test007");
+    request.setObjectid(ID)
+    request.setBucket(bucket);
+    request.setYearsList(years);
+
+    return request
+}
+
+function getEntity() {
+    let params = (new URL(document.location)).searchParams;
+    let year = params.get("year")
+    let bucket = params.get("bucket")
+    let objID = params.get("id")
+    console.log(year, bucket, objID)
+    
+
+    switch(bucket){
+        case "individuals":
+            let ireq = newGetIndvRequest(year, bucket, objID)
+            viewSvc.viewIndividual(ireq, {}, (err, resp) => {
+                if (err !== null) {
+                    console.log("error:")
+                    console.log(err)
+                    return
+                }
+                displayIndv(resp, year)
+            })
+            break;
+        case "cmte_tx_data":
+            let cmreq = newGetCmteRequest(year, bucket, objID)
+            viewSvc.viewCommittee(cmreq, {}, (err, resp) => {
+                if (err !== null) {
+                    console.log("error:")
+                    console.log(err)
+                    return
+                }
+                displayCmte(resp, year)
+            })
+            break;
+        case "committees":
+            let cmmreq = newGetCmteRequest(year, "cmte_tx_data", objID)
+            viewSvc.viewCommittee(cmmreq, {}, (err, resp) => {
+                if (err !== null) {
+                    console.log("error:")
+                    console.log(err)
+                    return
+                }
+                displayCmte(resp, year)
+            })
+            break;
+        case "candidates":
+            let cnreq = newGetCandRequest(year, bucket, objID)
+            viewSvc.viewCandidate(cnreq, {}, (err, resp) => {
+                if (err !== null) {
+                    console.log("error:")
+                    console.log(err)
+                    return
+                }
+                displayCand(resp, year)
+            })
+            break;
+    }
+}
+
+function displayIndv(resp, year) {
+    console.log("individual...")
+    let indv = resp.getIndividual()
+    console.log("indv: ")
+    let resultsString = ""
+    resultsString += "<h1 class='header-about'>" + indv.getName() +  " - " + year + "</h1>";
+    resultsString += "<h2 class='header-sub-about'> ID: " + indv.getId() + "</h3>";
+    resultsString += "<h4 class='header-sub-about'>" + indv.getCity() + ", " + indv.getState() +  "</h4>"
+    if (indv.getOccupation() !== "" && indv.getEmployer() !== "") {
+        resultsString += "<h4 class='header-sub-about'>"+ indv.getOccupation() + ", " + indv.getEmployer() +  "</h4>"
+    }
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Total Incoming: $"+ indv.getTotalinamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Incoming Transactions: " + indv.getTotalintxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average: $" + indv.getAvgtxin().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Total Outgoing: $"+ indv.getTotaloutamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Outgoing Transactions: " + indv.getTotalouttxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average: $" + indv.getAvgtxout().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    document.querySelector("#obj-summary-div").innerHTML = resultsString
+    document.querySelector("#obj-summary-div").style.display = "block"
+
+    // get senders sorted list
+    let senders = { amts: indv.getSendersamtList(), txs: indv.getSenderstxsMap() }
+    let senIDs = new Array()
+    let sAmts = {}
+    senders.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        sAmts[id] = r.getTotal()
+        senIDs.push(id)
+    });
+    console.log("senIDs:")
+    console.log(senIDs)
+
+    let slReq = newLookupRequest(senIDs)
+    viewSvc.lookupObjByID(slReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        let res = resp.getResultsList()
+        let sendersString = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = sAmts[id]
+            let txs = senders.txs.get(id)
+            let avg = amt / txs
+            sendersString += "<li class='list-full-item'>";
+            sendersString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            sendersString += "</li>"
+            i++
+        })
+        document.querySelector("#senders-list").innerHTML = sendersString
+        document.querySelector("#indv-senders").style.display = "block"
+    })   
+
+    // get recipients sorted list
+    let recs = { amts: indv.getRecipientsamtList(), txs: indv.getRecipientstxsMap() }
+    let recIDs = new Array()
+    rAmts = {}
+    recs.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        rAmts[id] = r.getTotal()
+        recIDs.push(id)
+    });
+    console.log("recIDs:")
+    console.log(recIDs)
+
+    let rlReq = newLookupRequest(recIDs)
+    viewSvc.lookupObjByID(rlReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        let res = resp.getResultsList()
+        let recipientsString = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = rAmts[id]
+            let txs = recs.txs.get(id)
+            let avg = amt / txs
+            recipientsString += "<li class='list-full-item'>";
+            recipientsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            recipientsString += "</li>"
+            i++
+        })
+        document.querySelector("#recipients-list").innerHTML = recipientsString
+        document.querySelector("#indv-recipients").style.display = "block"
+    })
+}
+
+function displayCmte(resp, year) {
+    console.log("committee...")
+    let resultsString = ""
+
+    // Summary info
+    let cmte = resp.getCommittee()
+    resultsString += "<h1 class='header-about'><a class='title-link' href='https://www.fec.gov/data/committee/"+cmte.getId()+"/'>" + cmte.getName() + " - " + year + "</a></h1>";
+    resultsString += "<h2 class='header-sub-about'>" + cmte.getParty() + "</h2>";
+    resultsString += "<h2 class='header-sub-about'> ID: " + cmte.getId() + "</h2>";
+    if (cmte.getCandid() !== "") {
+        resultsString += "<h2 class='header-sub-about'> Candidate ID: " + cmte.getCandid() + "</h2>";
+    }
+    if (cmte.getConnectedorg() !== "") {
+        resultsString += "<h2 class='header-sub-about'> Organization: " + cmte.getConnectedorg() + "</h2>";
+    }
+    resultsString += "<h4 class='header-sub-about'>" + cmte.getCity() + ", " + cmte.getState() +  "</h4>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    if (cmte.getDesignation() !== "") {
+        resultsString += "<li class='list-view-item'><p>Designation: "+ cmte.getDesignation() + "</p></li>"
+    }
+    if (cmte.getType() !== "") {
+        resultsString += "<li class='list-view-item'><p>Type: "+ cmte.getType() + "</p></li>"
+    }
+    if (cmte.getTresname() !== "") {
+        resultsString += "<li class='list-view-item'><p>Treasurer: "+ cmte.getTresname() + "</p></li>"
+    }
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    let txData = resp.getTxdata()
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Contributions Total: $"+ txData.getContributionsinamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Contributions Received: " + txData.getContributionsintxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average Contribution: $" + txData.getAvgcontributionin().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Other Receipts Total: $"+ txData.getOtherreceiptsinamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Other Receipts: " + txData.getOtherreceiptsintxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average Other Receipt: $" + txData.getAvgotherin().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Total Incoming: $"+ txData.getTotalincomingamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Total Incoming Transactions: " + txData.getTotalincomingtxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average Incoming Transaction: $" + txData.getAvgincoming().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Transfers to Other Committees Total: $"+ txData.getTransfersamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Transers to Other Committees: " + txData.getTransferstxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average Transfer: $" + txData.getAvgtransfer().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Expenditures Total: $"+ txData.getExpendituresamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Expenditure Transactions: " + txData.getExpenditurestxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average Expenditure: $" + txData.getAvgexpenditure().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Total Outgoing: $"+ txData.getTotaloutgoingamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Total Outgoing Transactions: " + txData.getTotaloutgoingtxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average Outgoing Transaction: $" + txData.getAvgoutgoing().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    document.querySelector("#obj-summary-div").innerHTML = resultsString
+    document.querySelector("#obj-summary-div").style.display = "block"
+
+    // Senders/Receivers
+    // Top Individual Contributors
+    let topIndv = { amts: txData.getTopindvcontributorsamtList(), txs: txData.getTopindvcontributorstxsMap() }
+    let indvIDs = new Array()
+    let iAmts = {}
+    topIndv.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        iAmts[id] = r.getTotal()
+        indvIDs.push(id)
+    });
+    console.log("indvIDs:")
+    console.log(indvIDs)
+
+    let inReq = newLookupRequest(indvIDs)
+    viewSvc.lookupObjByID(inReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        let res = resp.getResultsList()
+        let topIndvString = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = iAmts[id]
+            let txs = topIndv.txs.get(id)
+            let avg = amt / txs
+            topIndvString += "<li class='list-full-item'>";
+            topIndvString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            topIndvString += "</li>"
+            i++
+        })
+        document.querySelector("#top-indv-list").innerHTML = topIndvString
+        document.querySelector("#cmte-top-indv").style.display = "block"
+    })
+
+    // Top Committee Contributors
+    let topCmte = { amts: txData.getTopcmteorgcontributorsamtList(), txs: txData.getTopcmteorgcontributorstxsMap() }
+    let cmteIDs = new Array()
+    let cAmts = {}
+    topCmte.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        cAmts[id] = r.getTotal()
+        cmteIDs.push(id)
+    });
+    console.log("cmteIDs:")
+    console.log(cmteIDs)
+
+    let cmReq = newLookupRequest(cmteIDs)
+    viewSvc.lookupObjByID(cmReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        let res = resp.getResultsList()
+        let topCmteString = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = cAmts[id]
+            let txs = topCmte.txs.get(id)
+            let avg = amt / txs
+            topCmteString += "<li class='list-full-item'>";
+            topCmteString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            topCmteString += "</li>"
+            i++
+        })
+        document.querySelector("#top-cmte-list").innerHTML = topCmteString
+        document.querySelector("#cmte-top-cmte").style.display = "block"
+    })
+
+    // Transfer Recipients
+    let tr = { amts: txData.getTransferrecsamtList(), txs: txData.getTransferrecstxsMap() }
+    let trIDs = new Array()
+    let trAmts = {}
+    tr.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        trAmts[id] = r.getTotal()
+        trIDs.push(id)
+    });
+    console.log("recIDs:")
+    console.log(trIDs)
+
+    let trReq = newLookupRequest(trIDs)
+    viewSvc.lookupObjByID(trReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        let res = resp.getResultsList()
+        let trRecsString  = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = trAmts[id]
+            let txs = tr.txs.get(id)
+            let avg = amt / txs
+            trRecsString += "<li class='list-full-item'>";
+            trRecsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            trRecsString += "</li>"
+            i++
+        })
+        document.querySelector("#tr-rec-list").innerHTML = trRecsSt
+        document.querySelector("#cmte-transfer-recs").style.display = "block"
+    })
+
+    // Top Expenditure Recipients
+    let exps = { amts: txData.getTopexprecipientsamtList(), txs: txData.getTopexprecipientstxsMap() }
+    let expIDs = new Array()
+    let eAmts = {}
+    exps.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        eAmts[id] = r.getTotal()
+        expIDs.push(id)
+    });
+    console.log("expIDs:")
+    console.log(expIDs)
+
+    let exReq = newLookupRequest(expIDs)
+    viewSvc.lookupObjByID(exReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        let res = resp.getResultsList()
+        let expRecsString = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = eAmts[id]
+            let txs = exps.txs.get(id)
+            let avg = amt / txs
+            expRecsString += "<li class='list-full-item'>";
+            expRecsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            expRecsString += "</li>"
+            i++
+        })
+        document.querySelector("#exp-rec-list").innerHTML = expRecsString
+        document.querySelector("#cmte-exp-recs").style.display = "block"
+    })
+}
+
+function displayCand(resp, year) {
+    console.log("candidate...")
+    let cand = resp.getCandidate()
+    let resultsString = ""
+    resultsString += "<h1 class='header-about'>" + cand.getName() +  " - " + year + "</h1>"
+    resultsString += "<h2 class='header-sub-about'>" + cand.getParty() + " - " + cand.getOffice() +"</h2>"
+    resultsString += "<h2 class='header-sub-about'> ID: " + cand.getId() + "</h2>"
+    resultsString += "<h2 class='header-sub-about'> PCC: " + cand.getPcc() + "</h2>"
+    resultsString += "<h4 class='header-sub-about'>" + cand.getCity() + ", " + cand.getState() +  "</h4>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Total Incoming: $"+ cand.getTotaldirectinamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Incoming Transactions: " + cand.getTotaldirectintxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average: $" + cand.getAvgdirectin().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    resultsString += "<div class='list-full-div'>"
+    resultsString += "<ul class='list-full'>"
+    resultsString += "<li class='list-view-item'><p>Total Outgoing: $"+ cand.getTotaldirectoutamt().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Outgoing Transactions: " + cand.getTotaldirectouttxs().toLocaleString() + "</p></li>"
+    resultsString += "<li class='list-view-item'><p>Average: $" + cand.getAvgdirectout().toLocaleString() + "</p></li>"
+    resultsString += "</ul>"
+    resultsString += "</div>"
+
+    document.querySelector("#obj-summary-div").innerHTML = resultsString
+    document.querySelector("#obj-summary-div").style.display = "block"
+
+    // get senders sorted list
+    let senders = { amts: cand.getDirectsendersamtsList(), txs: cand.getDirectsenderstxsMap() }
+    let senIDs = new Array()
+    let sAmts = {}
+    senders.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        sAmts[id] = r.getTotal()
+        senIDs.push(id)
+    });
+    console.log("senIDs:")
+    console.log(senIDs)
+
+    let slReq = newLookupRequest(senIDs)
+    viewSvc.lookupObjByID(slReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        let res = resp.getResultsList()
+        let sendersString = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = sAmts[id]
+            let txs = senders.txs.get(id)
+            let avg = amt / txs
+            sendersString += "<li class='list-full-item'>";
+            sendersString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            sendersString += "</li>"
+            i++
+        })
+        document.querySelector("#senders-list").innerHTML = sendersString
+        document.querySelector("#indv-senders").style.display = "block"
+    })   
+
+    // get recipients sorted list
+    let recs = { amts: cand.getDirectrecipientsamtsList(), txs: cand.getDirectrecipientstxsMap() }
+    let recIDs = new Array()
+    let rAmts = {}
+    recs.amts.forEach(function (r) {
+        let id = r.getId() + ""
+        rAmts[id] = r.getTotal()
+        recIDs.push(id)
+    });
+    console.log("recIDs:")
+    console.log(recIDs)
+
+    let rlReq = newLookupRequest(reqIDs)
+    viewSvc.lookupObjByID(rlReq, {}, (err, resp) => {
+        if (err !== null) {
+            console.log("error:")
+            console.log(err)
+            return
+        }
+        console.log(resp)
+        let res = resp.getResultsList()
+        let recipientsString = ""
+        let i = 1
+        res.forEach(function (r) {
+            let id = r.getId() + ""
+            let bucket = r.getBucket()
+            let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+id
+            let amt = rAmts[id]
+            let txs = recs.txs.get(id)
+            let avg = amt / txs
+            recipientsString += "<li class='list-full-item'>";
+            recipientsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            recipientsString += "</li>"
+            i++
+        })
+        document.querySelector("#recipients-list").innerHTML = recipientsString
+        document.querySelector("#indv-recipients").style.display = "block"
+    })
+}
+
+
+function newLookupRequest(reqIDs) {
+    let req = new LookupRequest()
+    req.setUid("test007")
+    req.setObjectidsList(reqIDs)
+    return req
+}
+
+// END VIEW OBJECT OPERATIONS
 
 // HELPER FUNCTIONS
 function createNode(ele) {

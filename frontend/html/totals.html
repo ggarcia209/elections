@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cash Flow FEC</title>
 <!-- Bootstrap -->
-<link href="css/bootstrap-4.4.1.css" rel="stylesheet">
-<link href="css/site_styles.css" rel="stylesheet" type="text/css">
+<link href="../css/bootstrap-4.4.1.css" rel="stylesheet">
+<link href="../css/site_styles.css" rel="stylesheet" type="text/css">
 </head>
 
 <body id="main" class="body-main rankings-page" style="padding-top: 70px">
@@ -18,8 +18,8 @@
   <div class="collapse navbar-collapse" id="navbarSupportedContent1">
     <ul class="navbar-nav mr-auto">
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/">Home</a> </li>
-      <li class="nav-item active"> <a class="nav-link" href="http://localhost:8081/rankings/?year=2020&category=cmte_tx_data-rec">Rankings</a> </li>
-		<li class="nav-item"> <a class="nav-link" href="http://localhost:8081/yearly-totals">Totals<span class="sr-only">(current)</span></a> </li>		
+      <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/rankings/?year=2020&category=cmte_tx_data-rec">Rankings</a> </li>
+		<li class="nav-item active"> <a class="nav-link" href="http://localhost:8081/totals/?year=2020&category=rec">Totals<span class="sr-only">(current)</span></a> </li>		
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/about">About</a> </li>
     </ul>
     <form action="/search-results/" class="form-inline my-2 my-lg-0" method="GET">
@@ -30,10 +30,10 @@
 </nav>
 <div class="content-main">
   <h1 class="header-welcome">Yearly Totals</h1>
-  <p class="p-welcome">Here you fill find the rankings for different categories. Categories are broken down into the Top 100 Individuals, Committees, and Candidates by  total funds received and total funds contributed and/or  spent. The Committee and Candidate categories are broken down further by political party, including Democrat,  Republican, Independent/Non-Affiliated, and Other. View the rankings for each election cycle, or view the Top 100 of All Time. Results will appear below after making a selection and clicking Go.&nbsp; &nbsp;&nbsp;</p>
+  <p class="p-welcome">Here you will find the rankings for different categories. Categories are broken down into the Top 100 Individuals, Committees, and Candidates by  total funds received and total funds contributed and/or  spent. The Committee and Candidate categories are broken down further by political party, including Democrat,  Republican, Independent/Non-Affiliated, and Other. View the rankings for each election cycle, or view the Top 100 of All Time. Results will appear below after making a selection and clicking Go.&nbsp; &nbsp;&nbsp;</p>
   <div class="rankings-selectors">
     <h3 class="selectors-header">Select Year and Category</h3>
-    <form action="/rankings/" method="GET" class="rankings-input">
+    <form action="/totals/" method="GET" class="rankings-input">
       <fieldset class="rankings-fields">
         <div class="selector">
           <label for="yr-select" class="selector-component">Year:</label>
@@ -78,8 +78,12 @@
     </form>
   </div>
   <div class="results-div">
-    <h3 class="results-header"> Results</h3>
-    <div class="results">
+    <h3 class="results-header">Results</h3>
+    <h4 class="header-sub-about" id="yt-list-hdr"></h4>
+    <div class="list-full-div" id='yt-list-div'>
+		<ul class="list-full" id="yt-list">
+      <!---- ----->
+		</ul>
   </div>
 	</div>
 </div>
