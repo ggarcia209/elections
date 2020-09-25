@@ -2,6 +2,8 @@ package indexing
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -19,11 +21,13 @@ type resultList struct {
 }
 
 // save new Index entries
-func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
-	i := 0 // new terms
-	u := 0 // updated terms
-	n := 0 // new IDs/Search Data pairs wrote
+func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, error) {
+	var t int64 // new terms
+	var u int64 // updated terms
+	var n int64 // new IDs/Search Data pairs wrote
 	wrote := make(map[string]bool)
+	shards := make(map[string]float32) // number of shards for sharded term - keys will appears as: 'term', 'term.1', 'term.2', etc...
+	maxSize := 90000                   // # of IDs (max size @ 4b/ID)
 	fmt.Println("save index - writing objects to db/search_index.db")
 
 	// open/create bucket in db/offline_db.db
@@ -32,13 +36,16 @@ func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
-		return i, fmt.Errorf("saveIndex failed: %v", err)
+		return 0, 0, fmt.Errorf("saveIndex failed: %v", err)
 	}
 
 	// persist inverted index
 	// add/update each term for each partition
 	for prt, terms := range index {
-		// tx
+		fmt.Printf("writing partition '%s' - %d items...\n", prt, len(terms))
+		newShards := make(map[string][]string)
+
+		// 1st tx set
 		if err := db.Update(func(tx *bolt.Tx) error {
 			b, err := tx.CreateBucketIfNotExists([]byte(prt))
 			if err != nil {
@@ -46,89 +53,225 @@ func saveIndex(index indexMap, lookup lookupPairs) (int, error) {
 				return fmt.Errorf("tx failed failed: %v", err)
 			}
 
+			// begin sharding logic
+			// merge new list of IDs with existing data for each term
+			// create/re-create shards if necessary
+			// existing shards are recreated from aggregate total of existingShards[i:]
 			for term, ids := range terms {
-				// get previous data
-				prevData := b.Get([]byte(term))
+				// begin aggregate existing data logic
+				si := 0 // shard index
+				sort.Strings(ids)
+				comp := ids[0] // compare to greatest value in each shard to find corresponding index
 
-				if prevData != nil { // previous data exists
-					prev, err := decodeResultsList(prevData)
-					if err != nil {
-						fmt.Println(err)
-						return fmt.Errorf("tx failed failed: %v", err)
+				if id.Shards[term] != 0 { // shards exist for term
+					fmt.Printf("existing shards found for '%s': %.0f\n", term, id.Shards[term])
+					totalPrev := []string{} // aggregate total from shards
+					key := term             // shardID
+					prTotal := 0            // previous # of IDs in shards[i:]
+
+					// get aggregate data from existing shards
+					for i := 0; i < int(id.Shards[term]+1.0); i++ {
+						if i > 0 {
+							key = term + "." + strconv.Itoa(i)
+							fmt.Println("existing shard found: ", key)
+						}
+						// get previous data & check each partition for appropriate index of new key
+						// (store key in byte-sorted/alphabetical order)
+						prevData := b.Get([]byte(key))
+						prev, err := decodeResultsList(prevData)
+						if err != nil {
+							fmt.Println(err)
+							return fmt.Errorf("tx failed failed: %v", err)
+						}
+						max := prev[len(prev)-1]
+						fmt.Printf("\tcomp: %s\tmax: %s\n", comp, max)
+						if comp > max && len(prev) >= maxSize {
+							// if term out of range && partition is full - skip
+							// item indexes of preceeding shards remain unchanged
+							fmt.Println("skipping partition: ", si)
+							si++ // increment for every preceeding shard
+							continue
+						}
+						// add shard to aggregate total for re-ordering
+						totalPrev = append(totalPrev, prev...)
+						prTotal += len(prev)
+						fmt.Printf("added %d IDs for '%s'\n", len(prev), term)
 					}
 
-					// update & overwrite with updated copy
-					update := mergeIDs(ids, prev)
-					r := resultList{Results: update}
-					data, err := encodeResultsList(r)
-					if err := b.Put([]byte(term), data); err != nil { // serialize k,v
-						return fmt.Errorf("tx failed failed: %v", err)
-					}
+					// create set of new/existing IDs and update index
+					update := mergeIDs(ids, totalPrev)
+					terms[term] = update
+					shards[term] = float32(si) // new shards created at this index
+					fmt.Println("previous total: ", prTotal)
+					fmt.Println("new total: ", len(update))
+					fmt.Printf("creating new shards for term '%s' at index %d\n", term, si)
 					u++
-				} else { // new term - no existing data
-					r := resultList{Results: ids}
-					data, err := encodeResultsList(r)
-					if err != nil {
-						fmt.Println(err)
-						return fmt.Errorf("tx failed failed: %v", err)
+				} else { // no existing shards
+					// get previous data
+					prevData := b.Get([]byte(term))
+					if prevData != nil { // existing term entry
+						prev, err := decodeResultsList(prevData)
+						if err != nil {
+							fmt.Println(err)
+							return fmt.Errorf("tx failed failed: %v", err)
+						}
+						// create ID set and update index
+						update := mergeIDs(ids, prev)
+						terms[term] = update
+						u++
+					} else { // new term entry, no shards; sort IDs
+						empty := []string{}
+						sorted := mergeIDs(ids, empty)
+						terms[term] = sorted
+						t++
 					}
-					if err := b.Put([]byte(term), data); err != nil { // serialize k,v
-						return fmt.Errorf("tx failed failed: %v", err)
-					}
-					i++
-				}
+				} // end aggregate existing data logic
 
+				// create new shards if len(ids) > maxSize
+				// recreate shards at index if new ID's added to existing shard
+				l := len(terms[term])
+				if l > maxSize {
+					fmt.Printf("maxSize exceeded for term '%s' (%d)\n", term, l)
+					orig := terms[term]
+					shard := term
+					if shards[term] > 0 {
+						shard = shard + "." + strconv.Itoa(int(shards[term]))
+						delete(terms, term) // delete unsharded term from map if not overwriting in current function call
+					}
+					j := 0
+					for i, ID := range orig {
+						// add IDs to each shard; incremement shardID for every maxSize items
+						if i == maxSize*(j+1) {
+							j++
+							shards[term]++
+							shard = term + "." + strconv.Itoa(int(shards[term])) // new shard
+							fmt.Println("saveIndex: new list shard ", shard)
+						}
+						newShards[shard] = append(newShards[shard], ID)
+					}
+				} else if shards[term] > 0 { // shard index > 0; total items < maxSize
+					shard := term + "." + strconv.Itoa(int(shards[term]))
+					newShards[shard] = terms[term]
+					delete(terms, term)
+				}
+			} // end shard creation logic
+
+			// merge shards with index
+			for shard, list := range newShards {
+				index[prt][shard] = list
+			}
+			// end sharding logic
+
+			// encode ID lists and save to disk
+			for term, ids := range terms {
+				r := resultList{Results: ids}
+				data, err := encodeResultsList(r)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("tx failed failed: %v", err)
+				}
+				if err := b.Put([]byte(term), data); err != nil { // serialize k,v
+					return fmt.Errorf("tx failed failed: %v", err)
+				}
+				// delete(terms, term) // delete from memory once persisted; drain pressure on memory
 			}
 			return nil
 		}); err != nil {
 			fmt.Println(err)
-			return i, fmt.Errorf("saveIndex failed: %v", err)
+			return 0, 0, fmt.Errorf("saveIndex failed: %v", err)
 		}
 	}
+	// end 1st tx set
 
-	// check if SearchData persisted for corresponding ID; write new if not exist
-	// 2nd transaction
+	// write lookup objects to disk (90,000 max per iteration)
+	// 2nd transaction set
+	k := 0
+	sds := []*SearchData{}
+	for _, sd := range lookup {
+		limit := 90000 // limit to 90000 items per tx (90% of recommended max per BoltDB docs)
+		if k == limit {
+			sn, err := batchWriteLookup(db, sds, n, wrote)
+			if err != nil {
+				fmt.Println(err)
+				return 0, 0, fmt.Errorf("saveIndex failed: %v", err)
+			}
+			sds = []*SearchData{} // reset after batch write
+			k = 0                 // reset
+			n += sn
+		}
+		sds = append(sds, sd)
+		k++
+	}
+	// write remainder of SearchData objects
+	sn, err := batchWriteLookup(db, sds, n, wrote)
+	if err != nil {
+		fmt.Println(err)
+		return 0, 0, fmt.Errorf("saveIndex failed: %v", err)
+	}
+	n += sn
+
+	// merge shard counts with id.Shards
+	for shard, count := range shards {
+		if id.Shards == nil {
+			id.Shards = make(map[string]float32)
+		}
+		id.Shards[shard] = count
+	}
+
+	fmt.Println("index saved!")
+	fmt.Println("new terms wrote: ", t)
+	fmt.Println("existing terms: ", u)
+	fmt.Println("IDs recorded/updated: ", n)
+	fmt.Println()
+	return int(n), int(t), nil
+}
+
+// batch writes list of *SearchData objects to disk in single transaction
+func batchWriteLookup(db *bolt.DB, sds []*SearchData, n int64, wrote map[string]bool) (int64, error) {
+	// tx
 	if err := db.Update(func(tx *bolt.Tx) error {
-		for ID, sd := range lookup {
+		for _, sd := range sds {
 			// check if wrote to disk previously
-			if wrote[ID] == false { // not wrote to disk in this function call
+			if wrote[sd.ID] == false { // not wrote to disk in parent function call
 				luB, err := tx.CreateBucketIfNotExists([]byte("lookup"))
 				if err != nil {
 					fmt.Println(err)
 					return fmt.Errorf("tx failed failed: %v", err)
 				}
-				prevData := luB.Get([]byte(ID))
+				prevData := luB.Get([]byte(sd.ID))
 				if prevData != nil {
 					prev, err := decodeSearchData(prevData)
 					if err != nil {
 						fmt.Println()
 						return fmt.Errorf("tx failed: %v", err)
 					}
+					// reconcile "Unknown" records (entity not registered in current year)
 					sd.Years = append(sd.Years, prev.Years...)
-				}
+					if sd.Name == "Unknown" {
+						sd.Name = prev.Name
+						sd.City = prev.City
+						sd.State = prev.State
+						sd.Employer = prev.Employer
+						sd.Bucket = prev.Bucket
+					}
+				} // else { n++ }
 				data, err := encodeSearchData(sd)
 				if err != nil {
 					fmt.Println()
 					return fmt.Errorf("tx failed: %v", err)
 				}
-				if err := luB.Put([]byte(ID), data); err != nil { // serialize k,v
+				if err := luB.Put([]byte(sd.ID), data); err != nil { // serialize k,v
 					return fmt.Errorf("tx failed failed: %v", err)
 				}
-				n++
-				wrote[ID] = true
+				wrote[sd.ID] = true
 			}
 		}
 		return nil
 	}); err != nil {
 		fmt.Println(err)
-		return i, fmt.Errorf("saveIndex failed: %v", err)
+		return n, fmt.Errorf("batchWriteLookup failed: %v", err)
 	}
-	fmt.Println("index saved!")
-	fmt.Println("new terms wrote: ", i)
-	fmt.Println("existing terms: ", u)
-	fmt.Println("IDs recorded/updated: ", n)
-	fmt.Println()
-	return i, nil
+	return n, nil
 }
 
 // get lookup pairs from disk for given term
@@ -139,7 +282,7 @@ func getSearchEntry(term string) ([]SearchData, error) {
 	defer db.Close()
 	if err != nil {
 		fmt.Println(err)
-		return []SearchData{}, fmt.Errorf("getIndexData failed: %v", err)
+		return []SearchData{}, fmt.Errorf("getSearchEntry failed: %v", err)
 	}
 
 	var data []byte
@@ -186,7 +329,9 @@ func getSearchData(db *bolt.DB, ids []string) ([]SearchData, error) {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
 			}
-			results = append(results, *sd)
+			if sd.Bucket != "" { // not nil item
+				results = append(results, *sd)
+			}
 		}
 		return nil
 	}); err != nil {
@@ -326,12 +471,13 @@ func getPartitionMap() (map[string]bool, error) {
 // encode SearchData to protobuf
 func encodeSearchData(sd *SearchData) ([]byte, error) {
 	entry := &protobuf.SearchResult{
-		ID:     sd.ID,
-		Name:   sd.Name,
-		City:   sd.City,
-		State:  sd.State,
-		Bucket: sd.Bucket,
-		Years:  sd.Years,
+		ID:       sd.ID,
+		Name:     sd.Name,
+		City:     sd.City,
+		State:    sd.State,
+		Bucket:   sd.Bucket,
+		Employer: sd.Employer,
+		Years:    sd.Years,
 	}
 	data, err := proto.Marshal(entry)
 	if err != nil {
@@ -350,12 +496,13 @@ func decodeSearchData(input []byte) (*SearchData, error) {
 		return &SearchData{}, fmt.Errorf("decodeSearchData failed: %v", err)
 	}
 	sd := &SearchData{
-		ID:     sr.GetID(),
-		Name:   sr.GetName(),
-		City:   sr.GetCity(),
-		State:  sr.GetState(),
-		Bucket: sr.GetBucket(),
-		Years:  sr.GetYears(),
+		ID:       sr.GetID(),
+		Name:     sr.GetName(),
+		City:     sr.GetCity(),
+		State:    sr.GetState(),
+		Employer: sr.GetEmployer(),
+		Bucket:   sr.GetBucket(),
+		Years:    sr.GetYears(),
 	}
 	return sd, nil
 }
@@ -403,14 +550,18 @@ func mergeIDs(new, prev []string) []string {
 	for ID := range set {
 		update = append(update, ID)
 	}
+	sort.Strings(update)
 	return update
 }
 
 // encode IndexData to protobuf
 func encodeIndexData(id *IndexData) ([]byte, error) {
 	entry := &protobuf.IndexData{
-		Size:      float32(id.Size),
-		Completed: id.Completed,
+		TermsSize:      float32(id.TermsSize),
+		LookupSize:     float32(id.LookupSize),
+		Completed:      id.Completed,
+		Shards:         id.Shards,
+		YearsCompleted: id.YearsCompleted,
 	}
 	ts, err := ptypes.TimestampProto(id.LastUpdated)
 	if err != nil {
@@ -435,8 +586,11 @@ func decodeIndexData(raw []byte) (*IndexData, error) {
 		return &IndexData{}, fmt.Errorf("decodeIndexData failed: %v", err)
 	}
 	id := &IndexData{
-		Size:      int(data.GetSize()),
-		Completed: data.GetCompleted(),
+		TermsSize:      int(data.GetTermsSize()),
+		LookupSize:     int(data.GetLookupSize()),
+		Completed:      data.GetCompleted(),
+		Shards:         data.GetShards(),
+		YearsCompleted: data.GetYearsCompleted(),
 	}
 	if data.GetLastUpdated() == nil {
 		id.LastUpdated = time.Now()

@@ -44,7 +44,7 @@ func SearchData(txt string) ([]string, error) {
 	// get query from user / return & print results
 	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
 	q := indexing.CreateQuery(txt, "user")
-	common, err := indexing.GetResults(q)
+	common, err := indexing.GetResultsFromShards(q)
 	if err != nil {
 		if err.Error() == "MAX_LENGTH" {
 			return []string{}, err
@@ -731,12 +731,7 @@ func getCmteCodes(d, t, p string) (string, string, string) {
 	return dsgn[d], types[t], parties[p]
 }
 
-func getCandCodes(o, p string) (string, string) {
-	var office = map[string]string{
-		"H": "House",
-		"S": "Senate",
-		"P": "President",
-	}
+func getCandCodes(p, o string) (string, string) {
 	var parties = map[string]string{
 		"ACE": "Ace Party",
 		"AKI": "Alaskan Independence Party",
@@ -833,6 +828,11 @@ func getCandCodes(o, p string) (string, string) {
 		"VET": "Veterans Party",
 		"WTP": "We the People",
 		"W":   "Write-In",
+	}
+	var office = map[string]string{
+		"H": "House",
+		"S": "Senate",
+		"P": "President",
 	}
 	return parties[p], office[o]
 }

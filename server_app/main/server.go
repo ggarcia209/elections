@@ -121,10 +121,9 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 	txt := in.GetText()
 	common, err := server.SearchData(txt)
 	if err != nil {
-		errMsg := fmt.Errorf("%v\tSearchQuery failed: %v\tUID: %s", time.Now(), err, out.UID)
 		fmt.Println(err)
-		out.Msg = fmt.Sprintf("%s", errMsg)
-		return out, errMsg
+		out.Msg = fmt.Sprintf("%s", err.Error())
+		return out, err
 	}
 	sds, err := server.GetSearchResults(common, searchDataCache)
 	if err != nil {
@@ -138,12 +137,13 @@ func (s *viewServer) SearchQuery(ctx context.Context, in *pb.SearchRequest) (*pb
 	var results []*pb.SearchResult
 	for _, sd := range sds {
 		res := &pb.SearchResult{
-			ID:     sd.ID,
-			Bucket: sd.Bucket,
-			Name:   sd.Name,
-			City:   sd.City,
-			State:  sd.State,
-			Years:  sd.Years,
+			ID:       sd.ID,
+			Bucket:   sd.Bucket,
+			Name:     sd.Name,
+			City:     sd.City,
+			State:    sd.State,
+			Employer: sd.Employer,
+			Years:    sd.Years,
 		}
 		results = append(results, res)
 	}

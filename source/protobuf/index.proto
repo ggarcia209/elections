@@ -24,10 +24,12 @@ message LookupMap {
 }
 
 message IndexData {
-    float Size = 1;
-    google.protobuf.Timestamp LastUpdated = 2;
-    map<string, bool> Completed = 3;
-    map<string, float> Shards = 4;
+    float TermsSize = 1;
+    float LookupSize = 2;
+    google.protobuf.Timestamp LastUpdated = 3;
+    map<string, bool> Completed = 4;
+    map<string, float> Shards = 5;
+    repeated string YearsCompleted = 6;
 }
 
 message PartitionMap {

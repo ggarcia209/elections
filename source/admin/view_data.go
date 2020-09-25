@@ -35,6 +35,7 @@ func ViewMenu() error {
 		"View Top Rankings",
 		"View Yearly Totals",
 		"View Search Index",
+		"View Index Metadata",
 		"Query DyanamoDB",
 		"Return to Main Menu",
 	}
@@ -84,6 +85,12 @@ func ViewMenu() error {
 			}
 		case menu.OptionsMap[ch] == "View Search Index":
 			err := indexing.ViewIndex()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("ViewMenu failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "View Index Metadata":
+			err := viewIndexData()
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("ViewMenu failed: %v", err)
@@ -144,18 +151,23 @@ func queryData() error {
 			fmt.Println(err)
 			return fmt.Errorf("searchData failed: %v", err)
 		}
+		sds, err := indexing.LookupSearchData(res)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("searchData failed: %v", err)
+		}
 		resMap := make(map[string]indexing.SearchData)
 
 		// crate submenus for selecting dataset from search results
 		options := []string{"exit"}
-		for _, sd := range res {
-			resMap[sd.ID] = sd
+		for _, sd := range sds {
 			optn := sd.ID + " " + sd.Name + " " + sd.City + ", " + sd.State
 			options = append(options, optn)
+			resMap[sd.ID] = sd
 		}
 		idsSubmenu := ui.CreateMenu("admin-search-results", options)
 		for {
-			printResults(res)
+			printResults(sds)
 			fmt.Println("Choose an ID from the list to view more info or choose 'exit' to return")
 			chID, err := ui.Ask4MenuChoice(idsSubmenu)
 			if err != nil {
@@ -574,6 +586,26 @@ func viewBucket() error {
 			return nil
 		}
 	}
+}
+
+func viewIndexData() error {
+	id, err := indexing.GetIndexData()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("viewIndexData failed: %v", err)
+	}
+	fmt.Println("Index Data")
+	fmt.Println("Terms Size: ", id.TermsSize)
+	fmt.Println("Lookup Size: ", id.LookupSize)
+	fmt.Println("Last Updated: ", id.LastUpdated)
+	fmt.Println("Categories Completed for latest build: ", id.Completed)
+	fmt.Println("Years completed: ", id.YearsCompleted)
+	fmt.Println("Shards: ")
+	for k, v := range id.Shards {
+		fmt.Printf("Term: %s\tShards Created: %.0f\n", k, v)
+	}
+	fmt.Println()
+	return nil
 }
 
 // prints search results

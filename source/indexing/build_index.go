@@ -29,7 +29,8 @@ type SearchData struct {
 
 // IndexData type stores data related to the Index
 type IndexData struct {
-	Size           int
+	TermsSize      int // number of terms in index
+	LookupSize     int // number of lookup objects
 	LastUpdated    time.Time
 	Completed      map[string]bool // track categories completed in event of failure
 	YearsCompleted []string
@@ -62,7 +63,7 @@ func BuildIndex(year string) error {
 	}
 
 	// get user confirmation if new index
-	if len(indexData.Completed) == 0 {
+	if len(indexData.YearsCompleted) == 0 {
 		fmt.Println("*** Build new index? ***")
 		y := ui.Ask4confirm()
 		if !y {
@@ -71,13 +72,14 @@ func BuildIndex(year string) error {
 			return nil
 		}
 		indexData = &IndexData{ // initialize if nil
-			Size:        0,
+			TermsSize:   0,
+			LookupSize:  0,
 			LastUpdated: time.Now(),
 			Completed:   map[string]bool{"individuals": false, "committees": false, "candidates": false},
 		}
 	}
-
 	fmt.Println("index data: ", indexData)
+	fmt.Println()
 
 	// start goroutine to build index from each bucket not yet completed
 	for k, v := range indexData.Completed {
@@ -100,7 +102,7 @@ func BuildIndex(year string) error {
 	wg.Wait()
 
 	// reset map and save
-	indexData.Completed = make(map[string]bool)
+	indexData.Completed = map[string]bool{"individuals": false, "committees": false, "candidates": false}
 	indexData.YearsCompleted = append(indexData.YearsCompleted, year)
 	err = saveIndexData(indexData)
 	if err != nil {
@@ -109,7 +111,8 @@ func BuildIndex(year string) error {
 	}
 
 	fmt.Println("***** INDEX BUILD COMPLETE *****")
-	fmt.Println("items wrote: ", indexData.Size)
+	fmt.Println("terms: ", indexData.TermsSize)
+	fmt.Println("lookup items: ", indexData.LookupSize)
 	fmt.Println()
 
 	return nil
@@ -127,6 +130,9 @@ func UpdateIndex(year, bucket string) error {
 	// re-initialize map if nil
 	if len(id.Completed) == 0 {
 		id.Completed = make(map[string]bool)
+	}
+	if len(id.Shards) == 0 {
+		id.Shards = make(map[string]float32)
 	}
 	fmt.Printf("bucket '%s' updating...\n", bucket)
 
@@ -178,12 +184,12 @@ func indvRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, shards, err := saveIndex(index, lookup)
+	newWrites, newTerms, err := saveIndex(id, index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("indvRtn failed: %v", err)
 	}
-	updateIndexData(id, bucket, newWrites, shards)
+	updateIndexData(id, year, bucket, newWrites, newTerms)
 	err = saveIndexData(id)
 	if err != nil {
 		fmt.Println(err)
@@ -191,6 +197,8 @@ func indvRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 	}
 	mu.Unlock()
 	fmt.Println("individual data saved")
+	fmt.Println("FINISHED -- ", year)
+	fmt.Println()
 	return nil
 }
 
@@ -210,12 +218,12 @@ func cmteRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, shards, err := saveIndex(index, lookup)
+	newWrites, newTerms, err := saveIndex(id, index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("cmteRtn failed: %v", err)
 	}
-	updateIndexData(id, bucket, newWrites, shards)
+	updateIndexData(id, year, bucket, newWrites, newTerms)
 	err = saveIndexData(id)
 	if err != nil {
 		fmt.Println(err)
@@ -242,12 +250,12 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 
 	// update & save
 	mu.Lock()
-	newWrites, shards, err := saveIndex(index, lookup)
+	newWrites, newTerms, err := saveIndex(id, index, lookup)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("candRtn failed: %v", err)
 	}
-	updateIndexData(id, bucket, newWrites, shards)
+	updateIndexData(id, year, bucket, newWrites, newTerms)
 	err = saveIndexData(id)
 	if err != nil {
 		fmt.Println(err)
@@ -258,6 +266,7 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 	return nil
 }
 
+// TEMPORARILY DEPRECATED
 // process top individuals by funds received/sent and add to Index
 func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) error {
 	fmt.Println("processing top individuals...")
@@ -344,11 +353,13 @@ func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) err
 		ids = ids[:len(ids)-n]
 	}
 
+	mu.Lock()
 	err = savePartitionMap(pm)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("getTopIndvData failed: %v", err)
 	}
+	mu.Unlock()
 
 	fmt.Println("partition map saved")
 
@@ -401,6 +412,7 @@ func getObjData(year, bucket string, index indexMap, lookup lookupPairs) error {
 				if index[prt] == nil {
 					index[prt] = make(map[string][]string)
 				}
+				// update maps by reference
 				index[prt][term] = append(index[prt][term], k)
 				lookup[k] = sd
 				pm[prt] = true
@@ -414,11 +426,13 @@ func getObjData(year, bucket string, index indexMap, lookup lookupPairs) error {
 		startKey = currKey
 	}
 
+	mu.Lock()
 	err = savePartitionMap(pm)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("getObjData failed: %v", err)
 	}
+	mu.Unlock()
 
 	fmt.Printf("***** BUILD INDEX - '%s' FINSIHED *****\n", bucket)
 	fmt.Println()
@@ -434,32 +448,35 @@ func createSearchData(year string, objs []interface{}) lookupPairs {
 		switch t := obj.(type) {
 		case *donations.Individual:
 			sd := &SearchData{
-				ID:     obj.(*donations.Individual).ID,
-				Name:   obj.(*donations.Individual).Name,
-				City:   obj.(*donations.Individual).City,
-				State:  obj.(*donations.Individual).State,
-				Bucket: "individuals",
-				Years:  []string{year},
+				ID:       obj.(*donations.Individual).ID,
+				Name:     obj.(*donations.Individual).Name,
+				City:     obj.(*donations.Individual).City,
+				State:    obj.(*donations.Individual).State,
+				Employer: obj.(*donations.Individual).Employer,
+				Bucket:   "individuals",
+				Years:    []string{year},
 			}
 			lookup[sd.ID] = sd
 		case *donations.Committee:
 			sd := &SearchData{
-				ID:     obj.(*donations.Committee).ID,
-				Name:   obj.(*donations.Committee).Name,
-				City:   obj.(*donations.Committee).City,
-				State:  obj.(*donations.Committee).State,
-				Bucket: "committees",
-				Years:  []string{year},
+				ID:       obj.(*donations.Committee).ID,
+				Name:     obj.(*donations.Committee).Name,
+				City:     obj.(*donations.Committee).City,
+				State:    obj.(*donations.Committee).State,
+				Employer: obj.(*donations.Committee).Party,
+				Bucket:   "committees",
+				Years:    []string{year},
 			}
 			lookup[sd.ID] = sd
 		case *donations.Candidate:
 			sd := &SearchData{
-				ID:     obj.(*donations.Candidate).ID,
-				Name:   obj.(*donations.Candidate).Name,
-				City:   obj.(*donations.Candidate).City,
-				State:  obj.(*donations.Candidate).State,
-				Bucket: "candidates",
-				Years:  []string{year},
+				ID:       obj.(*donations.Candidate).ID,
+				Name:     obj.(*donations.Candidate).Name,
+				City:     obj.(*donations.Candidate).City,
+				State:    obj.(*donations.Candidate).State,
+				Employer: obj.(*donations.Candidate).Party,
+				Bucket:   "candidates",
+				Years:    []string{year},
 			}
 			lookup[sd.ID] = sd
 		default:
@@ -476,7 +493,6 @@ func createSearchData(year string, objs []interface{}) lookupPairs {
 func getTerms(sd *SearchData) []string {
 	name := sd.Name
 	city := sd.City
-
 	states := map[string]string{
 		"AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
 		"CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
@@ -492,8 +508,9 @@ func getTerms(sd *SearchData) []string {
 		"WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming",
 	}
 	state := states[sd.State]
+	employer := sd.Employer
 
-	return []string{name, city, state}
+	return []string{name, city, state, employer}
 }
 
 // formatTerms derives and formats search terms from a SearchData object
@@ -501,6 +518,9 @@ func getTerms(sd *SearchData) []string {
 func formatTerms(terms []string) []string {
 	fmtStrs := []string{}
 	for _, term := range terms {
+		if filter(term) {
+			continue
+		}
 		// remove & replace non-alpha-numeric characters and lowercase text
 		reg, err := regexp.Compile("[^a-zA-Z0-9]+") // removes all non alpha-numeric characters
 		if err != nil {
@@ -530,15 +550,16 @@ func getPartition(term string) string {
 }
 
 // update IndexData object
-func updateIndexData(id *IndexData, bucket string, newWrites int, shards map[string]float32) {
-	id.Size += newWrites
+func updateIndexData(id *IndexData, year, bucket string, newWrites, newTerms int) {
+	id.TermsSize += newTerms
+	id.LookupSize += (newWrites * 0) // temporarily disabled
 	id.Completed[bucket] = true
 	id.LastUpdated = time.Now()
-	id.Shards = shards
 	return
 }
 
 // filter generic terms & edge cases ("the", "for", "of", "",)
+// returns true if term meets filter criteria
 func filter(term string) bool {
 	f := map[string]bool{
 		"for": true,
