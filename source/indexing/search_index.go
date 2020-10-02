@@ -5,12 +5,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/elections/source/dynamo"
-
 	"github.com/boltdb/bolt"
+	"github.com/elections/source/dynamo"
 )
 
 // Query uses text from user input to look up corresponding results
@@ -33,9 +31,10 @@ type Entry struct {
 	Data SearchData
 }
 
-// DynamoSearchEntry is used to retrieve a list of IDs from the Index table
-type DynamoSearchEntry struct {
+// SearchEntry is used to store & retreive a Search Index entry
+type SearchEntry struct {
 	Partition string
+	Term      string
 	IDs       []string
 }
 
@@ -82,6 +81,7 @@ func CreateQuery(text, UID string) Query {
 	return q
 }
 
+/*
 // GetResults returns search results to user from user query.
 func GetResults(q Query) ([]string, error) {
 	if q.Text == "" {
@@ -146,11 +146,11 @@ func GetResults(q Query) ([]string, error) {
 	}
 
 	return common, nil
-}
+} */
 
-// GetResults returns search results to user from user query.
+// GetResultsFromShards returns search results from the sharded index stored on disk
 func GetResultsFromShards(q Query) ([]string, error) {
-	stTotal := time.Now()
+	st := time.Now()
 	if q.Text == "" {
 		return []string{}, nil
 	}
@@ -166,15 +166,23 @@ func GetResultsFromShards(q Query) ([]string, error) {
 	common := []string{}                             // aggegate total of intersections for every shard
 	maxResultsSize := 500                            // max number of SearchResults returned before throwing MAX_LENGTH error
 
+	// open db
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("getShard failed: %v", err)
+	}
+	defer db.Close()
+
 	// get IDs for single term
 	if len(terms) == 1 {
 		t := terms[0]
-		if id.Shards[t] > 0 {
+		if id.Shards[t] != nil && id.Shards[t].Shards > 0 {
 			fmt.Println("GetResults failed: MAX_LENGTH exceeded")
 			return []string{}, fmt.Errorf("MAX_LENGTH")
 		}
 		t = strings.TrimSpace(t)
-		ids, err := getShard(t)
+		ids, err := getShard(db, t)
 		if err != nil {
 			fmt.Println(err)
 			return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
@@ -187,54 +195,103 @@ func GetResultsFromShards(q Query) ([]string, error) {
 			}
 			common = append(common, ID)
 		}
-		fmt.Println("finish - ", time.Since(stTotal))
+		fmt.Println("finish - ", time.Since(st))
 		return common, nil
 	}
 
 	// sort terms by # of shards, least to greatest
-	st := time.Now()
 	termsSrt := shardEntries{}
 	for _, t := range terms {
-		se := shardEntry{ID: t, Shards: id.Shards[t]}
+		sh := float32(0)
+		if id.Shards[t] != nil {
+			sh = id.Shards[t].Shards
+		}
+		se := shardEntry{ID: t, Shards: sh}
 		termsSrt = append(termsSrt, se)
 	}
 	sort.Sort(termsSrt)
-	fmt.Println("terms sorted: ", time.Since(st))
 
 	// find intersections of two smallest records - terms[0] & terms[1] (t0, t1)
-	st = time.Now()
-	i0, i1 := termsSrt[0].ID, termsSrt[1].ID
-	k0, k1 := i0, i1
+	i0, i1 := termsSrt[0].ID, termsSrt[1].ID // terms
+	k0, k1 := i0, i1                         // shard keys
+	ct0, ct1 := float32(0.0), float32(0.0)   // number of shards created for each term
+	if id.Shards[i0] != nil {
+		ct0 = id.Shards[i0].Shards
+	}
+	if id.Shards[i1] != nil {
+		ct1 = id.Shards[i1].Shards
+	}
 	// compare each shard (s0) in t0 to each shard in t1 (s1) within min/max range
-	for x := 0; x < int((id.Shards[i0] + 1)); x++ {
+	for x := 0; x < int((ct0 + 1)); x++ {
+		s0 := []string{} // shard IDs - used to store IDs after first disk read call in inner loop
 		if x > 0 {
 			k0 = i0 + "." + strconv.Itoa(x)
 		}
-		s0, err := getShard(k0)
-		if err != nil {
-			fmt.Println(err)
-			return []string{}, fmt.Errorf("getRefs failed: %v", err)
+
+		min0, max0 := "", ""
+		if ct0 == 0 {
+			st1 := time.Now()
+			s0, err = getShard(db, k0)
+			if err != nil {
+				fmt.Println(err)
+				return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
+			}
+			fmt.Println("s0 read time: ", time.Since(st1))
+			min0, max0 = s0[0], s0[len(s0)-1]
+		} else {
+			r0 := id.Shards[i0].Ranges[k0]
+			min0, max0 = r0.Range[0], r0.Range[1] // min, max value of each shard in t1 compared to these values
 		}
-		min0, max0 := s0[0], s0[len(s0)-1] // min, max value of each shard in t1 compared to these values
 
 		// get each shard in t1 (s1), compare to s0 and find intersection
-		for y := 0; y < int((id.Shards[i1] + 1)); y++ {
+		for y := 0; y < int((ct1 + 1)); y++ {
+			s1 := []string{}
 			if y > 0 {
 				k1 = i1 + "." + strconv.Itoa(y)
 			}
-			s1, err := getShard(k1)
-			if err != nil {
-				fmt.Println(err)
-				return []string{}, fmt.Errorf("getRefs failed: %v", err)
+
+			min1, max1 := "", ""
+			if ct1 == 0 {
+				st1 := time.Now()
+				s1, err := getShard(db, k1)
+				if err != nil {
+					fmt.Println(err)
+					return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
+				}
+				fmt.Println("s1 read time: ", time.Since(st1))
+				min1, max1 = s1[0], s1[len(s1)-1]
+			} else {
+				r1 := id.Shards[i1].Ranges[k1]
+				min1, max1 = r1.Range[0], r1.Range[1]
 			}
 
-			// skip shards < min0 value, stop at shard > max0 value
-			min1, max1 := s1[0], s1[len(s1)-1]
 			if min0 > max1 {
+				fmt.Println("skipping shard ", y)
 				continue // skip
 			}
 			if max0 < min1 {
+				fmt.Println("breaking at shard ", y)
 				break // stop
+			}
+
+			if len(s1) == 0 {
+				st1 := time.Now()
+				s1, err = getShard(db, k1)
+				if err != nil {
+					fmt.Println(err)
+					return []string{}, fmt.Errorf("getRefs failed: %v", err)
+				}
+				fmt.Println("s1 read time: ", time.Since(st1))
+			}
+
+			if len(s0) == 0 {
+				st1 := time.Now()
+				s0, err = getShard(db, k0)
+				if err != nil {
+					fmt.Println(err)
+					return []string{}, fmt.Errorf("getRefs failed: %v", err)
+				}
+				fmt.Println("s0 read time: ", time.Since(st1))
 			}
 
 			// find intersection of s0, s1, add to common aggregate total
@@ -242,7 +299,6 @@ func GetResultsFromShards(q Query) ([]string, error) {
 			common = append(common, intsec...)
 		}
 	}
-	fmt.Println("s0, s1 comparision: ", time.Since(st))
 
 	// find intersections of each remaining term
 	for t := 2; t < len(termsSrt); t++ {
@@ -253,62 +309,59 @@ func GetResultsFromShards(q Query) ([]string, error) {
 		k2 := i2
 		buffer := common    // use to find values in common within range of current s1 shard
 		common = []string{} // reset for each term
-		errChan := make(chan error)
-		var wg sync.WaitGroup
-		st = time.Now()
 
-		// get each shard in t1 (s1), compare to s0 and find intersection
-		for z := 0; z < int((id.Shards[i2] + 1)); z++ {
-			wg.Add(1)
-			go func(wg *sync.WaitGroup) {
-				defer wg.Done()
-				if z > 0 {
-					k2 = i2 + "." + strconv.Itoa(z)
-				}
-				st = time.Now()
-				s2, err := getShard(k2)
+		// get each shard in t1 (s1), compare to sc and find intersection
+		sc := []string{} // shard created from common IDs within range of s2
+		ct2 := float32(0.0)
+		if id.Shards[i2] != nil {
+			ct2 = id.Shards[i2].Shards
+		}
+		for z := 0; z < int((ct2 + 1)); z++ {
+			s2 := []string{}
+			if z > 0 {
+				k2 = i2 + "." + strconv.Itoa(z)
+			}
+
+			min2, max2 := "", ""
+			if ct2 == 0 {
+				st1 := time.Now()
+				s2, err = getShard(db, k2)
 				if err != nil {
 					fmt.Println(err)
-					errChan <- err
-					return
+					return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
 				}
-				fmt.Printf("%s - getShard - %v\n", k2, time.Since(st))
-
-				s0 := []string{} // shard created from common IDs within range of s2
-				min1, max1 := s2[0], s2[len(s2)-1]
-
-				st = time.Now()
-				// create comparision shard from buffer IDs within range
-				for _, v := range buffer {
-					if v >= max1 { // no more common values exist
-						break // stop
-					}
-					if v >= min1 {
-						s0 = append(s0, v)
-					}
-				}
-				fmt.Printf("%s - create buffer - %v\n", k2, time.Since(st))
-
-				// find intersection of s0, s2, add to common aggregate total
-				st = time.Now()
-				intsec := intersection(s0, s2)
-				mu.Lock()
-				common = append(common, intsec...)
-				errChan <- nil
-				mu.Unlock()
-				fmt.Printf("%s - intersection - %v\n", k2, time.Since(st))
-				return
-
-			}(&wg)
-			err := <-errChan
-			if err != nil {
-				return []string{}, fmt.Errorf("getResultsFromShards failed: %v", err)
+				fmt.Println("s2 read time: ", time.Since(st1))
+				min2, max2 = s2[0], s2[len(s2)-1]
+			} else {
+				r2 := id.Shards[i2].Ranges[k2]
+				min2, max2 = r2.Range[0], r2.Range[1]
 			}
+
+			// create comparision shard from buffer IDs within range
+			for _, v := range buffer {
+				if v >= max2 { // no more common values exist
+					break // stop
+				}
+				if v >= min2 {
+					sc = append(sc, v)
+				}
+			}
+
+			if len(s2) == 0 {
+				st1 := time.Now()
+				s2, err = getShard(db, k2)
+				if err != nil {
+					fmt.Println(err)
+					return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
+				}
+				fmt.Println("s2 read time: ", time.Since(st1))
+			}
+
+			// find intersection of s0, s2, add to common aggregate total
+			intsec := intersection(sc, s2)
+			common = append(common, intsec...)
 		}
-		// wait for goroutines to finish and sort results
-		wg.Wait()
-		sort.Strings(common)
-		fmt.Println("s2 comparison: ", time.Since(st))
+		sort.Slice(common, func(i, j int) bool { return common[i] < common[j] })
 	}
 
 	fmt.Println("len(common): ", len(common))
@@ -317,7 +370,7 @@ func GetResultsFromShards(q Query) ([]string, error) {
 		return []string{}, fmt.Errorf("MAX_LENGTH")
 	}
 
-	fmt.Println("finish - ", time.Since(stTotal))
+	fmt.Println("finish - ", time.Since(st))
 	return common, nil
 }
 
@@ -452,7 +505,7 @@ func ViewIndex() error {
 	ct := 0
 
 	// get partition map
-	partitions, err := getPartitionMap()
+	partitions, err := GetPartitionMap()
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("ViewIndex failed: %v", err)
@@ -481,6 +534,7 @@ func ViewIndex() error {
 	}
 	defer db.Close()
 
+	totalWCU := 0.0
 	// iterate through each key in each partiton in alphabetical order
 	err = db.View(func(tx *bolt.Tx) error {
 		for _, prt := range es {
@@ -492,8 +546,10 @@ func ViewIndex() error {
 					fmt.Println(err)
 					return fmt.Errorf("tx failed: %v", err)
 				}
-				fmt.Printf("Partition: %s\tTerm: %s\tReferences: %d\n", prt.Prt, k, len(d))
+				fmt.Printf("Partition: %s\tTerm: %s\tReferences: %d\tSize: %d\n", prt.Prt, k, len(d), len(v))
 				ct++
+				wcuPerShard := float64((len(v) / 1000)) // 1KB = 1 WCU
+				totalWCU += wcuPerShard
 			}
 		}
 		return nil
@@ -503,8 +559,71 @@ func ViewIndex() error {
 		return fmt.Errorf("ViewIndex failed: %v", err)
 	}
 
+	rate := 1.25 / 1000000.0
+	price := totalWCU * rate
+	fmt.Println()
+	fmt.Println("***** SCAN FINISHED *****")
+	fmt.Println()
+	fmt.Printf("total price: %.2f\n", price)
+
 	fmt.Println("\nTotal entries: ", ct)
 	return nil
+}
+
+// BatchGetSequential retrieves a sequential list of n objects from the database starting at the given key.
+func BatchGetSequential(bucket, startKey string, n int) ([]interface{}, string, error) {
+	objs := []interface{}{}
+	currKey := startKey
+
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
+	}
+
+	if err := db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte(bucket))
+
+		c := b.Cursor()
+
+		if startKey == "" {
+			skBytes, _ := c.First()
+			startKey = string(skBytes)
+		}
+
+		for k, v := c.Seek([]byte(startKey)); k != nil; k, v = c.Next() {
+			if bucket == "lookup" {
+				obj, err := decodeResultsList(v)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("tx failed: %v", err)
+				}
+				objs = append(objs, obj)
+			} else {
+				res, err := decodeResultsList(v)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("tx failed: %v", err)
+				}
+				obj := SearchEntry{Partition: bucket, Term: string(k), IDs: res}
+				objs = append(objs, obj)
+			}
+			currKey = string(k)
+			if len(objs) == n {
+				break
+			}
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
+	}
+	if len(objs) < n {
+		currKey = ""
+	}
+	return objs, currKey, nil
 }
 
 // GetIndexData retrieves the IndexData search index metadata object from disk
@@ -517,6 +636,7 @@ func GetIndexData() (*IndexData, error) {
 	return id, nil
 }
 
+/*
 // getRefs finds the references for each term in query
 func getRefs(q []string, id *IndexData) (map[string][]string, int, error) {
 	var resultMap = make(map[string][]string)
@@ -539,7 +659,7 @@ func getRefs(q []string, id *IndexData) (map[string][]string, int, error) {
 		key := ""
 		result := []string{}
 		// get ids for each term and any shards
-		for i := 0; i < int(id.Shards[v]+1.0); i++ {
+		for i := 0; i < int(id.Shards[v].Shards+1.0); i++ {
 			err := db.View(func(tx *bolt.Tx) error {
 				b := tx.Bucket([]byte(prt))
 				v = strings.TrimSpace(v)
@@ -572,21 +692,14 @@ func getRefs(q []string, id *IndexData) (map[string][]string, int, error) {
 		resultMap[v] = result
 	}
 	return resultMap, x, nil
-}
+} */
 
 // get ids in single shard
-func getShard(id string) ([]string, error) {
-	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
-	if err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("getShard failed: %v", err)
-	}
-	defer db.Close()
-
+func getShard(db *bolt.DB, id string) ([]string, error) {
 	result := []string{}
 	prt := getPartition(id)
 
-	err = db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(prt))
 		id = strings.TrimSpace(id)
 		data := b.Get([]byte(id))
@@ -617,11 +730,11 @@ func getRefsFromDynamo(db *dynamo.DbInfo, t string, id *IndexData) ([]string, in
 	prt := getPartition(t)
 	key := ""
 	// get aggregate IDs from all shards
-	for i := 0; i < int(id.Shards[t]+1.0); i++ {
+	for i := 0; i < int(id.Shards[t].Shards+1.0); i++ {
 		t = strings.TrimSpace(t)
 		key = t
 		if i > 0 {
-			key = t + "." + strconv.Itoa(int(id.Shards[t]))
+			key = t + "." + strconv.Itoa(int(id.Shards[t].Shards))
 		}
 		query := dynamo.CreateNewQueryObj(prt, key)
 
@@ -633,7 +746,7 @@ func getRefsFromDynamo(db *dynamo.DbInfo, t string, id *IndexData) ([]string, in
 			fmt.Println(err)
 			return result, x, fmt.Errorf("Query failed: %v", err)
 		}
-		ids := obj.(DynamoSearchEntry).IDs // check
+		ids := obj.(SearchEntry).IDs // check
 		if len(ids) == 0 {
 			fmt.Println("no IDs found for term: ", t)
 			x++

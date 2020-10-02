@@ -146,7 +146,7 @@ func queryData() error {
 		fmt.Println("*** Search ***")
 		txt := ui.GetQuery()
 		q := indexing.CreateQuery(txt, "local_admin")
-		res, err := indexing.GetResults(q)
+		res, err := indexing.GetResultsFromShards(q)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("searchData failed: %v", err)
@@ -227,6 +227,7 @@ func queryData() error {
 			return nil
 		}
 	}
+	return nil
 }
 
 func lookupByID() error {
@@ -602,7 +603,7 @@ func viewIndexData() error {
 	fmt.Println("Years completed: ", id.YearsCompleted)
 	fmt.Println("Shards: ")
 	for k, v := range id.Shards {
-		fmt.Printf("Term: %s\tShards Created: %.0f\n", k, v)
+		fmt.Printf("Term: %s\tShards Created: %v\n", k, v)
 	}
 	fmt.Println()
 	return nil
@@ -833,7 +834,6 @@ func printSortedRankings(r *donations.TopOverallData, sorted util.SortedTotalsMa
 
 	ids := []string{}
 	for _, e := range sorted {
-		// sfmt.Printf("ID: %s\tTotal: %.2f\n", e.ID, e.Total)
 		ids = append(ids, e.ID)
 	}
 	sds, err := indexing.LookupSearchData(ids)

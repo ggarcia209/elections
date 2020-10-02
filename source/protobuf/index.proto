@@ -28,8 +28,18 @@ message IndexData {
     float LookupSize = 2;
     google.protobuf.Timestamp LastUpdated = 3;
     map<string, bool> Completed = 4;
-    map<string, float> Shards = 5;
+    map<string, ShardRanges> Shards = 5;
     repeated string YearsCompleted = 6;
+}
+
+message ShardRanges {
+    string Term = 1;
+    float Shards = 2;
+    map<string, Range> Ranges = 3;
+}
+
+message Range {
+    repeated string Range = 1;
 }
 
 message PartitionMap {

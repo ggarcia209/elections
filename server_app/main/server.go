@@ -544,7 +544,7 @@ func (s *viewServer) ViewCandidate(ctx context.Context, in *pb.GetCandRequest) (
 	}
 	out.Candidate = &candPb
 
-	obj, err = server.GetObjectFromDisk(year, in.GetObjectID(), "cmpn_fin")
+	/* obj, err = server.GetObjectFromDisk(year, in.GetObjectID(), "cmpn_fin")
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tViewCandidate failed: %v\tUID: %s", time.Now(), err, out.UID)
 		fmt.Println(errMsg)
@@ -585,7 +585,9 @@ func (s *viewServer) ViewCandidate(ctx context.Context, in *pb.GetCandRequest) (
 		out.Msg = "SUCCESS"
 	} else { // record does not exist for specified committee
 		out.Msg = "SUCCESS_NO_FIN"
-	}
+	} */
+
+	out.Msg = "SUCCESS"
 
 	return out, nil
 }

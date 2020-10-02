@@ -16,8 +16,23 @@ import (
 // OUTPUT_PATH is used to set the directory to write the search index to
 var OUTPUT_PATH string
 
+// list wrapped in struct for protobuf encoding
 type resultList struct {
-	Results []string
+	Results []string // new/updated ID references for given term encoded as Big Endian uint64s
+}
+
+type shardMap map[string]*shardRanges // schema: term: shards: range (min, max)
+
+// data for shards for each term in shardMap
+type shardRanges struct {
+	Term   string                // original search term
+	Shards float32               // number of shards for given term
+	Ranges map[string]rangeTuple // min, max value for each shard (ID = string(shardIndex))
+}
+
+// list wrapped in struct for protobuf encoding
+type rangeTuple struct {
+	Range []string // (min, max)
 }
 
 // save new Index entries
@@ -25,9 +40,11 @@ func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, err
 	var t int64 // new terms
 	var u int64 // updated terms
 	var n int64 // new IDs/Search Data pairs wrote
+	// uints := make(map[string]map[string][]string) // store big endian encoded IDs for each shard
 	wrote := make(map[string]bool)
-	shards := make(map[string]float32) // number of shards for sharded term - keys will appears as: 'term', 'term.1', 'term.2', etc...
-	maxSize := 90000                   // # of IDs (max size @ 4b/ID)
+	shards := make(shardMap) // shardMap buffer object
+	maxSize := 1250          // # of IDs (max size @ 4b/ID)
+	ns := "!"                // indicates max value not set for shard (shard incomplete)
 	fmt.Println("save index - writing objects to db/search_index.db")
 
 	// open/create bucket in db/offline_db.db
@@ -63,45 +80,85 @@ func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, err
 				sort.Strings(ids)
 				comp := ids[0] // compare to greatest value in each shard to find corresponding index
 
-				if id.Shards[term] != 0 { // shards exist for term
-					fmt.Printf("existing shards found for '%s': %.0f\n", term, id.Shards[term])
-					totalPrev := []string{} // aggregate total from shards
-					key := term             // shardID
-					prTotal := 0            // previous # of IDs in shards[i:]
+				if id.Shards[term] != nil && id.Shards[term].Shards != 0 { // shards exist for term
+					fmt.Printf("existing shards found for '%s': %.0f\n", term, id.Shards[term].Shards)
+					totalPrev := []string{}  // aggregate total from shards
+					key := term              // shardID
+					prTotal := 0             // previous # of IDs in shards[i:]
+					if shards[term] == nil { // re-initialize buffer object
+						shards[term] = &shardRanges{
+							Term:   term,
+							Shards: 0,
+							Ranges: make(map[string]rangeTuple),
+						}
+					}
 
 					// get aggregate data from existing shards
-					for i := 0; i < int(id.Shards[term]+1.0); i++ {
+					for i := 0; i < int(id.Shards[term].Shards+1.0); i++ {
 						if i > 0 {
 							key = term + "." + strconv.Itoa(i)
-							fmt.Println("existing shard found: ", key)
 						}
-						// get previous data & check each partition for appropriate index of new key
-						// (store key in byte-sorted/alphabetical order)
-						prevData := b.Get([]byte(key))
-						prev, err := decodeResultsList(prevData)
-						if err != nil {
-							fmt.Println(err)
-							return fmt.Errorf("tx failed failed: %v", err)
+						max := ns
+						if id.Shards[term].Ranges[key].Range[1] != ns { // shard is full and max value set
+							max = id.Shards[term].Ranges[key].Range[1]
 						}
-						max := prev[len(prev)-1]
-						fmt.Printf("\tcomp: %s\tmax: %s\n", comp, max)
-						if comp > max && len(prev) >= maxSize {
+
+						// compare max value of full shards, skip if below threshold
+						if max != ns && comp > max {
 							// if term out of range && partition is full - skip
 							// item indexes of preceeding shards remain unchanged
 							fmt.Println("skipping partition: ", si)
 							si++ // increment for every preceeding shard
 							continue
 						}
+
+						prevData := b.Get([]byte(key))
+						prev, err := decodeResultsList(prevData)
+						if err != nil {
+							fmt.Println(err)
+							return fmt.Errorf("tx failed failed: %v", err)
+						}
+
+						// DEBUGGING
+						if len(prev) == 0 {
+							fmt.Println("!!! EMPTY SHARD")
+						}
+						if i < int(id.Shards[term].Shards) && len(prev) < maxSize {
+							fmt.Println(" !!! INCOMPLETE SHARD")
+						}
+						/* repeats := make(map[string]bool)
+						for _, ID := range prev {
+							repeats[ID] = true
+						}
+						if len(repeats) < len(prev) {
+							fmt.Println("!!! INTERSHARD REPEATS FOUND")
+							fmt.Println("original len: ", len(prev))
+							fmt.Println("intershard set", len(repeats))
+						} */
+
 						// add shard to aggregate total for re-ordering
 						totalPrev = append(totalPrev, prev...)
 						prTotal += len(prev)
-						fmt.Printf("added %d IDs for '%s'\n", len(prev), term)
 					}
+
+					// debugging
+					/* repeats := make(map[string]bool)
+					r := 0
+					for _, ID := range totalPrev {
+						if repeats[ID] == true {
+							r++
+						}
+						repeats[ID] = true
+					}
+					if r != 0 {
+						fmt.Println("!!! REPEATS: ", r)
+					} */
 
 					// create set of new/existing IDs and update index
 					update := mergeIDs(ids, totalPrev)
 					terms[term] = update
-					shards[term] = float32(si) // new shards created at this index
+					shards[term].Shards = float32(si) // new shards created at this index
+
 					fmt.Println("previous total: ", prTotal)
 					fmt.Println("new total: ", len(update))
 					fmt.Printf("creating new shards for term '%s' at index %d\n", term, si)
@@ -134,46 +191,73 @@ func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, err
 					fmt.Printf("maxSize exceeded for term '%s' (%d)\n", term, l)
 					orig := terms[term]
 					shard := term
-					if shards[term] > 0 {
-						shard = shard + "." + strconv.Itoa(int(shards[term]))
-						delete(terms, term) // delete unsharded term from map if not overwriting in current function call
+					if shards[term] == nil { // previous IDs = 0 shards; + newIDs = 1+ shards
+						shards[term] = &shardRanges{
+							Term:   term,
+							Shards: 0,
+							Ranges: make(map[string]rangeTuple),
+						}
+					}
+					if shards[term].Shards > 0 { // new shard created at index > 0
+						shard = shard + "." + strconv.Itoa(int(shards[term].Shards))
+						delete(terms, term) // delete original term from map to prevent overwrite of index 0
 					}
 					j := 0
+					min, max := "", ns // min, max values of every shard ("!" indicates max value not set/shard incomplete)
 					for i, ID := range orig {
+						if i == 0 { // set min value of first shard (shards[term])
+							min = ID
+							shards[term].Ranges[shard] = rangeTuple{[]string{min, max}}
+							fmt.Println("new list shard ", shard)
+						}
 						// add IDs to each shard; incremement shardID for every maxSize items
 						if i == maxSize*(j+1) {
 							j++
-							shards[term]++
-							shard = term + "." + strconv.Itoa(int(shards[term])) // new shard
-							fmt.Println("saveIndex: new list shard ", shard)
+							// update data for current shard
+							max = orig[i-1] // set new max for current shard
+							shards[term].Ranges[shard].Range[1] = max
+							// create new shard
+							shards[term].Shards++
+							shard = term + "." + strconv.Itoa(int(shards[term].Shards)) // new shard
+							min = orig[i]                                               // set new min value
+							shards[term].Ranges[shard] = rangeTuple{[]string{min, ns}}
+							fmt.Println("new list shard ", shard)
 						}
 						newShards[shard] = append(newShards[shard], ID)
 					}
-				} else if shards[term] > 0 { // shard index > 0; total items < maxSize
-					shard := term + "." + strconv.Itoa(int(shards[term]))
+					fmt.Println()
+				} else if shards[term] != nil && shards[term].Shards > 0 { // shard index > 0; total items < maxSize (partial shard added to existing shard)
+					shard := term + "." + strconv.Itoa(int(shards[term].Shards)) // find current shard index
+					min := terms[term][0]
+					shards[term].Ranges[shard] = rangeTuple{[]string{min, ns}}
 					newShards[shard] = terms[term]
-					delete(terms, term)
+					delete(terms, term) // delete shard from original to prevent overwrite of index 0
+				} else {
+					// new entries
+					// no previous shards, new IDs < maxLength
+					// no change
 				}
 			} // end shard creation logic
 
 			// merge shards with index
 			for shard, list := range newShards {
-				index[prt][shard] = list
+				terms[shard] = list
+				delete(newShards, shard)
 			}
 			// end sharding logic
 
 			// encode ID lists and save to disk
-			for term, ids := range terms {
+			for shard, ids := range terms {
 				r := resultList{Results: ids}
 				data, err := encodeResultsList(r)
 				if err != nil {
 					fmt.Println(err)
 					return fmt.Errorf("tx failed failed: %v", err)
 				}
-				if err := b.Put([]byte(term), data); err != nil { // serialize k,v
+				if err := b.Put([]byte(shard), data); err != nil { // serialize k,v
 					return fmt.Errorf("tx failed failed: %v", err)
 				}
-				// delete(terms, term) // delete from memory once persisted; drain pressure on memory
+				delete(terms, shard)
 			}
 			return nil
 		}); err != nil {
@@ -185,45 +269,136 @@ func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, err
 
 	// write lookup objects to disk (90,000 max per iteration)
 	// 2nd transaction set
+	fmt.Printf("Writing %d lookup objects...\n", len(lookup))
 	k := 0
 	sds := []*SearchData{}
 	for _, sd := range lookup {
 		limit := 90000 // limit to 90000 items per tx (90% of recommended max per BoltDB docs)
 		if k == limit {
-			sn, err := batchWriteLookup(db, sds, n, wrote)
+			_, err := batchWriteLookup(db, sds, n, wrote)
 			if err != nil {
 				fmt.Println(err)
 				return 0, 0, fmt.Errorf("saveIndex failed: %v", err)
 			}
 			sds = []*SearchData{} // reset after batch write
 			k = 0                 // reset
-			n += sn
 		}
 		sds = append(sds, sd)
 		k++
 	}
 	// write remainder of SearchData objects
-	sn, err := batchWriteLookup(db, sds, n, wrote)
+	_, err = batchWriteLookup(db, sds, n, wrote)
 	if err != nil {
 		fmt.Println(err)
 		return 0, 0, fmt.Errorf("saveIndex failed: %v", err)
 	}
-	n += sn
 
-	// merge shard counts with id.Shards
-	for shard, count := range shards {
-		if id.Shards == nil {
-			id.Shards = make(map[string]float32)
+	// merge shard counts and ranges with id.Shards
+	for term, sr := range shards {
+		if sr.Shards == 0 {
+			continue
 		}
-		id.Shards[shard] = count
+		if id.Shards[term] == nil {
+			id.Shards[term] = sr
+			continue
+		}
+		for shard, tuple := range sr.Ranges {
+			id.Shards[term].Ranges[shard] = tuple
+		}
+		id.Shards[term].Shards = sr.Shards
 	}
 
 	fmt.Println("index saved!")
 	fmt.Println("new terms wrote: ", t)
 	fmt.Println("existing terms: ", u)
-	fmt.Println("IDs recorded/updated: ", n)
+	fmt.Println("IDs recorded/updated: ", len(lookup))
 	fmt.Println()
 	return int(n), int(t), nil
+}
+
+func getPreviousShards(id *IndexData, b *bolt.Bucket, term string, ids []string, terms map[string][]string, shards shardMap) (int, int, error) {
+	// begin aggregate existing data logic
+	si := 0 // shard index
+	t := 0  // new terms recorded in func call
+	u := 0  // existing terms updated in func call
+	sort.Strings(ids)
+	ns := "!"      // indicates max value for shard not set - shard is incomplete
+	comp := ids[0] // compare to greatest value in each shard to find corresponding index
+
+	if id.Shards[term] != nil && id.Shards[term].Shards != 0 { // shards exist for term
+		fmt.Printf("existing shards found for '%s': %.0f\n", term, id.Shards[term].Shards)
+		totalPrev := []string{}  // aggregate total from shards
+		key := term              // shardID
+		prTotal := 0             // previous # of IDs in shards[i:]
+		if shards[term] == nil { // re-initialize buffer object
+			shards[term] = &shardRanges{
+				Term:   term,
+				Shards: 0,
+				Ranges: make(map[string]rangeTuple),
+			}
+		}
+
+		// get aggregate data from existing shards
+		for i := 0; i < int(id.Shards[term].Shards+1.0); i++ {
+			if i > 0 {
+				key = term + "." + strconv.Itoa(i)
+			}
+			max := ns
+			if id.Shards[term].Ranges[key].Range[1] != ns { // shard is full and max value set
+				max = id.Shards[term].Ranges[key].Range[1]
+			}
+
+			// compare max value of full shards, skip if below threshold
+			if max != ns && comp > max {
+				// if term out of range && partition is full - skip
+				// item indexes of preceeding shards remain unchanged
+				fmt.Println("skipping partition: ", si)
+				si++ // increment for every preceeding shard
+				continue
+			}
+
+			prevData := b.Get([]byte(key))
+			prev, err := decodeResultsList(prevData)
+			if err != nil {
+				fmt.Println(err)
+				return 0, 0, fmt.Errorf("getPreviousShards failed failed: %v", err)
+			}
+
+			// add shard to aggregate total for re-ordering
+			totalPrev = append(totalPrev, prev...)
+			prTotal += len(prev)
+		}
+
+		// create set of new/existing IDs and update index
+		update := mergeIDs(ids, totalPrev)
+		terms[term] = update
+		shards[term].Shards = float32(si) // new shards created at this index
+
+		fmt.Println("previous total: ", prTotal)
+		fmt.Println("new total: ", len(update))
+		fmt.Printf("creating new shards for term '%s' at index %d\n", term, si)
+		u++
+	} else { // no existing shards
+		// get previous data
+		prevData := b.Get([]byte(term))
+		if prevData != nil { // existing term entry
+			prev, err := decodeResultsList(prevData)
+			if err != nil {
+				fmt.Println(err)
+				return 0, 0, fmt.Errorf("getPreviousShards failed failed: %v", err)
+			}
+			// create ID set and update index
+			update := mergeIDs(ids, prev)
+			terms[term] = update
+			u++
+		} else { // new term entry, no shards; sort IDs
+			empty := []string{}
+			sorted := mergeIDs(ids, empty)
+			terms[term] = sorted
+			t++
+		}
+	} // end aggregate existing data logic
+	return t, u, nil
 }
 
 // batch writes list of *SearchData objects to disk in single transaction
@@ -274,7 +449,7 @@ func batchWriteLookup(db *bolt.DB, sds []*SearchData, n int64, wrote map[string]
 	return n, nil
 }
 
-// get lookup pairs from disk for given term
+// get SearchData objs from ID references for given term
 func getSearchEntry(term string) ([]SearchData, error) {
 	// retreive lookupPairs from disk
 	prt := getPartition(term)
@@ -315,6 +490,7 @@ func getSearchEntry(term string) ([]SearchData, error) {
 	return results, nil
 }
 
+// get SearchData objects form list of IDs
 func getSearchData(db *bolt.DB, ids []string) ([]SearchData, error) {
 	results := []SearchData{}
 	var data []byte
@@ -441,7 +617,7 @@ func savePartitionMap(pm map[string]bool) error {
 }
 
 // get PartitionMap
-func getPartitionMap() (map[string]bool, error) {
+func GetPartitionMap() (map[string]bool, error) {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
 	defer db.Close()
 	if err != nil {
@@ -538,19 +714,23 @@ func mergeLookup(new, prev lookupPairs) {
 	}
 }
 
+// encode new IDs with big endian encoding and merge with existing IDs
 func mergeIDs(new, prev []string) []string {
+	// fmt.Printf("mergeIDs start: len new: %d, len prev: %d\n", len(new), len(prev))
 	update := []string{}
 	set := make(map[string]bool)
-	for _, ID := range new {
+	for _, ID := range prev {
 		set[ID] = true
 	}
-	for _, ID := range prev {
+	for _, ID := range new {
 		set[ID] = true
 	}
 	for ID := range set {
 		update = append(update, ID)
 	}
-	sort.Strings(update)
+
+	sort.Slice(update, func(i, j int) bool { return update[i] < update[j] })
+
 	return update
 }
 
@@ -560,9 +740,31 @@ func encodeIndexData(id *IndexData) ([]byte, error) {
 		TermsSize:      float32(id.TermsSize),
 		LookupSize:     float32(id.LookupSize),
 		Completed:      id.Completed,
-		Shards:         id.Shards,
 		YearsCompleted: id.YearsCompleted,
 	}
+
+	// encode shardMap nested objects
+	shards := make(map[string]*protobuf.ShardRanges)
+	for term, sr := range id.Shards {
+		srPb := &protobuf.ShardRanges{
+			Term:   sr.Term,
+			Shards: sr.Shards,
+			Ranges: make(map[string]*protobuf.Range),
+		}
+		for s, r := range sr.Ranges {
+			rangePb := &protobuf.Range{
+				Range: []string{},
+			}
+			for _, r := range r.Range {
+				rangePb.Range = append(rangePb.Range, r)
+			}
+			srPb.Ranges[s] = rangePb
+		}
+		shards[term] = srPb
+	}
+	entry.Shards = shards
+
+	// encode timestamp
 	ts, err := ptypes.TimestampProto(id.LastUpdated)
 	if err != nil {
 		fmt.Println(err)
@@ -589,9 +791,29 @@ func decodeIndexData(raw []byte) (*IndexData, error) {
 		TermsSize:      int(data.GetTermsSize()),
 		LookupSize:     int(data.GetLookupSize()),
 		Completed:      data.GetCompleted(),
-		Shards:         data.GetShards(),
 		YearsCompleted: data.GetYearsCompleted(),
 	}
+
+	// decode shards
+	shards := make(shardMap)
+	shardsPb := data.GetShards()
+	for shard, srPb := range shardsPb {
+		sr := &shardRanges{
+			Term:   srPb.GetTerm(),
+			Shards: srPb.GetShards(),
+		}
+		rs := srPb.GetRanges()
+		ranges := make(map[string]rangeTuple)
+		for key, r := range rs {
+			rt := rangeTuple{r.GetRange()}
+			ranges[key] = rt
+		}
+		sr.Ranges = ranges
+		shards[shard] = sr
+	}
+	id.Shards = shards
+
+	// decode timestampe
 	if data.GetLastUpdated() == nil {
 		id.LastUpdated = time.Now()
 	} else {

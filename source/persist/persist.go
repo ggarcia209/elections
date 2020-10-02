@@ -37,7 +37,7 @@ func Init(year string) error {
 	return nil
 }
 
-// StoreObjects persists a list of objects to the on-disk database
+// StoreObjects persists a list of objects to the on-disk database as a batch write transaction
 func StoreObjects(year string, objs []interface{}) error {
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
@@ -53,7 +53,7 @@ func StoreObjects(year string, objs []interface{}) error {
 	if err := db.Update(func(tx *bolt.Tx) error {
 		for _, obj := range objs {
 			// encode object
-			bucket, key, data, err := EncodeToProto(obj)
+			bucket, key, data, err := encodeToProto(obj)
 			if err != nil {
 				fmt.Println(err)
 				fmt.Println("obj: ", obj)
@@ -78,7 +78,7 @@ func StoreObjects(year string, objs []interface{}) error {
 // PutObject puts an object by year:bucket:key
 func PutObject(year string, object interface{}) error {
 	// encode object
-	bucket, key, data, err := EncodeToProto(object)
+	bucket, key, data, err := encodeToProto(object)
 	if err != nil {
 		fmt.Println("PutObject failed: ", err)
 		return fmt.Errorf("PutObject failed: %v", err)
@@ -127,7 +127,7 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
 
-	obj, err := DecodeFromProto(bucket, data) // change to decode
+	obj, err := decodeFromProto(bucket, data) // change to decode
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
@@ -160,7 +160,7 @@ func BatchGetSequential(year, bucket, startKey string, n int) ([]interface{}, st
 		}
 
 		for k, v := c.Seek([]byte(startKey)); k != nil; k, v = c.Next() {
-			obj, err := DecodeFromProto(bucket, v)
+			obj, err := decodeFromProto(bucket, v)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -206,7 +206,7 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 				nilIDs = append(nilIDs, id)
 				continue
 			}
-			obj, err := DecodeFromProto(bucket, data)
+			obj, err := decodeFromProto(bucket, data)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -244,7 +244,7 @@ func GetTopOverall(year string) ([]interface{}, error) {
 				fmt.Printf("nil object: %s\n", string(k))
 				continue
 			}
-			obj, err := DecodeFromProto("top_overall", v)
+			obj, err := decodeFromProto("top_overall", v)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -274,7 +274,7 @@ func SaveTopOverall(year, bucket string, ods []interface{}) error {
 		b := tx.Bucket([]byte(year)).Bucket([]byte("top_overall"))
 
 		for _, od := range ods {
-			_, key, data, err := EncodeToProto(od)
+			_, key, data, err := encodeToProto(od)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed %v", err)
@@ -309,7 +309,7 @@ func GetYearlyTotals(year, cat string) ([]interface{}, error) {
 		c := b.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			obj, err := DecodeFromProto("yearly_totals", v)
+			obj, err := decodeFromProto("yearly_totals", v)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed: %v", err)
@@ -339,7 +339,7 @@ func SaveYearlyTotals(year, cat string, yts []interface{}) error {
 		b := tx.Bucket([]byte(year)).Bucket([]byte("yearly_totals"))
 
 		for _, yt := range yts {
-			_, key, data, err := EncodeToProto(yt)
+			_, key, data, err := encodeToProto(yt)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("tx failed %v", err)
@@ -406,9 +406,9 @@ func ViewDataByBucket(year, bucket, start string) (string, error) {
 	return curr, nil
 }
 
-// EncodeToProto encodes an object interface to protobuf
+// encodeToProto encodes an object interface to protobuf
 // Returns bucket, key (ID), serialized data, and err
-func EncodeToProto(obj interface{}) (string, string, []byte, error) {
+func encodeToProto(obj interface{}) (string, string, []byte, error) {
 	if obj == nil {
 		fmt.Println("empty object passed to encodeProto")
 		return "", "", nil, nil
@@ -493,9 +493,9 @@ func EncodeToProto(obj interface{}) (string, string, []byte, error) {
 	}
 }
 
-// DecodeFromProto encodes an object interface to protobuf
+// decodeFromProto encodes an object interface to protobuf
 // Returns pointer to deserialized object as interface{}
-func DecodeFromProto(bucket string, data []byte) (interface{}, error) {
+func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 	switch bucket {
 	case "":
 		return nil, fmt.Errorf("decodeFromProto failed: nil bucket")
@@ -505,12 +505,18 @@ func DecodeFromProto(bucket string, data []byte) (interface{}, error) {
 			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
+		if data.State == "" { // set DynamoDB partition key value if none
+			data.State = "???"
+		}
 		return &data, nil
 	case "committees":
 		data, err := decodeCmte(data)
 		if err != nil {
 			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
+		}
+		if data.State == "" {
+			data.State = "???"
 		}
 		return &data, nil
 	case "candidates":
@@ -519,12 +525,18 @@ func DecodeFromProto(bucket string, data []byte) (interface{}, error) {
 			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
+		if data.State == "" {
+			data.State = "???"
+		}
 		return &data, nil
 	case "cmte_tx_data":
 		data, err := decodeCmteTxData(data)
 		if err != nil {
 			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
+		}
+		if data.Party == "" {
+			data.Party = "???"
 		}
 		return &data, nil
 	case "cmpn_fin":
@@ -547,12 +559,18 @@ func DecodeFromProto(bucket string, data []byte) (interface{}, error) {
 			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
 		}
+		if data.Year == "" {
+			data.Year = "0000"
+		}
 		return &data, nil
 	case "yearly_totals":
 		data, err := decodeYrTotal(data)
 		if err != nil {
 			fmt.Println(err)
 			return nil, fmt.Errorf("decodeFromProto failed: %v", err)
+		}
+		if data.Year == "" {
+			data.Year = "0000"
 		}
 		return &data, nil
 	default:
