@@ -78,8 +78,12 @@ function displaySearchResults(resp) {
         res.forEach(function (r) {
         rslt = new SearchResult()
         rslt = r
-        let entry = i + ".  " + rslt.getName() + " - " +rslt.getCity() + ", " + rslt.getState()
-        resultsString += "<li class='list-full-item'><p>"+entry+"</p><span class='list-full-years'><ul class='years-list'>"
+        let entry = i + ".  " + rslt.getName() + " - " + rslt.getEmployer() + " - " +rslt.getCity() + ", " + rslt.getState()
+        // let entry = i + ".  " + rslt.getName() + " - " + rslt.getCity() + ", " + rslt.getState()
+        if (rslt.getBucket() !== "individuals") {
+            entry = i + ".  " + rslt.getName() + " - " + rslt.getCity() + ", " + rslt.getState()
+        }
+        resultsString += "<li class='list-full-item'><p>"+ entry +"</p><span class='list-full-years'><ul class='years-list'>"
         rslt.getYearsList().forEach(function (y) {
             let link = "http://localhost:8081/view-object/?year="+y+"&bucket="+rslt.getBucket()+"&id="+rslt.getId()
             resultsString += "<li class='years-list-item'><a class='list-full-link' href='"+link+"'>"+ y +"</a></li>";
@@ -312,8 +316,10 @@ function displayRankingsAll(resp, year, bucket) {
     let resultsString = ""
     rnkList.forEach(function (r) {
         let link = "http://localhost:8081/view-object/?year="+year+"&bucket="+bucket+"&id="+r.getId()
+        let entry = r.getName() + " - " + r.getCity() + ", " + r.getState()
+
         resultsString += "<li class='list-full-item'>";
-        resultsString +=  "<p>" + i + ".  " + "<a class='list-full-link' href='"+link+"'>" + r.getName() + " - " + r.getCity() + ", " + r.getState() + " - " + "$" + r.getAmount().toLocaleString() + "</a></p>";
+        resultsString +=  "<p>" + i + ".  " + "<a class='list-full-link' href='"+link+"'>" + entry + ": </a> " + "$" + r.getAmount().toLocaleString() + "</p>";
         resultsString += "</li>"
         i++
     });
@@ -521,7 +527,7 @@ function displayIndv(resp, year) {
             let txs = senders.txs.get(id)
             let avg = amt / txs
             sendersString += "<li class='list-full-item'>";
-            sendersString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            sendersString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + "  - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
             sendersString += "</li>"
             i++
         })
@@ -559,7 +565,7 @@ function displayIndv(resp, year) {
             let txs = recs.txs.get(id)
             let avg = amt / txs
             recipientsString += "<li class='list-full-item'>";
-            recipientsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            recipientsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
             recipientsString += "</li>"
             i++
         })
@@ -682,8 +688,12 @@ function displayCmte(resp, year) {
             let amt = iAmts[id]
             let txs = topIndv.txs.get(id)
             let avg = amt / txs
+            let record = r.getName() + " - " + r.getEmployer() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            if (r.getEmployer() == "") {
+                record = r.getName() + "  - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            }
             topIndvString += "<li class='list-full-item'>";
-            topIndvString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            topIndvString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + record + "</p>";
             topIndvString += "</li>"
             i++
         })
@@ -721,7 +731,7 @@ function displayCmte(resp, year) {
             let txs = topCmte.txs.get(id)
             let avg = amt / txs
             topCmteString += "<li class='list-full-item'>";
-            topCmteString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            topCmteString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + "  - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
             topCmteString += "</li>"
             i++
         })
@@ -759,11 +769,11 @@ function displayCmte(resp, year) {
             let txs = tr.txs.get(id)
             let avg = amt / txs
             trRecsString += "<li class='list-full-item'>";
-            trRecsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            trRecsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
             trRecsString += "</li>"
             i++
         })
-        document.querySelector("#tr-rec-list").innerHTML = trRecsSt
+        document.querySelector("#tr-rec-list").innerHTML = trRecsString
         document.querySelector("#cmte-transfer-recs").style.display = "block"
     })
 
@@ -796,8 +806,12 @@ function displayCmte(resp, year) {
             let amt = eAmts[id]
             let txs = exps.txs.get(id)
             let avg = amt / txs
+            let entry = r.getName() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            if (bucket !== "individuals") {
+                entry = entry = r.getName() + "  - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            }
             expRecsString += "<li class='list-full-item'>";
-            expRecsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            expRecsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + entry +"</p>";
             expRecsString += "</li>"
             i++
         })
@@ -810,8 +824,8 @@ function displayCand(resp, year) {
     console.log("candidate...")
     let cand = resp.getCandidate()
     let resultsString = ""
-    resultsString += "<h1 class='header-about'>" + cand.getName() +  " - " + year + "</h1>"
-    resultsString += "<h2 class='header-sub-about'>" + cand.getParty() + " - " + cand.getOffice() +"</h2>"
+    resultsString += "<h1 class='header-about'><a class='title-link' href='https://www.fec.gov/data/candidate/"+cand.getId()+"/'>" + cand.getName() + " - " + year + "</a></h1>";
+    resultsString += "<h2 class='header-sub-about'>" + cand.getParty() + " - " + cand.getOffice() + "</h2>"
     resultsString += "<h2 class='header-sub-about'> ID: " + cand.getId() + "</h2>"
     resultsString += "<h2 class='header-sub-about'> PCC: " + cand.getPcc() + "</h2>"
     resultsString += "<h4 class='header-sub-about'>" + cand.getCity() + ", " + cand.getState() +  "</h4>"
@@ -864,8 +878,12 @@ function displayCand(resp, year) {
             let amt = sAmts[id]
             let txs = senders.txs.get(id)
             let avg = amt / txs
+            let entry = r.getName() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            if (bucket !== "individuals") {
+                entry = entry = r.getName() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            }
             sendersString += "<li class='list-full-item'>";
-            sendersString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            sendersString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + entry +"</p>";
             sendersString += "</li>"
             i++
         })
@@ -885,7 +903,7 @@ function displayCand(resp, year) {
     console.log("recIDs:")
     console.log(recIDs)
 
-    let rlReq = newLookupRequest(reqIDs)
+    let rlReq = newLookupRequest(recIDs)
     viewSvc.lookupObjByID(rlReq, {}, (err, resp) => {
         if (err !== null) {
             console.log("error:")
@@ -903,8 +921,12 @@ function displayCand(resp, year) {
             let amt = rAmts[id]
             let txs = recs.txs.get(id)
             let avg = amt / txs
+            let entry = r.getName() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            if (bucket !== "individuals") {
+                entry = entry = r.getName() + " - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")"
+            }
             recipientsString += "<li class='list-full-item'>";
-            recipientsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + r.getName() + " " + r.getEmployer() +" - " + r.getCity() + ", " + r.getState() +"</a>: $" + amt.toLocaleString() + " (Avg: $"+avg.toLocaleString()+")</p>";
+            recipientsString +=   "<p>"+i +". <a class='list-full-link' href='"+link+"'>" + entry + "</p>";
             recipientsString += "</li>"
             i++
         })

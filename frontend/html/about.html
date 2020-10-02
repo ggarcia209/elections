@@ -6,8 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CashFlow FEC</title>
 <!-- Bootstrap -->
-<link href="css/bootstrap-4.4.1.css" rel="stylesheet">
-<link href="css/site_styles.css" rel="stylesheet" type="text/css">
+<link href="../css/bootstrap-4.4.1.css" rel="stylesheet">
+<link href="../css/site_styles.css" rel="stylesheet" type="text/css">
 </head>
 <body class="body-main rankings-page" style="padding-top: 70px">
 <!-- body code goes here --> 
@@ -21,7 +21,7 @@
       <li class="nav-item"> <a class="nav-link" href="http://localhost:8081/totals/?year=2020&category=rec">Totals</a> </li>
       <li class="nav-item active"> <a class="nav-link" href="http://localhost:8081/about">About<span class="sr-only">(current)</span></a> </li>
     </ul>
-    <form class="form-inline my-2 my-lg-0">
+    <form action="/search-results/" method="GET" class="form-inline my-2 my-lg-0">
       <input class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
       <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
     </form>
@@ -79,11 +79,11 @@
   <p class="footer-text"> &#169; Gilberto Garcia</p>
 </footer>
 <!-- jQuery (necessary for Bootstrap's JavaScript plugins) --> 
-<script src="js/jquery-3.4.1.min.js"></script> 
+<script src="../js/jquery-3.4.1.min.js"></script> 
 
 <!-- Include all compiled plugins (below), or include individual files as needed --> 
-<script src="js/popper.min.js"></script> 
-<script src="js/bootstrap-4.4.1.js"></script>
+<script src="../js/popper.min.js"></script> 
+<script src="../js/bootstrap-4.4.1.js"></script>
 <script src="../js/dist/main.js"></script>
 </body>
 </html>

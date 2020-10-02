@@ -334,19 +334,20 @@ a:hover {
 .text-div {
   width: 100%;
   height: auto;
-  margin-top: 2%;
   margin-bottom: 2%;
   margin-right: auto;
   margin-left: auto;
 }
 .header-about {
   margin-left: 8%;
+  margin-right: 8%;
   margin-top: 3%;
   margin-bottom: 1%;
   color: #1A60E6;
 }
 .header-sub-about {
   margin-left: 8%;
+  margin-right: 8%;
   margin-top: 1%;
   margin-bottom: 1%;
 }
