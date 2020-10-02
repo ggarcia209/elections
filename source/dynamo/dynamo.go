@@ -78,6 +78,7 @@ func ListTables(svc *dynamodb.DynamoDB) ([]string, int, error) {
 }
 
 // CreateTable creates a new table with the parameters passed to the Table struct
+// NOTE: CreateTable creates Table in * On-Demand * billing mode
 func CreateTable(svc *dynamodb.DynamoDB, table *Table) error {
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
@@ -90,6 +91,7 @@ func CreateTable(svc *dynamodb.DynamoDB, table *Table) error {
 				AttributeType: aws.String(table.SortKeyType),
 			},
 		},
+		BillingMode: aws.String("PAY_PER_REQUEST"),
 		KeySchema: []*dynamodb.KeySchemaElement{
 			{
 				AttributeName: aws.String(table.PrimaryKeyName),
@@ -100,18 +102,26 @@ func CreateTable(svc *dynamodb.DynamoDB, table *Table) error {
 				KeyType:       aws.String("RANGE"),
 			},
 		},
-		ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+		/* ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(25), // free tier limit = 25
 			WriteCapacityUnits: aws.Int64(25), // free tier limit = 25
-		},
+		}, */
 		TableName: aws.String(table.TableName),
 	}
 
 	_, err := svc.CreateTable(input)
 	if err != nil {
-		fmt.Println("Got error calling CreateTable:")
-		fmt.Println(err.Error())
-		return fmt.Errorf("CreateTable failed: %v", err)
+		if awsErr, ok := err.(awserr.Error); ok {
+			if awsErr.Code() == "ResourceInUseException" {
+				return fmt.Errorf(awsErr.Code())
+			}
+			fmt.Println("Got error calling CreateTable:")
+			// Get error details
+			fmt.Println("CreateTable failed:", awsErr.Code(), awsErr.Message())
+		} else {
+			fmt.Println(err.Error())
+			return fmt.Errorf("CreateTable failed: %v", err)
+		}
 	}
 
 	fmt.Println("Created the table: ", table.TableName)
@@ -238,6 +248,7 @@ func BatchWriteCreate(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 		// marshal each item
 		av, err := dynamodbattribute.MarshalMap(item)
 		if err != nil {
+			fmt.Println("*** err item: ", item)
 			return fmt.Errorf("BatchWriteCreate failed: %v", err)
 		}
 		// create put request, reformat as write request, and add to list
@@ -262,7 +273,8 @@ func BatchWriteCreate(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 			// if not HTTP 5xx error
 			if err.(awserr.Error).Code() != dynamodb.ErrCodeInternalServerError {
 				fmt.Printf("unprocessed items: \n%v\n", result.UnprocessedItems)
-				return fmt.Errorf("BatchWriteCreate failed: %v", err)
+				// return fmt.Errorf("BatchWriteCreate failed: %v", err)
+				return err
 			}
 
 			// Retry with exponential backoff algorithm
@@ -271,6 +283,7 @@ func BatchWriteCreate(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 				input = &dynamodb.BatchWriteItemInput{
 					RequestItems: result.UnprocessedItems,
 				}
+				fmt.Println("retrying...")
 				fc.ExponentialBackoff() // waits
 				if fc.MaxRetriesReached == true {
 					return fmt.Errorf("BatchWriteCreate failed: Max retries exceeded: %v", err)
@@ -399,6 +412,10 @@ func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query
 			if err.(awserr.Error).Code() != dynamodb.ErrCodeInternalServerError {
 				fmt.Printf("unprocessed items: \n%v\n", result.UnprocessedKeys)
 				return nil, fmt.Errorf("BatchWriteCreate failed: %v", err)
+			}
+			if err.(awserr.Error).Code() == "ValidationException" {
+				fmt.Printf("unprocessed items: \n%v\n", result.UnprocessedKeys)
+				return nil, err
 			}
 
 			// Retry with exponential backoff algorithm
