@@ -133,8 +133,9 @@ message GetIndvResponse{
     // into singular object encoded on server prior
     // to encoding response
     Individual Individual = 4;
-    google.protobuf.Timestamp Timestamp = 5;
-    string Msg = 6;
+    repeated string Years = 5;
+    google.protobuf.Timestamp Timestamp = 6;
+    string Msg = 7;
 }
 
 message TotalsMap{
@@ -182,8 +183,9 @@ message GetCandResponse{
     // to encoding response
     Candidate Candidate = 4;
     CmpnFinancials Financials = 5;
-    google.protobuf.Timestamp Timestamp = 6;
-    string Msg = 7;
+    repeated string Years = 6;
+    google.protobuf.Timestamp Timestamp = 7;
+    string Msg = 8;
 }
 
 message Candidate {
@@ -263,8 +265,9 @@ message GetCmteResponse{
     Committee Committee = 4;
     CmteTxData TxData = 5;
     CmteFinancials Financials = 6;
-    google.protobuf.Timestamp Timestamp = 7;
-    string Msg = 8;
+    repeated string Years = 7;
+    google.protobuf.Timestamp Timestamp = 8;
+    string Msg = 9;
 }
 
 message Committee {

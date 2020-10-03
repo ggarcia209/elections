@@ -182,6 +182,13 @@ func GetResultsFromShards(q Query) ([]string, error) {
 			return []string{}, fmt.Errorf("MAX_LENGTH")
 		}
 		t = strings.TrimSpace(t)
+
+		// check if lookup by ID
+		lookup := checkForID(t)
+		if lookup {
+			return []string{strings.ToUpper(t)}, nil
+		}
+
 		ids, err := getShard(db, t)
 		if err != nil {
 			fmt.Println(err)
@@ -252,13 +259,11 @@ func GetResultsFromShards(q Query) ([]string, error) {
 
 			min1, max1 := "", ""
 			if ct1 == 0 {
-				st1 := time.Now()
 				s1, err := getShard(db, k1)
 				if err != nil {
 					fmt.Println(err)
 					return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
 				}
-				fmt.Println("s1 read time: ", time.Since(st1))
 				min1, max1 = s1[0], s1[len(s1)-1]
 			} else {
 				r1 := id.Shards[i1].Ranges[k1]
@@ -275,23 +280,19 @@ func GetResultsFromShards(q Query) ([]string, error) {
 			}
 
 			if len(s1) == 0 {
-				st1 := time.Now()
 				s1, err = getShard(db, k1)
 				if err != nil {
 					fmt.Println(err)
 					return []string{}, fmt.Errorf("getRefs failed: %v", err)
 				}
-				fmt.Println("s1 read time: ", time.Since(st1))
 			}
 
 			if len(s0) == 0 {
-				st1 := time.Now()
 				s0, err = getShard(db, k0)
 				if err != nil {
 					fmt.Println(err)
 					return []string{}, fmt.Errorf("getRefs failed: %v", err)
 				}
-				fmt.Println("s0 read time: ", time.Since(st1))
 			}
 
 			// find intersection of s0, s1, add to common aggregate total
@@ -299,6 +300,8 @@ func GetResultsFromShards(q Query) ([]string, error) {
 			common = append(common, intsec...)
 		}
 	}
+
+	fmt.Println("common - s0, s1: ", len(common))
 
 	// find intersections of each remaining term
 	for t := 2; t < len(termsSrt); t++ {
@@ -324,13 +327,11 @@ func GetResultsFromShards(q Query) ([]string, error) {
 
 			min2, max2 := "", ""
 			if ct2 == 0 {
-				st1 := time.Now()
 				s2, err = getShard(db, k2)
 				if err != nil {
 					fmt.Println(err)
 					return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
 				}
-				fmt.Println("s2 read time: ", time.Since(st1))
 				min2, max2 = s2[0], s2[len(s2)-1]
 			} else {
 				r2 := id.Shards[i2].Ranges[k2]
@@ -348,13 +349,11 @@ func GetResultsFromShards(q Query) ([]string, error) {
 			}
 
 			if len(s2) == 0 {
-				st1 := time.Now()
 				s2, err = getShard(db, k2)
 				if err != nil {
 					fmt.Println(err)
 					return []string{}, fmt.Errorf("GetResultsFromShards failed: %v", err)
 				}
-				fmt.Println("s2 read time: ", time.Since(st1))
 			}
 
 			// find intersection of s0, s2, add to common aggregate total
@@ -497,6 +496,15 @@ func ConsolidateSearchData(origIDs []string, frmCache, frmDisk []SearchData) []S
 	for _, ID := range origIDs {
 		agg = append(agg, sds[ID])
 	}
+
+	// sort results by most recent year
+	sort.Slice(agg, func(i, j int) bool {
+		if agg[i].Years[0] != agg[j].Years[0] {
+			return agg[i].Years[0] > agg[j].Years[0]
+		}
+		return len(agg[i].Years) > len(agg[j].Years)
+	})
+
 	return agg
 }
 
@@ -693,6 +701,43 @@ func getRefs(q []string, id *IndexData) (map[string][]string, int, error) {
 	}
 	return resultMap, x, nil
 } */
+
+// check if single term query is ID for lookup
+func checkForID(id string) bool {
+	fmt.Println("ID: ", id)
+	if len(id) == 32 {
+		fmt.Println("ID found - len 32")
+		return true
+	}
+	if len(id) != 9 {
+		fmt.Println("not ID - len != 9 || 32")
+		return false
+	}
+
+	fecIDs := map[string]bool{
+		"C": true, "c": true, "H": true, "h": true,
+		"S": true, "s": true, "P": true, "p": true,
+	}
+	nums := map[string]bool{
+		"0": true, "1": true, "2": true, "3": true, "4": true,
+		"5": true, "6": true, "7": true, "8": true, "9": true,
+	}
+	ss := strings.Split(id, "")
+	for i, s := range ss {
+		if i == 0 {
+			if !fecIDs[s] {
+				fmt.Println("not FEC ID code")
+				return false
+			}
+		}
+		if i > 0 && !nums[s] {
+			fmt.Println("not id - alphanumeric sequence found")
+			return false
+		}
+	}
+	fmt.Println("ID found")
+	return true
+}
 
 // get ids in single shard
 func getShard(db *bolt.DB, id string) ([]string, error) {

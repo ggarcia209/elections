@@ -347,7 +347,7 @@ if (goog.DEBUG && !COMPILED) {
  * @constructor
  */
 proto.proto.GetIndvResponse = function(opt_data) {
-  jspb.Message.initialize(this, opt_data, 0, -1, null, null);
+  jspb.Message.initialize(this, opt_data, 0, -1, proto.proto.GetIndvResponse.repeatedFields_, null);
 };
 goog.inherits(proto.proto.GetIndvResponse, jspb.Message);
 if (goog.DEBUG && !COMPILED) {
@@ -431,7 +431,7 @@ if (goog.DEBUG && !COMPILED) {
  * @constructor
  */
 proto.proto.GetCandResponse = function(opt_data) {
-  jspb.Message.initialize(this, opt_data, 0, -1, null, null);
+  jspb.Message.initialize(this, opt_data, 0, -1, proto.proto.GetCandResponse.repeatedFields_, null);
 };
 goog.inherits(proto.proto.GetCandResponse, jspb.Message);
 if (goog.DEBUG && !COMPILED) {
@@ -515,7 +515,7 @@ if (goog.DEBUG && !COMPILED) {
  * @constructor
  */
 proto.proto.GetCmteResponse = function(opt_data) {
-  jspb.Message.initialize(this, opt_data, 0, -1, null, null);
+  jspb.Message.initialize(this, opt_data, 0, -1, proto.proto.GetCmteResponse.repeatedFields_, null);
 };
 goog.inherits(proto.proto.GetCmteResponse, jspb.Message);
 if (goog.DEBUG && !COMPILED) {
@@ -4590,6 +4590,13 @@ proto.proto.GetIndvRequest.prototype.setMsg = function(value) {
 
 
 
+/**
+ * List of repeated fields within this message type.
+ * @private {!Array<number>}
+ * @const
+ */
+proto.proto.GetIndvResponse.repeatedFields_ = [5];
+
 
 
 if (jspb.Message.GENERATE_TO_OBJECT) {
@@ -4625,8 +4632,9 @@ proto.proto.GetIndvResponse.toObject = function(includeInstance, msg) {
     objectid: jspb.Message.getFieldWithDefault(msg, 2, ""),
     bucket: jspb.Message.getFieldWithDefault(msg, 3, ""),
     individual: (f = msg.getIndividual()) && proto.proto.Individual.toObject(includeInstance, f),
+    yearsList: (f = jspb.Message.getRepeatedField(msg, 5)) == null ? undefined : f,
     timestamp: (f = msg.getTimestamp()) && google_protobuf_timestamp_pb.Timestamp.toObject(includeInstance, f),
-    msg: jspb.Message.getFieldWithDefault(msg, 6, "")
+    msg: jspb.Message.getFieldWithDefault(msg, 7, "")
   };
 
   if (includeInstance) {
@@ -4681,11 +4689,15 @@ proto.proto.GetIndvResponse.deserializeBinaryFromReader = function(msg, reader) 
       msg.setIndividual(value);
       break;
     case 5:
+      var value = /** @type {string} */ (reader.readString());
+      msg.addYears(value);
+      break;
+    case 6:
       var value = new google_protobuf_timestamp_pb.Timestamp;
       reader.readMessage(value,google_protobuf_timestamp_pb.Timestamp.deserializeBinaryFromReader);
       msg.setTimestamp(value);
       break;
-    case 6:
+    case 7:
       var value = /** @type {string} */ (reader.readString());
       msg.setMsg(value);
       break;
@@ -4747,10 +4759,17 @@ proto.proto.GetIndvResponse.serializeBinaryToWriter = function(message, writer) 
       proto.proto.Individual.serializeBinaryToWriter
     );
   }
+  f = message.getYearsList();
+  if (f.length > 0) {
+    writer.writeRepeatedString(
+      5,
+      f
+    );
+  }
   f = message.getTimestamp();
   if (f != null) {
     writer.writeMessage(
-      5,
+      6,
       f,
       google_protobuf_timestamp_pb.Timestamp.serializeBinaryToWriter
     );
@@ -4758,7 +4777,7 @@ proto.proto.GetIndvResponse.serializeBinaryToWriter = function(message, writer) 
   f = message.getMsg();
   if (f.length > 0) {
     writer.writeString(
-      6,
+      7,
       f
     );
   }
@@ -4857,12 +4876,49 @@ proto.proto.GetIndvResponse.prototype.hasIndividual = function() {
 
 
 /**
- * optional google.protobuf.Timestamp Timestamp = 5;
+ * repeated string Years = 5;
+ * @return {!Array<string>}
+ */
+proto.proto.GetIndvResponse.prototype.getYearsList = function() {
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 5));
+};
+
+
+/**
+ * @param {!Array<string>} value
+ * @return {!proto.proto.GetIndvResponse} returns this
+ */
+proto.proto.GetIndvResponse.prototype.setYearsList = function(value) {
+  return jspb.Message.setField(this, 5, value || []);
+};
+
+
+/**
+ * @param {string} value
+ * @param {number=} opt_index
+ * @return {!proto.proto.GetIndvResponse} returns this
+ */
+proto.proto.GetIndvResponse.prototype.addYears = function(value, opt_index) {
+  return jspb.Message.addToRepeatedField(this, 5, value, opt_index);
+};
+
+
+/**
+ * Clears the list making it empty but non-null.
+ * @return {!proto.proto.GetIndvResponse} returns this
+ */
+proto.proto.GetIndvResponse.prototype.clearYearsList = function() {
+  return this.setYearsList([]);
+};
+
+
+/**
+ * optional google.protobuf.Timestamp Timestamp = 6;
  * @return {?proto.google.protobuf.Timestamp}
  */
 proto.proto.GetIndvResponse.prototype.getTimestamp = function() {
   return /** @type{?proto.google.protobuf.Timestamp} */ (
-    jspb.Message.getWrapperField(this, google_protobuf_timestamp_pb.Timestamp, 5));
+    jspb.Message.getWrapperField(this, google_protobuf_timestamp_pb.Timestamp, 6));
 };
 
 
@@ -4871,7 +4927,7 @@ proto.proto.GetIndvResponse.prototype.getTimestamp = function() {
  * @return {!proto.proto.GetIndvResponse} returns this
 */
 proto.proto.GetIndvResponse.prototype.setTimestamp = function(value) {
-  return jspb.Message.setWrapperField(this, 5, value);
+  return jspb.Message.setWrapperField(this, 6, value);
 };
 
 
@@ -4889,16 +4945,16 @@ proto.proto.GetIndvResponse.prototype.clearTimestamp = function() {
  * @return {boolean}
  */
 proto.proto.GetIndvResponse.prototype.hasTimestamp = function() {
-  return jspb.Message.getField(this, 5) != null;
+  return jspb.Message.getField(this, 6) != null;
 };
 
 
 /**
- * optional string Msg = 6;
+ * optional string Msg = 7;
  * @return {string}
  */
 proto.proto.GetIndvResponse.prototype.getMsg = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 6, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 7, ""));
 };
 
 
@@ -4907,7 +4963,7 @@ proto.proto.GetIndvResponse.prototype.getMsg = function() {
  * @return {!proto.proto.GetIndvResponse} returns this
  */
 proto.proto.GetIndvResponse.prototype.setMsg = function(value) {
-  return jspb.Message.setProto3StringField(this, 6, value);
+  return jspb.Message.setProto3StringField(this, 7, value);
 };
 
 
@@ -6147,6 +6203,13 @@ proto.proto.GetCandRequest.prototype.setMsg = function(value) {
 
 
 
+/**
+ * List of repeated fields within this message type.
+ * @private {!Array<number>}
+ * @const
+ */
+proto.proto.GetCandResponse.repeatedFields_ = [6];
+
 
 
 if (jspb.Message.GENERATE_TO_OBJECT) {
@@ -6183,8 +6246,9 @@ proto.proto.GetCandResponse.toObject = function(includeInstance, msg) {
     bucket: jspb.Message.getFieldWithDefault(msg, 3, ""),
     candidate: (f = msg.getCandidate()) && proto.proto.Candidate.toObject(includeInstance, f),
     financials: (f = msg.getFinancials()) && proto.proto.CmpnFinancials.toObject(includeInstance, f),
+    yearsList: (f = jspb.Message.getRepeatedField(msg, 6)) == null ? undefined : f,
     timestamp: (f = msg.getTimestamp()) && google_protobuf_timestamp_pb.Timestamp.toObject(includeInstance, f),
-    msg: jspb.Message.getFieldWithDefault(msg, 7, "")
+    msg: jspb.Message.getFieldWithDefault(msg, 8, "")
   };
 
   if (includeInstance) {
@@ -6244,11 +6308,15 @@ proto.proto.GetCandResponse.deserializeBinaryFromReader = function(msg, reader) 
       msg.setFinancials(value);
       break;
     case 6:
+      var value = /** @type {string} */ (reader.readString());
+      msg.addYears(value);
+      break;
+    case 7:
       var value = new google_protobuf_timestamp_pb.Timestamp;
       reader.readMessage(value,google_protobuf_timestamp_pb.Timestamp.deserializeBinaryFromReader);
       msg.setTimestamp(value);
       break;
-    case 7:
+    case 8:
       var value = /** @type {string} */ (reader.readString());
       msg.setMsg(value);
       break;
@@ -6318,10 +6386,17 @@ proto.proto.GetCandResponse.serializeBinaryToWriter = function(message, writer) 
       proto.proto.CmpnFinancials.serializeBinaryToWriter
     );
   }
+  f = message.getYearsList();
+  if (f.length > 0) {
+    writer.writeRepeatedString(
+      6,
+      f
+    );
+  }
   f = message.getTimestamp();
   if (f != null) {
     writer.writeMessage(
-      6,
+      7,
       f,
       google_protobuf_timestamp_pb.Timestamp.serializeBinaryToWriter
     );
@@ -6329,7 +6404,7 @@ proto.proto.GetCandResponse.serializeBinaryToWriter = function(message, writer) 
   f = message.getMsg();
   if (f.length > 0) {
     writer.writeString(
-      7,
+      8,
       f
     );
   }
@@ -6465,12 +6540,49 @@ proto.proto.GetCandResponse.prototype.hasFinancials = function() {
 
 
 /**
- * optional google.protobuf.Timestamp Timestamp = 6;
+ * repeated string Years = 6;
+ * @return {!Array<string>}
+ */
+proto.proto.GetCandResponse.prototype.getYearsList = function() {
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 6));
+};
+
+
+/**
+ * @param {!Array<string>} value
+ * @return {!proto.proto.GetCandResponse} returns this
+ */
+proto.proto.GetCandResponse.prototype.setYearsList = function(value) {
+  return jspb.Message.setField(this, 6, value || []);
+};
+
+
+/**
+ * @param {string} value
+ * @param {number=} opt_index
+ * @return {!proto.proto.GetCandResponse} returns this
+ */
+proto.proto.GetCandResponse.prototype.addYears = function(value, opt_index) {
+  return jspb.Message.addToRepeatedField(this, 6, value, opt_index);
+};
+
+
+/**
+ * Clears the list making it empty but non-null.
+ * @return {!proto.proto.GetCandResponse} returns this
+ */
+proto.proto.GetCandResponse.prototype.clearYearsList = function() {
+  return this.setYearsList([]);
+};
+
+
+/**
+ * optional google.protobuf.Timestamp Timestamp = 7;
  * @return {?proto.google.protobuf.Timestamp}
  */
 proto.proto.GetCandResponse.prototype.getTimestamp = function() {
   return /** @type{?proto.google.protobuf.Timestamp} */ (
-    jspb.Message.getWrapperField(this, google_protobuf_timestamp_pb.Timestamp, 6));
+    jspb.Message.getWrapperField(this, google_protobuf_timestamp_pb.Timestamp, 7));
 };
 
 
@@ -6479,7 +6591,7 @@ proto.proto.GetCandResponse.prototype.getTimestamp = function() {
  * @return {!proto.proto.GetCandResponse} returns this
 */
 proto.proto.GetCandResponse.prototype.setTimestamp = function(value) {
-  return jspb.Message.setWrapperField(this, 6, value);
+  return jspb.Message.setWrapperField(this, 7, value);
 };
 
 
@@ -6497,16 +6609,16 @@ proto.proto.GetCandResponse.prototype.clearTimestamp = function() {
  * @return {boolean}
  */
 proto.proto.GetCandResponse.prototype.hasTimestamp = function() {
-  return jspb.Message.getField(this, 6) != null;
+  return jspb.Message.getField(this, 7) != null;
 };
 
 
 /**
- * optional string Msg = 7;
+ * optional string Msg = 8;
  * @return {string}
  */
 proto.proto.GetCandResponse.prototype.getMsg = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 7, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 8, ""));
 };
 
 
@@ -6515,7 +6627,7 @@ proto.proto.GetCandResponse.prototype.getMsg = function() {
  * @return {!proto.proto.GetCandResponse} returns this
  */
 proto.proto.GetCandResponse.prototype.setMsg = function(value) {
-  return jspb.Message.setProto3StringField(this, 7, value);
+  return jspb.Message.setProto3StringField(this, 8, value);
 };
 
 
@@ -8725,6 +8837,13 @@ proto.proto.GetCmteRequest.prototype.setMsg = function(value) {
 
 
 
+/**
+ * List of repeated fields within this message type.
+ * @private {!Array<number>}
+ * @const
+ */
+proto.proto.GetCmteResponse.repeatedFields_ = [7];
+
 
 
 if (jspb.Message.GENERATE_TO_OBJECT) {
@@ -8762,8 +8881,9 @@ proto.proto.GetCmteResponse.toObject = function(includeInstance, msg) {
     committee: (f = msg.getCommittee()) && proto.proto.Committee.toObject(includeInstance, f),
     txdata: (f = msg.getTxdata()) && proto.proto.CmteTxData.toObject(includeInstance, f),
     financials: (f = msg.getFinancials()) && proto.proto.CmteFinancials.toObject(includeInstance, f),
+    yearsList: (f = jspb.Message.getRepeatedField(msg, 7)) == null ? undefined : f,
     timestamp: (f = msg.getTimestamp()) && google_protobuf_timestamp_pb.Timestamp.toObject(includeInstance, f),
-    msg: jspb.Message.getFieldWithDefault(msg, 8, "")
+    msg: jspb.Message.getFieldWithDefault(msg, 9, "")
   };
 
   if (includeInstance) {
@@ -8828,11 +8948,15 @@ proto.proto.GetCmteResponse.deserializeBinaryFromReader = function(msg, reader) 
       msg.setFinancials(value);
       break;
     case 7:
+      var value = /** @type {string} */ (reader.readString());
+      msg.addYears(value);
+      break;
+    case 8:
       var value = new google_protobuf_timestamp_pb.Timestamp;
       reader.readMessage(value,google_protobuf_timestamp_pb.Timestamp.deserializeBinaryFromReader);
       msg.setTimestamp(value);
       break;
-    case 8:
+    case 9:
       var value = /** @type {string} */ (reader.readString());
       msg.setMsg(value);
       break;
@@ -8910,10 +9034,17 @@ proto.proto.GetCmteResponse.serializeBinaryToWriter = function(message, writer) 
       proto.proto.CmteFinancials.serializeBinaryToWriter
     );
   }
+  f = message.getYearsList();
+  if (f.length > 0) {
+    writer.writeRepeatedString(
+      7,
+      f
+    );
+  }
   f = message.getTimestamp();
   if (f != null) {
     writer.writeMessage(
-      7,
+      8,
       f,
       google_protobuf_timestamp_pb.Timestamp.serializeBinaryToWriter
     );
@@ -8921,7 +9052,7 @@ proto.proto.GetCmteResponse.serializeBinaryToWriter = function(message, writer) 
   f = message.getMsg();
   if (f.length > 0) {
     writer.writeString(
-      8,
+      9,
       f
     );
   }
@@ -9094,12 +9225,49 @@ proto.proto.GetCmteResponse.prototype.hasFinancials = function() {
 
 
 /**
- * optional google.protobuf.Timestamp Timestamp = 7;
+ * repeated string Years = 7;
+ * @return {!Array<string>}
+ */
+proto.proto.GetCmteResponse.prototype.getYearsList = function() {
+  return /** @type {!Array<string>} */ (jspb.Message.getRepeatedField(this, 7));
+};
+
+
+/**
+ * @param {!Array<string>} value
+ * @return {!proto.proto.GetCmteResponse} returns this
+ */
+proto.proto.GetCmteResponse.prototype.setYearsList = function(value) {
+  return jspb.Message.setField(this, 7, value || []);
+};
+
+
+/**
+ * @param {string} value
+ * @param {number=} opt_index
+ * @return {!proto.proto.GetCmteResponse} returns this
+ */
+proto.proto.GetCmteResponse.prototype.addYears = function(value, opt_index) {
+  return jspb.Message.addToRepeatedField(this, 7, value, opt_index);
+};
+
+
+/**
+ * Clears the list making it empty but non-null.
+ * @return {!proto.proto.GetCmteResponse} returns this
+ */
+proto.proto.GetCmteResponse.prototype.clearYearsList = function() {
+  return this.setYearsList([]);
+};
+
+
+/**
+ * optional google.protobuf.Timestamp Timestamp = 8;
  * @return {?proto.google.protobuf.Timestamp}
  */
 proto.proto.GetCmteResponse.prototype.getTimestamp = function() {
   return /** @type{?proto.google.protobuf.Timestamp} */ (
-    jspb.Message.getWrapperField(this, google_protobuf_timestamp_pb.Timestamp, 7));
+    jspb.Message.getWrapperField(this, google_protobuf_timestamp_pb.Timestamp, 8));
 };
 
 
@@ -9108,7 +9276,7 @@ proto.proto.GetCmteResponse.prototype.getTimestamp = function() {
  * @return {!proto.proto.GetCmteResponse} returns this
 */
 proto.proto.GetCmteResponse.prototype.setTimestamp = function(value) {
-  return jspb.Message.setWrapperField(this, 7, value);
+  return jspb.Message.setWrapperField(this, 8, value);
 };
 
 
@@ -9126,16 +9294,16 @@ proto.proto.GetCmteResponse.prototype.clearTimestamp = function() {
  * @return {boolean}
  */
 proto.proto.GetCmteResponse.prototype.hasTimestamp = function() {
-  return jspb.Message.getField(this, 7) != null;
+  return jspb.Message.getField(this, 8) != null;
 };
 
 
 /**
- * optional string Msg = 8;
+ * optional string Msg = 9;
  * @return {string}
  */
 proto.proto.GetCmteResponse.prototype.getMsg = function() {
-  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 8, ""));
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 9, ""));
 };
 
 
@@ -9144,7 +9312,7 @@ proto.proto.GetCmteResponse.prototype.getMsg = function() {
  * @return {!proto.proto.GetCmteResponse} returns this
  */
 proto.proto.GetCmteResponse.prototype.setMsg = function(value) {
-  return jspb.Message.setProto3StringField(this, 8, value);
+  return jspb.Message.setProto3StringField(this, 9, value);
 };
 
 

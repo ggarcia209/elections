@@ -7,6 +7,17 @@ a:hover {
   filter: brightness(120%);
   text-decoration: none;
 }
+input {
+  padding: 2px 2px;
+  border-width: 0px;
+  border-style: none;
+}
+input[type="search"], textarea, select { 
+  outline: none;
+}
+input:focus {
+  border-style: none;
+}
 .content-main {
   width: 100%;
   min-height: 33%;
@@ -199,6 +210,7 @@ a:hover {
   margin: auto;
   width: 100%;
   border-radius: 18px;
+  padding: 2%;
 }
 .search-btn {
   font-size: 1.2em;
@@ -344,12 +356,14 @@ a:hover {
   margin-top: 3%;
   margin-bottom: 1%;
   color: #1A60E6;
+  overflow-wrap: break-word;
 }
 .header-sub-about {
   margin-left: 8%;
   margin-right: 8%;
   margin-top: 1%;
   margin-bottom: 1%;
+  overflow-wrap: break-word;
 }
 .bullet-pts {
   display: flex;
@@ -453,6 +467,47 @@ a:hover {
 .view-obj-list-div {
   display: none;
 }
+.list-full-div-obj {
+  width: auto;
+  margin-top: 0%;
+  margin-bottom: 2%;
+  margin-left: 8%;
+  margin-right: 8%;
+}
+.list-full-obj {
+  overflow: hidden;
+  list-style: none;
+  padding-inline-start: 0px;
+}
+.list-full-item-obj {
+  margin-right: 4%;
+}
+.list-full-years-obj {
+  margin-top: 0%;
+  margin-left: 0%;
+  margin-right: 0%;
+  width: auto;
+  padding-inline-start: 0px;
+}
+.years-list-obj {
+  list-style-type: none;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
+  width: auto;
+  padding-inline-start: 0px;
+}
+.years-list-item-obj {
+  padding-top: 2%;
+  padding-bottom: 2%;
+  padding-right: 2%;
+  margin-left: 0%;
+  margin-right: 4%;
+  font-size: 1.5em;
+  width: auto;
+}
 /* ***** END VIEW OBJECT ***** */
 /* ***** MEDIA QUERIES ***** */
 @media (min-width: 576px) {
@@ -478,6 +533,12 @@ a:hover {
   }
   .row {
     flex-direction: row;
+  }
+  .search-bar-main {
+    padding-top: 1%;
+    padding-bottom: 1%;
+    padding-right: 2%;
+    padding-left: 2%;
   }
   .title-rankings {
     font-size: 1.6em;
@@ -542,6 +603,11 @@ a:hover {
     padding-top: 1%;
     padding-bottom: 1%;
   }
+  .years-list-item-obj {
+    padding-top: 1%;
+    padding-bottom: 1%;
+    padding-right: 1%;
+  }
 }
 @media (min-width: 992px) {
   .title-rankings {
@@ -569,10 +635,6 @@ a:hover {
     padding-bottom: 0.5%;
     margin-bottom: 0;
     width: 74%;
-  }
-  .search-bar-main {
-    padding-top: 1%;
-    padding-bottom: 1%;
   }
   .search-btn {
     font-size: 1.6em;
@@ -613,9 +675,20 @@ a:hover {
     line-height: 1.5;
     padding: 0;
   }
-}
-.list-full-years {
-  font-size: 1.0em;
+  .list-full-years {
+    font-size: 1.0em;
+  }
+  .years-list-item-obj {
+    margin-left: 0%;
+    margin-right: 4%;
+    font-size: 1.5em;
+    width: auto;
+  }
+  .years-list-item-obj {
+    padding-top: 0%;
+    padding-bottom: 0%;
+    padding-right: 0%;
+  }
 }
 @media (min-width: 1200px) {
   .title-div {

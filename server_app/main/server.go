@@ -253,6 +253,7 @@ func (s *viewServer) ViewIndividual(ctx context.Context, in *pb.GetIndvRequest) 
 		UID:      in.GetUID(),
 		ObjectID: in.GetObjectID(),
 		Bucket:   in.GetBucket(),
+		Years:    in.GetYears(),
 	}
 	ts, err := ptypes.TimestampProto(time.Now())
 	if err != nil {
@@ -261,6 +262,15 @@ func (s *viewServer) ViewIndividual(ctx context.Context, in *pb.GetIndvRequest) 
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
+	sd, err := server.LookupByID([]string{out.ObjectID})
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewIndividual failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	out.Years = sd[0].Years
+
 	out.Timestamp = ts
 
 	// Get object binary and return in response
@@ -338,6 +348,15 @@ func (s *viewServer) ViewCommittee(ctx context.Context, in *pb.GetCmteRequest) (
 		return out, errMsg
 	}
 	out.Timestamp = ts
+
+	sd, err := server.LookupByID([]string{out.ObjectID})
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCommittee failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	out.Years = sd[0].Years
 
 	// Get object binary and return in response
 	/* support for multiple years and aggregated datasets will be available in future version */
@@ -491,6 +510,15 @@ func (s *viewServer) ViewCandidate(ctx context.Context, in *pb.GetCandRequest) (
 		return out, errMsg
 	}
 	out.Timestamp = ts
+
+	sd, err := server.LookupByID([]string{out.ObjectID})
+	if err != nil {
+		errMsg := fmt.Errorf("%v\tViewCandidate failed: %v\tUID: %s", time.Now(), err, out.UID)
+		fmt.Println(errMsg)
+		out.Msg = fmt.Sprintf("%s", errMsg)
+		return out, errMsg
+	}
+	out.Years = sd[0].Years
 
 	// Get object binary and return in response
 	/* support for multiple years and aggregated datasets will be available in future version */

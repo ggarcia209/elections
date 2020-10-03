@@ -478,6 +478,18 @@ function displayIndv(resp, year) {
         resultsString += "<h4 class='header-sub-about'>"+ indv.getOccupation() + ", " + indv.getEmployer() +  "</h4>"
     }
 
+    resultsString += "<div class='list-full-div-obj'>"
+    resultsString += "<ul class='list-full-obj'>"
+    resultsString += "<li class='list-full-item-obj'>"
+    resultsString += "<span class='list-full-years-obj'><ul class='years-list-obj'>"
+    resp.getYearsList().forEach(function (y) {
+        let link = "http://localhost:8081/view-object/?year="+y+"&bucket="+resp.getBucket()+"&id="+indv.getId()
+        resultsString += "<li class='years-list-item-obj'><a class='list-full-link' href='"+link+"'>"+ y +"</a></li>";
+    })
+    resultsString += "</ul>"
+    resultsString += "</span>"
+    resultsString += "</li></ul></div>"
+
     resultsString += "<div class='list-full-div'>"
     resultsString += "<ul class='list-full'>"
     resultsString += "<li class='list-view-item'><p>Total Incoming: $"+ indv.getTotalinamt().toLocaleString() + "</p></li>"
@@ -590,6 +602,18 @@ function displayCmte(resp, year) {
         resultsString += "<h2 class='header-sub-about'> Organization: " + cmte.getConnectedorg() + "</h2>";
     }
     resultsString += "<h4 class='header-sub-about'>" + cmte.getCity() + ", " + cmte.getState() +  "</h4>"
+
+    resultsString += "<div class='list-full-div-obj'>"
+    resultsString += "<ul class='list-full-obj'>"
+    resultsString += "<li class='list-full-item-obj'>"
+    resultsString += "<span class='list-full-years-obj'><ul class='years-list-obj'>"
+    resp.getYearsList().forEach(function (y) {
+        let link = "http://localhost:8081/view-object/?year="+y+"&bucket="+resp.getBucket()+"&id="+cmte.getId()
+        resultsString += "<li class='years-list-item-obj'><a class='list-full-link' href='"+link+"'>"+ y +"</a></li>";
+    })
+    resultsString += "</ul>"
+    resultsString += "</span>"
+    resultsString += "</li></ul></div>"
 
     resultsString += "<div class='list-full-div'>"
     resultsString += "<ul class='list-full'>"
@@ -829,6 +853,18 @@ function displayCand(resp, year) {
     resultsString += "<h2 class='header-sub-about'> ID: " + cand.getId() + "</h2>"
     resultsString += "<h2 class='header-sub-about'> PCC: " + cand.getPcc() + "</h2>"
     resultsString += "<h4 class='header-sub-about'>" + cand.getCity() + ", " + cand.getState() +  "</h4>"
+
+    resultsString += "<div class='list-full-div-obj'>"
+    resultsString += "<ul class='list-full-obj'>"
+    resultsString += "<li class='list-full-item-obj'>"
+    resultsString += "<span class='list-full-years-obj'><ul class='years-list-obj'>"
+    resp.getYearsList().forEach(function (y) {
+        let link = "http://localhost:8081/view-object/?year="+y+"&bucket="+resp.getBucket()+"&id="+cand.getId()
+        resultsString += "<li class='years-list-item-obj'><a class='list-full-link' href='"+link+"'>"+ y +"</a></li>";
+    })
+    resultsString += "</ul>"
+    resultsString += "</span>"
+    resultsString += "</li></ul></div>"
 
     resultsString += "<div class='list-full-div'>"
     resultsString += "<ul class='list-full'>"
