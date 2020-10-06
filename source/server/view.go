@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+	"log"
+	"regexp"
 	"strings"
 
 	"github.com/elections/source/persist"
@@ -13,13 +15,16 @@ import (
 )
 
 // RankingsMap stores references to each rankings list by year
-type RankingsMap map[string]map[string]donations.TopOverallData
+type RankingsMap map[string]map[string]RankingsData
 
 // YrTotalsMap stores references to each yearly total by year
-type YrTotalsMap map[string]map[string]donations.YearlyTotal
+type YrTotalsMap map[string]map[string]YrTotalData
 
 // SearchDataMap stores references to SearchData objects
 type SearchDataMap map[string]indexing.SearchData
+
+// IndexData wraps and encapsulates the indexing.IndexData object
+type IndexData indexing.IndexData
 
 // InitServerDiskCache creates the ../db directory on the local disk
 func InitServerDiskCache() {
@@ -30,23 +35,54 @@ func InitServerDiskCache() {
 
 // InitDynamo initialized a Dynamo session with default settings
 func InitDynamo() (*dynamo.DbInfo, error) {
+	// init sesh and db with default options
 	db, err := initDynamoDbDefault()
 	if err != nil {
 		fmt.Println(err)
-		return nil, fmt.Errorf("GetRankingsFromDisk failed: %v", err)
+		return db, fmt.Errorf("Upload failed: %v", err)
 	}
 	return db, nil
 }
 
+// GetIndexData retreives the encapsulated IndexData object from disk
+func GetIndexData() (*IndexData, error) {
+	id, err := indexing.GetIndexData()
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("GetIndexData failed: %v", err)
+	}
+	wrap := &IndexData{
+		TermsSize:      id.TermsSize,
+		LookupSize:     id.LookupSize,
+		LastUpdated:    id.LastUpdated,
+		YearsCompleted: id.YearsCompleted,
+		Completed:      id.Completed,
+		Shards:         id.Shards,
+	}
+	return wrap, nil
+}
+
 // SearchData takes a user query as a string and
 // finds the results matching each word in query.
-func SearchData(txt string) ([]string, error) {
+func SearchData(id *IndexData, txt string) ([]string, error) {
 	// get query from user / return & print results
 	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
+	terms := formatTerms(strings.Split(txt, " "))
+	wrap := &indexing.IndexData{
+		Shards: make(indexing.ShardMap),
+	}
+	for _, t := range terms {
+		wrap.Shards[t] = id.Shards[t]
+	}
+
 	q := indexing.CreateQuery(txt, "user")
-	common, err := indexing.GetResultsFromShards(q)
+	common, err := indexing.GetResultsFromShards(wrap, q)
 	if err != nil {
 		if err.Error() == "MAX_LENGTH" {
+			return []string{}, err
+		}
+		if err.Error() == "NO_RESULTS" {
+			fmt.Println("search data: ", err)
 			return []string{}, err
 		}
 		fmt.Println(err)
@@ -56,10 +92,10 @@ func SearchData(txt string) ([]string, error) {
 }
 
 // GetSearchResults returns the SearchData object for the given IDs
-func GetSearchResults(ids []string, cache SearchDataMap) ([]indexing.SearchData, error) {
+func GetSearchResults(db *dynamo.DbInfo, ids []string, cache SearchDataMap) ([]indexing.SearchData, error) {
 	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
 	nilIDs, frmCache := indexing.LookupSearchDataFromCache(ids, cache)
-	frmDisk, err := indexing.LookupSearchData(nilIDs) // refactor to read from DynamoDB
+	frmDisk, err := indexing.LookupSearchDataFromDynamo(db, nilIDs) // refactor to read from DynamoDB
 	if err != nil {
 		fmt.Println(err)
 		return []indexing.SearchData{}, fmt.Errorf("GetSearchResults failed: %v", err)
@@ -263,81 +299,37 @@ func GetObjectFromDisk(year, ID, bucket string) (interface{}, error) {
 func GetObjectFromDynamo(db *dynamo.DbInfo, query *dynamo.Query, bucket string, years []string) ([]interface{}, error) {
 	datasets := []interface{}{}
 
-	err := initDynamoTables(db, years)
-	if err != nil {
-		fmt.Println(err)
-		return datasets, fmt.Errorf("GetObjectFromDynamo failed: %v", err)
-	}
-
 	// retreive item's datasets for each year from db
 	refObj := getRefObj(bucket)
 	for _, yr := range years {
 		tName := "cf-" + yr + "-" + bucket
+		if db.Tables[tName] == nil {
+			fmt.Println("TABLE_NOT_FOUND")
+			return nil, fmt.Errorf("TABLE_NOT_FOUND")
+		}
 		obj, err := dynamo.GetItem(db.Svc, query, db.Tables[tName], refObj)
 		if err != nil {
 			fmt.Println(err)
 			return datasets, fmt.Errorf("GetObjectFromDynamo failed: %v", err)
 		}
-		datasets = append(datasets, obj)
+		wrap := wrapObj(obj)
+		datasets = append(datasets, wrap)
 	}
 
 	return datasets, nil
 }
 
-// ADMIN - CHANGE UPLOAD PARTITION KEYS TO FIRST LETTER OF LAST NAME
 // CreateQueryFromSearchData returns a Dynamo Query object from SearchData info
 func CreateQueryFromSearchData(sd indexing.SearchData) *dynamo.Query {
-	ns := strings.Split(sd.Name, "")
-	pk := ns[0]
+	pk := ""
+
+	if sd.Bucket == "cmte_tx_data" {
+		pk = sd.Employer
+	} else {
+		pk = sd.State
+	}
+
 	return &dynamo.Query{PrimaryValue: pk, SortValue: sd.ID}
-}
-
-// GetRankingsFromDynamo retrieves the TopOvearll datasets
-// for the given year from Dynamo to store in memory
-func GetRankingsFromDynamo(db *dynamo.DbInfo) (RankingsMap, error) {
-	rankings := make(RankingsMap)
-	queries := []*dynamo.Query{}
-	years := []string{
-		"2020", "2018", "2016", "2014", "2012", "2010", "2008", "2006", "2004", "2002",
-		"2000", "1998", "1996", "1994", "1992", "1990", "1988", "1986", "1984", "1982",
-		"1980", "all-time",
-	}
-
-	// create table references for each year
-	err := initDynamoTables(db, years)
-	if err != nil {
-		fmt.Println(err)
-		return rankings, fmt.Errorf("GetRankingsFromDisk failed: %v", err)
-	}
-
-	for _, yr := range years {
-		// get list of object IDs for the year,
-		// create query from name
-		names := createRankingsNames(yr)
-		for _, n := range names {
-			rpl := strings.ReplaceAll(n, "-", " ")
-			ss := strings.Split(rpl, " ")
-			prt := ss[1]
-			query := &dynamo.Query{PrimaryValue: prt, SortValue: n}
-			queries = append(queries, query)
-		}
-		for _, q := range queries {
-			// get rankings list for the year
-			odl, err := GetObjectFromDynamo(db, q, "top_overall", []string{yr})
-			if err != nil {
-				fmt.Println(err)
-				return rankings, fmt.Errorf("GetRankingsFromDisk failed: %v", err)
-			}
-			for _, od := range odl {
-				// add rankiings list to map
-				if rankings[yr] == nil {
-					rankings[yr] = make(map[string]donations.TopOverallData)
-				}
-				rankings[yr][od.(*donations.TopOverallData).ID] = *od.(*donations.TopOverallData)
-			}
-		}
-	}
-	return rankings, nil
 }
 
 // GetRankingsFromDynamo retrieves the TopOvearll datasets
@@ -376,14 +368,91 @@ func GetRankingsFromDisk() (RankingsMap, error) {
 				}
 				full.Amts = clip
 			}
+			// add rankiings list to map
 			if rankings[yr] == nil {
-				rankings[yr] = make(map[string]donations.TopOverallData)
+				rankings[yr] = make(map[string]RankingsData)
 			}
-			rankings[yr][full.ID] = *full
+			wrap := RankingsData{
+				ID:       full.ID,
+				Year:     full.Year,
+				Bucket:   full.Bucket,
+				Category: full.Category,
+				Party:    full.Party,
+				Rankings: full.Amts,
+			}
+			rankings[yr][wrap.ID] = wrap
 
 			// create preview list and add preview object to map
-			pre := createRankingsPreview(full)
+			pre := createRankingsPreview(wrap)
 			rankings[yr][pre.ID] = pre
+		}
+	}
+	return rankings, nil
+}
+
+// GetRankingsFromDynamo retrieves the TopOvearll datasets
+// for the given year from Dynamo to store in memory
+func GetRankingsFromDynamo(db *dynamo.DbInfo) (RankingsMap, error) {
+	persist.OUTPUT_PATH = "/Volumes/T7/processed"
+	rankings := make(RankingsMap)
+	years := []string{"2020"}
+	/*years := []string{
+		"2020", "2018", "2016", "2014", "2012", "2010", "2008", "2006", "2004", "2002",
+		"2000", "1998", "1996", "1994", "1992", "1990", "1988", "1986", "1984", "1982",
+		"1980",
+	} */
+
+	for _, yr := range years {
+		fmt.Printf("getting rankings for %s...\n", yr)
+		// get list of object IDs for the year,
+		queries := []*dynamo.Query{}
+		names := createRankingsNames(yr)
+		for _, n := range names {
+			ss := strings.Split(n, "-")
+			prt := ss[1]
+			query := &dynamo.Query{PrimaryValue: prt, SortValue: n}
+			queries = append(queries, query)
+		}
+		for _, q := range queries {
+			// get rankings list for the year
+			odl, err := GetObjectFromDynamo(db, q, "top_overall", []string{yr})
+			if err != nil {
+				fmt.Println(err)
+				return rankings, fmt.Errorf("GetRankingsFromDisk failed: %v", err)
+			}
+			for _, od := range odl {
+				full := od.(*donations.TopOverallData)
+				// add rankiings list to map
+				if full.Bucket == "individuals" {
+					// clip individuals lists to 500 entries
+					sorted := util.SortMapObjectTotals(full.Amts)
+					clip := make(map[string]float32)
+					for i, e := range sorted {
+						if i == 500 {
+							break
+						}
+						clip[e.ID] = e.Total
+					}
+					full.Amts = clip
+				}
+				// add rankiings list to map
+				if rankings[yr] == nil {
+					rankings[yr] = make(map[string]RankingsData)
+				}
+				wrap := RankingsData{
+					ID:       full.ID,
+					Year:     full.Year,
+					Bucket:   full.Bucket,
+					Category: full.Category,
+					Party:    full.Party,
+					Rankings: full.Amts,
+				}
+				rankings[yr][wrap.ID] = wrap
+
+				// create preview list and add preview object to map
+				pre := createRankingsPreview(wrap)
+				rankings[yr][pre.ID] = pre
+			}
 		}
 	}
 	return rankings, nil
@@ -415,9 +484,17 @@ func GetYrTotalsFromDisk() (YrTotalsMap, error) {
 			for _, yt := range ytl {
 				// add rankiings list to map
 				if totals[yr] == nil {
-					totals[yr] = make(map[string]donations.YearlyTotal)
+					totals[yr] = make(map[string]YrTotalData)
 				}
-				totals[yr][yt.(*donations.YearlyTotal).ID] = *yt.(*donations.YearlyTotal)
+				total := yt.(*donations.YearlyTotal)
+				wrap := YrTotalData{
+					ID:       total.ID,
+					Year:     total.Year,
+					Category: total.Category,
+					Party:    total.Party,
+					Total:    total.Total,
+				}
+				totals[yr][wrap.ID] = wrap
 			}
 		}
 	}
@@ -439,11 +516,11 @@ func CreateSearchCache(rankings RankingsMap) (SearchDataMap, error) {
 			return cache, fmt.Errorf("CreateSearchCache failed: empty set in year %s", yr)
 		}
 		for id, data := range set {
-			if len(data.Amts) == 0 {
+			if len(data.Rankings) == 0 {
 				fmt.Printf("empty obj in year %s - ID: %s\n", yr, id)
 				continue
 			}
-			for objID := range data.Amts {
+			for objID := range data.Rankings {
 				if !ids[objID] {
 					ids[objID] = true
 					idList = append(idList, objID)
@@ -468,97 +545,138 @@ func initDynamoDbDefault() (*dynamo.DbInfo, error) {
 	db := dynamo.InitDbInfo()
 	db.SetSvc(dynamo.InitSesh())
 	db.SetFailConfig(dynamo.DefaultFailConfig)
+
+	years := []string{"2020"}
+
+	for _, yr := range years {
+		// create Table objects
+		initTableObjs(db, yr)
+	}
+
+	err := initDynamoTables(db)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("initDynamoDbDefault failed: %v", err)
+	}
+
+	// list tables currently in DB
+	_, t, err := dynamo.ListTables(db.Svc)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("initDynamoDbDefault failed: %v", err)
+	}
+
+	fmt.Println("Total tables: ", t)
+	fmt.Println()
+
 	return db, nil
 }
 
-func initDynamoTables(db *dynamo.DbInfo, years []string) error {
-	// get existing tables
-	tables := make(map[string]bool)
-	names, _, err := dynamo.ListTables(db.Svc)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("InitDynamoTables failed: %v", err)
-	}
-
-	// check tables for every given year exist
-	for _, n := range names {
-		tables[n] = true
-	}
-	for _, yr := range years {
-		ts := initTableObjs(db, yr) // create in memory references to dynamo tables
-		for _, t := range ts {
-			if !tables[t.TableName] { // tables for given year do not exist
-				err := createTables(db, ts) // create table set for year
-				if err != nil {
-					fmt.Println(err)
-					return fmt.Errorf("initDynamoTables failed: %v", err)
-				}
+// initDynamoTables initializes Tables for each object category for the given year
+// and adds the corresponding Table object to the db.Tables field.
+// TableName format: "cf-%s-individuals", year
+//                   "cf-%s-candidates", year
+//                   "cf-s-committees", year
+//                   "cf-%s-cmte_tx_data", year
+//                   "cf-%s-cmte_financials", year
+//                   "cf-%s-top_ovearll", year
+func initDynamoTables(db *dynamo.DbInfo) error {
+	for _, t := range db.Tables {
+		err := dynamo.CreateTable(db.Svc, t)
+		if err != nil {
+			if err.Error() == "ResourceInUseException" {
+				fmt.Printf("table '%s' already exists\n", t.TableName)
 				continue
+			}
+			fmt.Println(err)
+			return fmt.Errorf("initDynamoTables failed: %v", err)
+		}
+		ss := strings.Split(t.TableName, "-")
+		year := ""
+		bucket := ""
+		if len(ss) == 3 {
+			year = ss[1]   // year
+			bucket = ss[2] // object bucket
+		} else {
+			year = "all-time"
+			bucket = ss[1] // index/lookup
+		}
+
+		// reset BatchGetSequential startKeys for new tables
+		switch bucket {
+		case "index":
+			fmt.Println("resetting key for table: ", t.TableName)
+			err := persist.LogKey(year, "index-partitions", "")
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("initDynamoTables failed: %v", err)
+			}
+		case "lookup":
+			fmt.Println("resetting key for table: ", t.TableName)
+			err := persist.LogKey(year, bucket, "")
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("initDynamoTables failed: %v", err)
+			}
+		default:
+			fmt.Println("resetting key for table: ", t.TableName)
+			err := persist.LogKey(year, bucket, "")
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("initDynamoTables failed: %v", err)
 			}
 		}
 	}
-	return nil
-}
 
-func createTables(db *dynamo.DbInfo, ts []*dynamo.Table) error {
-	for _, t := range ts {
-		err := dynamo.CreateTable(db.Svc, t)
-		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("createTables failed: %v", err)
-		}
-	}
 	return nil
 }
 
 // initTableObjs creates dynamo.Table objects for given year in memory only and
 // adds them to the db.Tables field. See InitDynamoTables description for TableName format.
-func initTableObjs(db *dynamo.DbInfo, year string) []*dynamo.Table {
-	indv := "cf-" + year + "-individuals"        // pk = State
-	cand := "cf-" + year + "-candidates"         // pk = State
-	cmte := "cf-" + year + "-committees"         // pk = State
-	cmteData := "cf-" + year + "-cmte_tx_data"   // pk = Name
-	cmteFin := "cf-" + year + "-cmte_financials" // pk = Name
-	topOverall := "cf-" + year + "-top_overall"  // pk = SizeLimit
-	yrTotals := "cf-" + year + "-yearly_totals"  // pk = SizeLimit
-	tables := []*dynamo.Table{}
+func initTableObjs(db *dynamo.DbInfo, year string) {
+	indv := "cf-" + year + "-individuals"      // pk = First Letter of Name
+	cand := "cf-" + year + "-candidates"       // pk = First Letter of Name
+	cmte := "cf-" + year + "-committees"       // pk = First Letter of Name
+	cmteData := "cf-" + year + "-cmte_tx_data" // pk = First Letter of Name
+	// cmteFin := "cf-" + year + "-cmte_financials" // pk = First Letter of Name
+	topOverall := "cf-" + year + "-top_overall" // pk = Year
+	yrTotals := "cf-" + year + "-yearly_totals" // pk = Year
+	index := "cf-index"                         // pk = Index Partition
+	lookup := "cf-lookup"                       // pk = First Letter of Name
 
 	// create object tables
 	t := dynamo.CreateNewTableObj(indv, "State", "string", "ID", "string")
 	db.AddTable(t)
-	tables = append(tables, t)
 
 	// create object tables
 	t = dynamo.CreateNewTableObj(cand, "State", "string", "ID", "string")
 	db.AddTable(t)
-	tables = append(tables, t)
 
 	// create object tables
 	t = dynamo.CreateNewTableObj(cmte, "State", "string", "ID", "string")
 	db.AddTable(t)
-	tables = append(tables, t)
 
 	// create object tables
-	t = dynamo.CreateNewTableObj(cmteData, "Name", "string", "ID", "string")
+	t = dynamo.CreateNewTableObj(cmteData, "Party", "string", "CmteID", "string")
 	db.AddTable(t)
-	tables = append(tables, t)
-
-	// create object tables
-	t = dynamo.CreateNewTableObj(cmteFin, "Name", "string", "ID", "string")
-	db.AddTable(t)
-	tables = append(tables, t)
 
 	// create TopOverall table
-	t = dynamo.CreateNewTableObj(topOverall, "Category", "int", "ID", "string")
+	t = dynamo.CreateNewTableObj(topOverall, "Year", "string", "ID", "string")
 	db.AddTable(t)
-	tables = append(tables, t)
 
-	// create TopOverall table
-	t = dynamo.CreateNewTableObj(yrTotals, "Category", "string", "ID", "string")
+	// create YearlyTotals table
+	t = dynamo.CreateNewTableObj(yrTotals, "Year", "string", "ID", "string")
 	db.AddTable(t)
-	tables = append(tables, t)
 
-	return tables
+	// create Index table
+	t = dynamo.CreateNewTableObj(index, "Partition", "string", "Term", "string")
+	db.AddTable(t)
+
+	// create Index table
+	t = dynamo.CreateNewTableObj(lookup, "Partition", "string", "ID", "string")
+	db.AddTable(t)
+
+	return
 }
 
 func getRefObj(bucket string) interface{} {
@@ -600,24 +718,24 @@ func createRankingsNames(year string) []string {
 	return names
 }
 
-func createRankingsPreview(full *donations.TopOverallData) donations.TopOverallData {
+func createRankingsPreview(full RankingsData) RankingsData {
 	// create preview object
-	pre := donations.TopOverallData{
+	pre := RankingsData{
 		ID:       full.ID + "-pre",
 		Year:     full.Year,
 		Bucket:   full.Bucket,
 		Category: full.Category,
 		Party:    full.Party,
-		Amts:     make(map[string]float32),
+		Rankings: make(map[string]float32),
 	}
 
 	// sort map and get top 10 results
-	sorted := util.SortMapObjectTotals(full.Amts)
+	sorted := util.SortMapObjectTotals(full.Rankings)
 	for i, e := range sorted {
 		if i == 10 {
 			break
 		}
-		pre.Amts[e.ID] = e.Total
+		pre.Rankings[e.ID] = e.Total
 	}
 	return pre
 }
@@ -835,4 +953,158 @@ func getCandCodes(p, o string) (string, string) {
 		"P": "President",
 	}
 	return parties[p], office[o]
+}
+
+// formatTerms derives and formats search terms from a SearchData object
+// (ex; "Bush, George H.W. -> []string{"bush", "george", "hw")
+func formatTerms(terms []string) []string {
+	fmtStrs := []string{}
+	for _, term := range terms {
+		if filter(term) {
+			continue
+		}
+		// remove & replace non-alpha-numeric characters and lowercase text
+		reg, err := regexp.Compile("[^a-zA-Z0-9]+") // removes all non alpha-numeric characters
+		if err != nil {
+			log.Fatal(err)
+		}
+		rmApost := strings.Replace(term, "'", "", -1)    // don't split contractions (ex: 'can't' !-> "can", "t")
+		rmComma := strings.Replace(rmApost, ",", "", -1) // don't split numerical values > 999 (ex: 20,000 !-> 20 000)
+		lwr := strings.ToLower(rmComma)
+		regged := reg.ReplaceAllString(lwr, " ")
+		spl := strings.Split(regged, " ")
+		for _, s := range spl {
+			trim := strings.TrimSpace(s)
+			if trim != "" {
+				fmtStrs = append(fmtStrs, trim)
+			}
+		}
+	}
+
+	return fmtStrs
+}
+
+// filter generic terms & edge cases ("the", "for", "of", "",)
+// returns true if term meets filter criteria
+func filter(term string) bool {
+	f := map[string]bool{
+		"for":  true,
+		"the":  true,
+		"of":   true,
+		"":     true,
+		"and":  true,
+		"mr":   true,
+		"mr.":  true,
+		"mrs":  true,
+		"mrs.": true,
+		"ms.":  true,
+		"to":   true,
+	}
+	return f[term]
+}
+
+// wrap object from package donations
+func wrapObj(obj interface{}) interface{} {
+	var wrap interface{}
+	switch t := obj.(type) {
+	case *donations.Individual:
+		w := Individual{
+			ID:            obj.(*donations.Individual).ID,
+			Name:          obj.(*donations.Individual).Name,
+			City:          obj.(*donations.Individual).City,
+			State:         obj.(*donations.Individual).State,
+			Zip:           obj.(*donations.Individual).Zip,
+			Occupation:    obj.(*donations.Individual).Occupation,
+			TotalOutAmt:   obj.(*donations.Individual).TotalOutAmt,
+			TotalOutTxs:   obj.(*donations.Individual).TotalOutTxs,
+			AvgTxOut:      obj.(*donations.Individual).AvgTxOut,
+			TotalInAmt:    obj.(*donations.Individual).TotalInAmt,
+			TotalInTxs:    obj.(*donations.Individual).TotalInTxs,
+			AvgTxIn:       obj.(*donations.Individual).AvgTxIn,
+			NetBalance:    obj.(*donations.Individual).NetBalance,
+			RecipientsAmt: obj.(*donations.Individual).RecipientsAmt,
+			RecipientsTxs: obj.(*donations.Individual).RecipientsTxs,
+			SendersAmt:    obj.(*donations.Individual).SendersAmt,
+			SendersTxs:    obj.(*donations.Individual).SendersTxs,
+		}
+		wrap = w
+	case *donations.Committee:
+		w := Committee{
+			ID:           obj.(*donations.Committee).ID,
+			Name:         obj.(*donations.Committee).Name,
+			TresName:     obj.(*donations.Committee).TresName,
+			City:         obj.(*donations.Committee).City,
+			State:        obj.(*donations.Committee).State,
+			Designation:  obj.(*donations.Committee).Designation,
+			Type:         obj.(*donations.Committee).Type,
+			Party:        obj.(*donations.Committee).Party,
+			FilingFreq:   obj.(*donations.Committee).FilingFreq,
+			OrgType:      obj.(*donations.Committee).OrgType,
+			ConnectedOrg: obj.(*donations.Committee).ConnectedOrg,
+			CandID:       obj.(*donations.Committee).CandID,
+		}
+		wrap = w
+	case *donations.CmteTxData:
+		w := CmteTxData{
+			CmteID:                    obj.(*donations.CmteTxData).CmteID,
+			CandID:                    obj.(*donations.CmteTxData).CandID,
+			Party:                     obj.(*donations.CmteTxData).Party,
+			ContributionsInAmt:        obj.(*donations.CmteTxData).ContributionsInAmt,
+			ContributionsInTxs:        obj.(*donations.CmteTxData).ContributionsInTxs,
+			AvgContributionIn:         obj.(*donations.CmteTxData).AvgContributionIn,
+			OtherReceiptsInAmt:        obj.(*donations.CmteTxData).OtherReceiptsInAmt,
+			OtherReceiptsInTxs:        obj.(*donations.CmteTxData).OtherReceiptsInTxs,
+			AvgOtherIn:                obj.(*donations.CmteTxData).AvgOtherIn,
+			TotalIncomingAmt:          obj.(*donations.CmteTxData).TotalIncomingAmt,
+			TotalIncomingTxs:          obj.(*donations.CmteTxData).TotalIncomingTxs,
+			AvgIncoming:               obj.(*donations.CmteTxData).AvgIncoming,
+			TransfersAmt:              obj.(*donations.CmteTxData).TransfersAmt,
+			TransfersTxs:              obj.(*donations.CmteTxData).TransfersTxs,
+			AvgTransfer:               obj.(*donations.CmteTxData).AvgTransfer,
+			ExpendituresAmt:           obj.(*donations.CmteTxData).ExpendituresAmt,
+			ExpendituresTxs:           obj.(*donations.CmteTxData).ExpendituresTxs,
+			AvgExpenditure:            obj.(*donations.CmteTxData).AvgExpenditure,
+			TotalOutgoingAmt:          obj.(*donations.CmteTxData).TotalOutgoingAmt,
+			TotalOutgoingTxs:          obj.(*donations.CmteTxData).TotalOutgoingTxs,
+			AvgOutgoing:               obj.(*donations.CmteTxData).AvgOutgoing,
+			NetBalance:                obj.(*donations.CmteTxData).NetBalance,
+			TopIndvContributorsAmt:    obj.(*donations.CmteTxData).TopIndvContributorsAmt,
+			TopIndvContributorsTxs:    obj.(*donations.CmteTxData).TopIndvContributorsTxs,
+			TopCmteOrgContributorsAmt: obj.(*donations.CmteTxData).TopCmteOrgContributorsAmt,
+			TopCmteOrgContributorsTxs: obj.(*donations.CmteTxData).TopCmteOrgContributorsTxs,
+			TransferRecsAmt:           obj.(*donations.CmteTxData).TransferRecsAmt,
+			TransferRecsTxs:           obj.(*donations.CmteTxData).TransferRecsTxs,
+			TopExpRecipientsAmt:       obj.(*donations.CmteTxData).TopExpRecipientsAmt,
+			TopExpRecipientsTxs:       obj.(*donations.CmteTxData).TopExpRecipientsTxs,
+		}
+		wrap = w
+	case *donations.Candidate:
+		w := Candidate{
+			ID:                   obj.(*donations.Candidate).ID,
+			Name:                 obj.(*donations.Candidate).Name,
+			Party:                obj.(*donations.Candidate).Party,
+			ElectnYr:             obj.(*donations.Candidate).ElectnYr,
+			OfficeState:          obj.(*donations.Candidate).OfficeState,
+			Office:               obj.(*donations.Candidate).Office,
+			PCC:                  obj.(*donations.Candidate).PCC,
+			City:                 obj.(*donations.Candidate).City,
+			State:                obj.(*donations.Candidate).State,
+			TotalDirectInAmt:     obj.(*donations.Candidate).TotalDirectInAmt,
+			TotalDirectInTxs:     obj.(*donations.Candidate).TotalDirectInTxs,
+			AvgDirectIn:          obj.(*donations.Candidate).AvgDirectIn,
+			TotalDirectOutAmt:    obj.(*donations.Candidate).TotalDirectOutAmt,
+			TotalDirectOutTxs:    obj.(*donations.Candidate).TotalDirectOutTxs,
+			AvgDirectOut:         obj.(*donations.Candidate).AvgDirectOut,
+			NetBalanceDirectTx:   obj.(*donations.Candidate).NetBalanceDirectTx,
+			DirectRecipientsAmts: obj.(*donations.Candidate).DirectRecipientsAmts,
+			DirectRecipientsTxs:  obj.(*donations.Candidate).DirectRecipientsTxs,
+			DirectSendersAmts:    obj.(*donations.Candidate).DirectSendersAmts,
+			DirectSendersTxs:     obj.(*donations.Candidate).DirectSendersTxs,
+		}
+		wrap = w
+	default:
+		_ = t
+		wrap = nil
+	}
+	return wrap
 }

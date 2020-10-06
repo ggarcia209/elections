@@ -34,7 +34,7 @@ type IndexData struct {
 	LastUpdated    time.Time
 	Completed      map[string]bool // track categories completed in event of failure
 	YearsCompleted []string
-	Shards         shardMap // shardMap object defined in ./persist_index.go
+	Shards         ShardMap // ShardMap object defined in ./persist_index.go
 }
 
 // inverted index
@@ -76,7 +76,7 @@ func BuildIndex(year string) error {
 			LookupSize:  0,
 			LastUpdated: time.Now(),
 			Completed:   map[string]bool{"individuals": false, "committees": false, "candidates": false},
-			Shards:      make(shardMap),
+			Shards:      make(ShardMap),
 		}
 	}
 	fmt.Println("Years completed: ", indexData.YearsCompleted)
@@ -132,7 +132,7 @@ func UpdateIndex(year, bucket string) error {
 		id.Completed = make(map[string]bool)
 	}
 	if len(id.Shards) == 0 {
-		id.Shards = make(shardMap)
+		id.Shards = make(ShardMap)
 	}
 	fmt.Printf("bucket '%s' updating...\n", bucket)
 

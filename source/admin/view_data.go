@@ -35,6 +35,7 @@ func ViewMenu() error {
 		"View Top Rankings",
 		"View Yearly Totals",
 		"View Search Index",
+		"View Lookup Objects",
 		"View Index Metadata",
 		"Query DyanamoDB",
 		"Return to Main Menu",
@@ -85,6 +86,12 @@ func ViewMenu() error {
 			}
 		case menu.OptionsMap[ch] == "View Search Index":
 			err := indexing.ViewIndex()
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("ViewMenu failed: %v", err)
+			}
+		case menu.OptionsMap[ch] == "View Lookup Objects":
+			err := indexing.ViewLookup()
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("ViewMenu failed: %v", err)
@@ -141,12 +148,17 @@ func searchData() error {
 // returns results and provides sub menu for
 // selecting dataset by object ID and year
 func queryData() error {
+	id, err := indexing.GetIndexData()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("searchData failed: %v", err)
+	}
 	for {
 		// get query from user / return & print results
 		fmt.Println("*** Search ***")
 		txt := ui.GetQuery()
 		q := indexing.CreateQuery(txt, "local_admin")
-		res, err := indexing.GetResultsFromShards(q)
+		res, err := indexing.GetResultsFromShards(id, q)
 		if err != nil {
 			fmt.Println(err)
 			return fmt.Errorf("searchData failed: %v", err)

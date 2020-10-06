@@ -21,9 +21,10 @@ type resultList struct {
 	Results []string // new/updated ID references for given term encoded as Big Endian uint64s
 }
 
-type shardMap map[string]*shardRanges // schema: term: shards: range (min, max)
+// ShardMap records the number of shards for each term and the min, max values of each shard
+type ShardMap map[string]*shardRanges // schema: term: shards: range (min, max)
 
-// data for shards for each term in shardMap
+// data for shards for each term in ShardMap
 type shardRanges struct {
 	Term   string                // original search term
 	Shards float32               // number of shards for given term
@@ -35,6 +36,135 @@ type rangeTuple struct {
 	Range []string // (min, max)
 }
 
+// WriteOutIndex writes data from OUTPUT_PATH/db/search_index.db to ./index/db/search_data.db
+// use 0 to write out search index / 1 to write out index metadata
+func WriteOutIndex(opt int) error {
+	switch opt {
+	case 0:
+		err := writeOutIndex()
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("WriteOutIndex failed: %v", err)
+		}
+	case 1:
+		err := writeOutIndexData()
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("WriteOutIndex failed: %v", err)
+		}
+	default:
+		fmt.Println("invalid option")
+		return fmt.Errorf("WriteOutIndex failed: invalid option")
+	}
+	return nil
+}
+
+func writeOutIndex() error {
+	n := 25000 // items per iteration
+	t := 0     // total
+	pm, err := GetPartitionMap()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("writeOutIndex failed: %v", err)
+	}
+
+	// ran from ./admin_app/main
+	db, err := bolt.Open(OUTPUT_PATH+"/index/db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("saveIndexData failed: %v", err)
+	}
+
+	for prt := range pm {
+		// tx
+		fmt.Println("scanning partition: ", prt)
+		startKey := ""
+		for {
+			objs, currKey, err := BatchGetSequential(prt, startKey, n)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("saveIndexData failed: %v", err)
+			}
+			if len(objs) == 0 {
+				break
+			}
+			if err := db.Update(func(tx *bolt.Tx) error {
+				for _, obj := range objs {
+					res := obj.(SearchEntry)
+					luB, err := tx.CreateBucketIfNotExists([]byte(prt))
+					if err != nil {
+						fmt.Println(err)
+						return fmt.Errorf("tx failed failed: %v", err)
+					}
+
+					data, err := encodeResultsList(resultList{res.IDs})
+					if err != nil {
+						fmt.Println()
+						return fmt.Errorf("tx failed: %v", err)
+					}
+					if err := luB.Put([]byte(res.Term), data); err != nil { // serialize k,v
+						return fmt.Errorf("tx failed failed: %v", err)
+					}
+				}
+				return nil
+			}); err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("batchWriteLookup failed: %v", err)
+			}
+			if len(objs) < n {
+				t += len(objs)
+				fmt.Println("items scanned: ", t)
+				break
+			}
+			startKey = currKey
+			t += n
+			fmt.Println("items scanned: ", t)
+		}
+	}
+	fmt.Println("write out done - total items: ", t)
+	return nil
+}
+
+func writeOutIndexData() error {
+	id, err := getIndexData()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("WriteOutIndex failed: %v", err)
+	}
+
+	// ran from ./admin_app/main
+	db, err := bolt.Open("../../index/db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("saveIndexData failed: %v", err)
+	}
+
+	// tx
+	if err := db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte("index_data"))
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("tx failed failed: %v", err)
+		}
+		data, err := encodeIndexData(id)
+		if err != nil {
+			fmt.Println(err)
+			return fmt.Errorf("tx failed failed: %v", err)
+		}
+		if err := b.Put([]byte("data"), data); err != nil {
+			return fmt.Errorf("saveIndexData failed: %v", err)
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("saveIndexData failed: %v", err)
+	}
+	return nil
+
+}
+
 // save new Index entries
 func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, error) {
 	var t int64 // new terms
@@ -42,7 +172,7 @@ func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, err
 	var n int64 // new IDs/Search Data pairs wrote
 	// uints := make(map[string]map[string][]string) // store big endian encoded IDs for each shard
 	wrote := make(map[string]bool)
-	shards := make(shardMap) // shardMap buffer object
+	shards := make(ShardMap) // ShardMap buffer object
 	maxSize := 1250          // # of IDs (max size @ 4b/ID)
 	ns := "!"                // indicates max value not set for shard (shard incomplete)
 	fmt.Println("save index - writing objects to db/search_index.db")
@@ -316,7 +446,7 @@ func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, err
 	return int(n), int(t), nil
 }
 
-func getPreviousShards(id *IndexData, b *bolt.Bucket, term string, ids []string, terms map[string][]string, shards shardMap) (int, int, error) {
+func getPreviousShards(id *IndexData, b *bolt.Bucket, term string, ids []string, terms map[string][]string, shards ShardMap) (int, int, error) {
 	// begin aggregate existing data logic
 	si := 0 // shard index
 	t := 0  // new terms recorded in func call
@@ -743,7 +873,7 @@ func encodeIndexData(id *IndexData) ([]byte, error) {
 		YearsCompleted: id.YearsCompleted,
 	}
 
-	// encode shardMap nested objects
+	// encode ShardMap nested objects
 	shards := make(map[string]*protobuf.ShardRanges)
 	for term, sr := range id.Shards {
 		srPb := &protobuf.ShardRanges{
@@ -795,7 +925,7 @@ func decodeIndexData(raw []byte) (*IndexData, error) {
 	}
 
 	// decode shards
-	shards := make(shardMap)
+	shards := make(ShardMap)
 	shardsPb := data.GetShards()
 	for shard, srPb := range shardsPb {
 		sr := &shardRanges{

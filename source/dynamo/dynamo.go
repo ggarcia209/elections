@@ -155,9 +155,10 @@ func CreateItem(svc *dynamodb.DynamoDB, item interface{}, table *Table) error {
 
 // GetItem reads an item from the database
 func GetItem(svc *dynamodb.DynamoDB, q *Query, t *Table, item interface{}) (interface{}, error) {
+	key := keyMaker(q, t)
 	result, err := svc.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(t.TableName),
-		Key:       keyMaker(q, t),
+		Key:       key,
 	})
 	if err != nil {
 		fmt.Println(err.Error())
@@ -370,7 +371,7 @@ func BatchWriteDelete(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries 
 // 1 for each query/object returned.
 //   returns err if len(queries) != len(refObjs)
 func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query, refObjs []interface{}) ([]interface{}, error) {
-	if len(queries) > 25 {
+	if len(queries) > 100 {
 		return nil, fmt.Errorf("too many items to process")
 	}
 
@@ -411,9 +412,13 @@ func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query
 			// if not HTTP 5xx error
 			if err.(awserr.Error).Code() != dynamodb.ErrCodeInternalServerError {
 				fmt.Printf("unprocessed items: \n%v\n", result.UnprocessedKeys)
-				return nil, fmt.Errorf("BatchWriteCreate failed: %v", err)
+				return nil, fmt.Errorf("BatchGet failed: %v", err)
 			}
 			if err.(awserr.Error).Code() == "ValidationException" {
+				fmt.Printf("unprocessed items: \n%v\n", result.UnprocessedKeys)
+				return nil, err
+			}
+			if err.(awserr.Error).Code() == "RequestError" {
 				fmt.Printf("unprocessed items: \n%v\n", result.UnprocessedKeys)
 				return nil, err
 			}
@@ -426,7 +431,7 @@ func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query
 				}
 				fc.ExponentialBackoff() // waits
 				if fc.MaxRetriesReached == true {
-					return nil, fmt.Errorf("BatchWriteCreate failed: Max retries exceeded: %v", err)
+					return nil, fmt.Errorf("BatchGet failed: Max retries exceeded: %v", err)
 				}
 			}
 		}
@@ -436,7 +441,7 @@ func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query
 			err = dynamodbattribute.UnmarshalMap(r, &ref)
 			if err != nil {
 				fmt.Printf("Failed to unmarshal record, %v\n", err)
-				return nil, fmt.Errorf("GetItem failed: Failed to unmarshal record, %v", err)
+				return nil, fmt.Errorf("BatchGet failed: Failed to unmarshal record, %v", err)
 			}
 			items = append(items, ref)
 		}

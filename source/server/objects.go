@@ -2,6 +2,25 @@ package server
 
 import "time"
 
+// RankingsData wraps the donations.TopOverall object
+type RankingsData struct {
+	ID       string
+	Year     string
+	Bucket   string
+	Category string
+	Party    string
+	Rankings map[string]float32
+}
+
+// YrTotalData wraps the donatios.YrTotals object
+type YrTotalData struct {
+	ID       string
+	Year     string
+	Category string
+	Party    string
+	Total    float32
+}
+
 // Individual donor represents an individual donor.
 type Individual struct {
 	ID            string

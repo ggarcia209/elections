@@ -21,7 +21,7 @@ func BuildIndexFromYear() error {
 	indexing.OUTPUT_PATH = output
 	persist.OUTPUT_PATH = output
 	// create submenu
-	opts := []string{"Build New Index", "Update Index", "Return"}
+	opts := []string{"Build New Index", "Update Index", "Write Out Index", "Return"}
 	menu := ui.CreateMenu("admin-index-options", opts)
 
 	for {
@@ -48,6 +48,19 @@ func BuildIndexFromYear() error {
 			}
 		case choice == "Update Index":
 			err := update(year)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("BuildIndexFromYear failed: %v", err)
+			}
+		case choice == "Write Out Index":
+			subOpts := []string{"Write Out Search Index", "Write Out Index Data"}
+			sub := ui.CreateMenu("index-sub-menu", subOpts)
+			ch, err := ui.Ask4MenuChoice(sub)
+			if err != nil {
+				fmt.Println(err)
+				return fmt.Errorf("BuildIndexFromYear failed: %v", err)
+			}
+			err = indexing.WriteOutIndex(ch)
 			if err != nil {
 				fmt.Println(err)
 				return fmt.Errorf("BuildIndexFromYear failed: %v", err)
