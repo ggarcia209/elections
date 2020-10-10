@@ -241,7 +241,7 @@ func (s *indexServer) LookupObjects(ctx context.Context, in *pb.LookupObjRequest
 
 	// find matching search results
 	IDs := in.GetObjectIds()
-	sds, err := server.LookupByID(IDs)
+	sds, err := server.LookupByID(database, IDs)
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tLookupObjByID failed: %v", time.Now(), err.Error())
 		fmt.Println(errMsg)
@@ -273,7 +273,7 @@ func (s *indexServer) LookupObjects(ctx context.Context, in *pb.LookupObjRequest
 
 // retrieve object from cache/DynamoDB
 func (s *indexServer) GetIndividual(ctx context.Context, in *pb.LookupIndvRequest) (*pb.LookupIndvResponse, error) {
-	fmt.Println("called LookupIndividualt...")
+	fmt.Println("called LookupIndividual...")
 	out := &pb.LookupIndvResponse{
 		UID:      in.GetUID(),
 		ObjectID: in.GetObjectID(),
@@ -287,7 +287,7 @@ func (s *indexServer) GetIndividual(ctx context.Context, in *pb.LookupIndvReques
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
-	sd, err := server.LookupByID([]string{out.ObjectID})
+	sd, err := server.LookupByID(database, []string{out.ObjectID})
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tLookupIndividual failed: %v\tUID: %s", time.Now(), err, out.UID)
 		fmt.Println(errMsg)
@@ -308,16 +308,17 @@ func (s *indexServer) GetIndividual(ctx context.Context, in *pb.LookupIndvReques
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
-	year := years[0]
 
-	obj, err := server.GetObjectFromDisk(year, in.GetObjectID(), in.GetBucket())
+	q := server.CreateQueryFromSearchData(sd[0])
+	objs, err := server.GetObjectFromDynamo(database, q, sd[0].Bucket, years)
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tLookupIndividual failed: %v\tUID: %s", time.Now(), err, out.UID)
 		fmt.Println(errMsg)
 		out.Msg = fmt.Sprintf("%s", errMsg)
 		return out, errMsg
 	}
-	indv := obj.(server.Individual)
+	indv := objs[0].(server.Individual)
+
 	recAmtsSrt := util.SortMapObjectTotals(indv.RecipientsAmt)
 	recAmts := []*pb.TotalsMap{}
 	for _, e := range recAmtsSrt {
@@ -374,7 +375,7 @@ func (s *indexServer) GetCommittee(ctx context.Context, in *pb.LookupCmteRequest
 	}
 	out.Timestamp = ts
 
-	sd, err := server.LookupByID([]string{out.ObjectID})
+	sd, err := server.LookupByID(database, []string{out.ObjectID})
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tLookupCommittee failed: %v\tUID: %s", time.Now(), err, out.UID)
 		fmt.Println(errMsg)
@@ -392,11 +393,9 @@ func (s *indexServer) GetCommittee(ctx context.Context, in *pb.LookupCmteRequest
 	// Get object binary and return in response
 	/* support for multiple years and aggregated datasets will be available in future version */
 	years := in.GetYears()
-	year := years[0]
-
 	query := server.CreateQueryFromSearchData(sd[0])
 	st := time.Now()
-	obj, err := server.GetObjectFromDynamo(database, query, sd[0].Bucket, []string{year})
+	objs, err := server.GetObjectFromDynamo(database, query, sd[0].Bucket, years)
 	if err != nil {
 		if err.Error() == "TABLE_NOT_FOUND" {
 			out.Msg = err.Error()
@@ -408,7 +407,8 @@ func (s *indexServer) GetCommittee(ctx context.Context, in *pb.LookupCmteRequest
 		return out, errMsg
 	}
 	fmt.Println("get obj from dynamo time: ", time.Since(st))
-	cmte := obj[0].(server.Committee)
+	cmte := objs[0].(server.Committee)
+
 	cmtePb := pb.Committee{
 		ID:           cmte.ID,
 		Name:         cmte.Name,
@@ -429,7 +429,7 @@ func (s *indexServer) GetCommittee(ctx context.Context, in *pb.LookupCmteRequest
 	sd[0].Bucket = "cmte_tx_data"
 	query = server.CreateQueryFromSearchData(sd[0])
 	st = time.Now()
-	obj, err = server.GetObjectFromDynamo(database, query, sd[0].Bucket, []string{year})
+	objs, err = server.GetObjectFromDynamo(database, query, sd[0].Bucket, years)
 	// obj, err = server.GetObjectFromDisk(year, in.GetObjectID(), "cmte_tx_data")
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tLookupCommittee failed: %v\tUID: %s", time.Now(), err, out.UID)
@@ -438,7 +438,7 @@ func (s *indexServer) GetCommittee(ctx context.Context, in *pb.LookupCmteRequest
 		return out, errMsg
 	}
 	fmt.Println("get obj from dynamo time: ", time.Since(st))
-	cmteTx := obj[0].(server.CmteTxData)
+	cmteTx := objs[0].(server.CmteTxData)
 	indvAmtsSrt := util.SortMapObjectTotals(cmteTx.TopIndvContributorsAmt)
 	indvAmts := []*pb.TotalsMap{}
 	for _, e := range indvAmtsSrt {
@@ -555,7 +555,7 @@ func (s *indexServer) GetCandidate(ctx context.Context, in *pb.LookupCandRequest
 	}
 	out.Timestamp = ts
 
-	sd, err := server.LookupByID([]string{out.ObjectID})
+	sd, err := server.LookupByID(database, []string{out.ObjectID})
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tViewCandidate failed: %v\tUID: %s", time.Now(), err, out.UID)
 		fmt.Println(errMsg)
@@ -567,11 +567,9 @@ func (s *indexServer) GetCandidate(ctx context.Context, in *pb.LookupCandRequest
 	// Get object binary and return in response
 	/* support for multiple years and aggregated datasets will be available in future version */
 	years := in.GetYears()
-	year := years[0]
-
 	query := server.CreateQueryFromSearchData(sd[0])
 	st := time.Now()
-	obj, err := server.GetObjectFromDynamo(database, query, sd[0].Bucket, []string{year})
+	obj, err := server.GetObjectFromDynamo(database, query, sd[0].Bucket, years)
 	// obj, err := server.GetObjectFromDisk(year, in.GetObjectID(), "candidates")
 	if err != nil {
 		errMsg := fmt.Errorf("%v\tViewCandidate failed: %v\tUID: %s", time.Now(), err, out.UID)

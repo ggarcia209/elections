@@ -154,6 +154,8 @@ func CreateItem(svc *dynamodb.DynamoDB, item interface{}, table *Table) error {
 }
 
 // GetItem reads an item from the database
+// Returns Attribute Value map interface (map[stirng]interface{}) if object found
+// Returns interface of type item if object not found
 func GetItem(svc *dynamodb.DynamoDB, q *Query, t *Table, item interface{}) (interface{}, error) {
 	key := keyMaker(q, t)
 	result, err := svc.GetItem(&dynamodb.GetItemInput{

@@ -2,6 +2,9 @@ package server
 
 import "time"
 
+// Objects in this file are used to wrap the objects in package donations and maintain encapsulation.
+// Some fields not used by grpc-web client are removed
+
 // RankingsData wraps the donations.TopOverall object
 type RankingsData struct {
 	ID       string
@@ -21,7 +24,7 @@ type YrTotalData struct {
 	Total    float32
 }
 
-// Individual donor represents an individual donor.
+// Individual wraps donations.Individual
 type Individual struct {
 	ID            string
 	Name          string
@@ -43,8 +46,7 @@ type Individual struct {
 	SendersAmt    map[string]float32 // $ Value returned from each committee
 }
 
-// Committee represents a committee
-// Commitee objects both receive and send donations
+// Committee wraps donations.Committee
 type Committee struct {
 	ID           string
 	Name         string
@@ -61,9 +63,7 @@ type Committee struct {
 	CandID       string // null if Type != "H", "S", or "P"
 }
 
-// CmteTxData contains incoming/outgoing cashflow data, top contributors/recipiens of cashflows,
-// and the corresponding total $ values/# of transactions for each contributor/recipient.
-// Candidate data is derived by aggregating all affiliated committees into one CmteTxData object.
+// CmteTxData wraps donations.CmteTxData
 type CmteTxData struct {
 	CmteID                    string             // ID of committee directly linked to data
 	CandID                    string             // ID of candidate indirectly linked through Candidate PCC ID (nil if non-affiliated committee)
@@ -98,7 +98,7 @@ type CmteTxData struct {
 	TopExpRecipientsTxs       map[string]float32 // # of transactions for each top recipient by $ value
 }
 
-// CmteFinancials represents the financial data of a political action committee
+// CmteFinancials wraps donations.CmteTxData (not used in current version)
 type CmteFinancials struct {
 	CmteID string
 	Type   string
@@ -126,7 +126,7 @@ type CmteFinancials struct {
 	CovgEndDate     time.Time // coverage end date
 }
 
-// Candidate represents a candidate
+// Candidate wraps donations.Candidate
 type Candidate struct {
 	ID                   string
 	Name                 string
@@ -153,7 +153,7 @@ type Candidate struct {
 	DirectSendersTxs     map[string]float32
 }
 
-// CmpnFinancials contains financial data reported by a candidate's campaign
+// CmpnFinancials wraps donations.CpmnFinancials (not used in current version)
 type CmpnFinancials struct {
 	CandID         string
 	Name           string

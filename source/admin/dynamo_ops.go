@@ -362,8 +362,6 @@ func initDynamoDbDefault(year string) (*dynamo.DbInfo, error) {
 
 	// create Table objects
 	initTableObjs(db, year)
-	tbl := db.Tables["cf-2020-cmte_tx_data"]
-	fmt.Println(tbl.TableName, tbl.PrimaryKeyName, tbl.PrimaryKeyType, tbl.SortKeyName, tbl.SortKeyType)
 
 	err := initDynamoTables(db)
 	if err != nil {
@@ -464,6 +462,7 @@ func uploadFromDisk(db *dynamo.DbInfo, year, bucket string, n int) error {
 		} */
 
 	startKey, err := persist.GetKey(year, bucket)
+	fmt.Println("startKey: ", startKey)
 	if err != nil {
 		fmt.Println(err)
 		return fmt.Errorf("UploadFromDisk failed: %v", err)

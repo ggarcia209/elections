@@ -93,22 +93,19 @@ func SearchData(id *IndexData, txt string) ([]string, error) {
 
 // GetSearchResults returns the SearchData object for the given IDs
 func GetSearchResults(db *dynamo.DbInfo, ids []string, cache SearchDataMap) ([]indexing.SearchData, error) {
-	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
 	nilIDs, frmCache := indexing.LookupSearchDataFromCache(ids, cache)
-	frmDisk, err := indexing.LookupSearchDataFromDynamo(db, nilIDs) // refactor to read from DynamoDB
+	frmDb, err := indexing.LookupSearchDataFromDynamo(db, nilIDs)
 	if err != nil {
 		fmt.Println(err)
 		return []indexing.SearchData{}, fmt.Errorf("GetSearchResults failed: %v", err)
 	}
-	sds := indexing.ConsolidateSearchData(ids, frmCache, frmDisk)
-
+	sds := indexing.ConsolidateSearchData(ids, frmCache, frmDb)
 	return sds, nil
 }
 
 // LookupByID finds an entity by ID
-func LookupByID(IDs []string) ([]indexing.SearchData, error) {
-	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
-	sds, err := indexing.LookupSearchData(IDs)
+func LookupByID(db *dynamo.DbInfo, IDs []string) ([]indexing.SearchData, error) {
+	sds, err := indexing.LookupSearchDataFromDynamo(db, IDs)
 	if err != nil {
 		fmt.Println(err)
 		return []indexing.SearchData{}, fmt.Errorf("LookupByID failed: %v", err)
@@ -299,6 +296,7 @@ func GetObjectFromDisk(year, ID, bucket string) (interface{}, error) {
 func GetObjectFromDynamo(db *dynamo.DbInfo, query *dynamo.Query, bucket string, years []string) ([]interface{}, error) {
 	datasets := []interface{}{}
 
+	fmt.Println("query: ", query)
 	// retreive item's datasets for each year from db
 	refObj := getRefObj(bucket)
 	for _, yr := range years {
@@ -312,7 +310,7 @@ func GetObjectFromDynamo(db *dynamo.DbInfo, query *dynamo.Query, bucket string, 
 			fmt.Println(err)
 			return datasets, fmt.Errorf("GetObjectFromDynamo failed: %v", err)
 		}
-		wrap := wrapObj(obj)
+		wrap := wrapObject(obj, refObj)
 		datasets = append(datasets, wrap)
 	}
 
@@ -546,7 +544,9 @@ func initDynamoDbDefault() (*dynamo.DbInfo, error) {
 	db.SetSvc(dynamo.InitSesh())
 	db.SetFailConfig(dynamo.DefaultFailConfig)
 
-	years := []string{"2020"}
+	years := []string{
+		"2020", "2018", "2016", "2014", "2012",
+	}
 
 	for _, yr := range years {
 		// create Table objects
@@ -643,6 +643,7 @@ func initTableObjs(db *dynamo.DbInfo, year string) {
 	yrTotals := "cf-" + year + "-yearly_totals" // pk = Year
 	index := "cf-index"                         // pk = Index Partition
 	lookup := "cf-lookup"                       // pk = First Letter of Name
+	missing := "cf-missing"                     // "objects" / "lookup"
 
 	// create object tables
 	t := dynamo.CreateNewTableObj(indv, "State", "string", "ID", "string")
@@ -676,6 +677,10 @@ func initTableObjs(db *dynamo.DbInfo, year string) {
 	t = dynamo.CreateNewTableObj(lookup, "Partition", "string", "ID", "string")
 	db.AddTable(t)
 
+	// create Missing table
+	t = dynamo.CreateNewTableObj(missing, "Partition", "string", "ID", "string")
+	db.AddTable(t)
+
 	return
 }
 
@@ -683,17 +688,19 @@ func getRefObj(bucket string) interface{} {
 	var refObj interface{}
 	switch {
 	case bucket == "individuals":
-		refObj = &donations.Individual{}
+		refObj = Individual{}
 	case bucket == "candidates":
-		refObj = &donations.Candidate{}
+		refObj = Candidate{}
 	case bucket == "committees":
-		refObj = &donations.Committee{}
+		refObj = Committee{}
 	case bucket == "cmte_tx_data":
-		refObj = &donations.CmteTxData{}
+		refObj = CmteTxData{}
 	case bucket == "cmte_financials":
-		refObj = &donations.CmteFinancials{}
+		refObj = CmteFinancials{}
 	case bucket == "top_overall":
-		refObj = &donations.TopOverallData{}
+		refObj = RankingsData{}
+	case bucket == "totals":
+		refObj = YrTotalData{}
 	default:
 		refObj = nil
 	}
@@ -1003,108 +1010,259 @@ func filter(term string) bool {
 	return f[term]
 }
 
-// wrap object from package donations
-func wrapObj(obj interface{}) interface{} {
+// convert interface and wrap object returned from dynamo
+func wrapObject(obj, refObj interface{}) interface{} {
 	var wrap interface{}
 	switch t := obj.(type) {
-	case *donations.Individual:
+	case map[string]interface{}:
+		wrap = wrapObjAv(obj.(map[string]interface{}), refObj)
+	default:
+		wrap = wrapObjStruct(obj)
+		_ = t
+	}
+	return wrap
+}
+
+// wrap object from object struct in package donations
+func wrapObjStruct(obj interface{}) interface{} {
+	var wrap interface{}
+	switch t := obj.(type) {
+	case Individual:
+		indv := obj.(Individual)
 		w := Individual{
-			ID:            obj.(*donations.Individual).ID,
-			Name:          obj.(*donations.Individual).Name,
-			City:          obj.(*donations.Individual).City,
-			State:         obj.(*donations.Individual).State,
-			Zip:           obj.(*donations.Individual).Zip,
-			Occupation:    obj.(*donations.Individual).Occupation,
-			TotalOutAmt:   obj.(*donations.Individual).TotalOutAmt,
-			TotalOutTxs:   obj.(*donations.Individual).TotalOutTxs,
-			AvgTxOut:      obj.(*donations.Individual).AvgTxOut,
-			TotalInAmt:    obj.(*donations.Individual).TotalInAmt,
-			TotalInTxs:    obj.(*donations.Individual).TotalInTxs,
-			AvgTxIn:       obj.(*donations.Individual).AvgTxIn,
-			NetBalance:    obj.(*donations.Individual).NetBalance,
-			RecipientsAmt: obj.(*donations.Individual).RecipientsAmt,
-			RecipientsTxs: obj.(*donations.Individual).RecipientsTxs,
-			SendersAmt:    obj.(*donations.Individual).SendersAmt,
-			SendersTxs:    obj.(*donations.Individual).SendersTxs,
+			ID:            indv.ID,
+			Name:          indv.Name,
+			City:          indv.City,
+			State:         indv.State,
+			Occupation:    indv.Occupation,
+			TotalOutAmt:   indv.TotalOutAmt,
+			TotalOutTxs:   indv.TotalOutTxs,
+			AvgTxOut:      indv.AvgTxOut,
+			TotalInAmt:    indv.TotalInAmt,
+			TotalInTxs:    indv.TotalInTxs,
+			AvgTxIn:       indv.AvgTxIn,
+			NetBalance:    indv.NetBalance,
+			RecipientsAmt: indv.RecipientsAmt,
+			RecipientsTxs: indv.RecipientsTxs,
+			SendersAmt:    indv.SendersAmt,
+			SendersTxs:    indv.SendersTxs,
 		}
 		wrap = w
-	case *donations.Committee:
+	case Committee:
+		cmte := obj.(Committee)
 		w := Committee{
-			ID:           obj.(*donations.Committee).ID,
-			Name:         obj.(*donations.Committee).Name,
-			TresName:     obj.(*donations.Committee).TresName,
-			City:         obj.(*donations.Committee).City,
-			State:        obj.(*donations.Committee).State,
-			Designation:  obj.(*donations.Committee).Designation,
-			Type:         obj.(*donations.Committee).Type,
-			Party:        obj.(*donations.Committee).Party,
-			FilingFreq:   obj.(*donations.Committee).FilingFreq,
-			OrgType:      obj.(*donations.Committee).OrgType,
-			ConnectedOrg: obj.(*donations.Committee).ConnectedOrg,
-			CandID:       obj.(*donations.Committee).CandID,
+			ID:           cmte.ID,
+			Name:         cmte.Name,
+			TresName:     cmte.TresName,
+			City:         cmte.City,
+			State:        cmte.State,
+			Designation:  cmte.Designation,
+			Type:         cmte.Type,
+			Party:        cmte.Party,
+			FilingFreq:   cmte.FilingFreq,
+			OrgType:      cmte.OrgType,
+			ConnectedOrg: cmte.ConnectedOrg,
+			CandID:       cmte.CandID,
 		}
 		wrap = w
-	case *donations.CmteTxData:
+	case CmteTxData:
+		cmte := obj.(CmteTxData)
 		w := CmteTxData{
-			CmteID:                    obj.(*donations.CmteTxData).CmteID,
-			CandID:                    obj.(*donations.CmteTxData).CandID,
-			Party:                     obj.(*donations.CmteTxData).Party,
-			ContributionsInAmt:        obj.(*donations.CmteTxData).ContributionsInAmt,
-			ContributionsInTxs:        obj.(*donations.CmteTxData).ContributionsInTxs,
-			AvgContributionIn:         obj.(*donations.CmteTxData).AvgContributionIn,
-			OtherReceiptsInAmt:        obj.(*donations.CmteTxData).OtherReceiptsInAmt,
-			OtherReceiptsInTxs:        obj.(*donations.CmteTxData).OtherReceiptsInTxs,
-			AvgOtherIn:                obj.(*donations.CmteTxData).AvgOtherIn,
-			TotalIncomingAmt:          obj.(*donations.CmteTxData).TotalIncomingAmt,
-			TotalIncomingTxs:          obj.(*donations.CmteTxData).TotalIncomingTxs,
-			AvgIncoming:               obj.(*donations.CmteTxData).AvgIncoming,
-			TransfersAmt:              obj.(*donations.CmteTxData).TransfersAmt,
-			TransfersTxs:              obj.(*donations.CmteTxData).TransfersTxs,
-			AvgTransfer:               obj.(*donations.CmteTxData).AvgTransfer,
-			ExpendituresAmt:           obj.(*donations.CmteTxData).ExpendituresAmt,
-			ExpendituresTxs:           obj.(*donations.CmteTxData).ExpendituresTxs,
-			AvgExpenditure:            obj.(*donations.CmteTxData).AvgExpenditure,
-			TotalOutgoingAmt:          obj.(*donations.CmteTxData).TotalOutgoingAmt,
-			TotalOutgoingTxs:          obj.(*donations.CmteTxData).TotalOutgoingTxs,
-			AvgOutgoing:               obj.(*donations.CmteTxData).AvgOutgoing,
-			NetBalance:                obj.(*donations.CmteTxData).NetBalance,
-			TopIndvContributorsAmt:    obj.(*donations.CmteTxData).TopIndvContributorsAmt,
-			TopIndvContributorsTxs:    obj.(*donations.CmteTxData).TopIndvContributorsTxs,
-			TopCmteOrgContributorsAmt: obj.(*donations.CmteTxData).TopCmteOrgContributorsAmt,
-			TopCmteOrgContributorsTxs: obj.(*donations.CmteTxData).TopCmteOrgContributorsTxs,
-			TransferRecsAmt:           obj.(*donations.CmteTxData).TransferRecsAmt,
-			TransferRecsTxs:           obj.(*donations.CmteTxData).TransferRecsTxs,
-			TopExpRecipientsAmt:       obj.(*donations.CmteTxData).TopExpRecipientsAmt,
-			TopExpRecipientsTxs:       obj.(*donations.CmteTxData).TopExpRecipientsTxs,
+			CmteID:                    cmte.CmteID,
+			CandID:                    cmte.CandID,
+			Party:                     cmte.Party,
+			ContributionsInAmt:        cmte.ContributionsInAmt,
+			ContributionsInTxs:        cmte.ContributionsInTxs,
+			AvgContributionIn:         cmte.AvgContributionIn,
+			OtherReceiptsInAmt:        cmte.OtherReceiptsInAmt,
+			OtherReceiptsInTxs:        cmte.OtherReceiptsInTxs,
+			AvgOtherIn:                cmte.AvgOtherIn,
+			TotalIncomingAmt:          cmte.TotalIncomingAmt,
+			TotalIncomingTxs:          cmte.TotalIncomingTxs,
+			AvgIncoming:               cmte.AvgIncoming,
+			TransfersAmt:              cmte.TransfersAmt,
+			TransfersTxs:              cmte.TransfersTxs,
+			AvgTransfer:               cmte.AvgTransfer,
+			ExpendituresAmt:           cmte.ExpendituresAmt,
+			ExpendituresTxs:           cmte.ExpendituresTxs,
+			AvgExpenditure:            cmte.AvgExpenditure,
+			TotalOutgoingAmt:          cmte.TotalOutgoingAmt,
+			TotalOutgoingTxs:          cmte.TotalOutgoingTxs,
+			AvgOutgoing:               cmte.AvgOutgoing,
+			NetBalance:                cmte.NetBalance,
+			TopIndvContributorsAmt:    cmte.TopIndvContributorsAmt,
+			TopIndvContributorsTxs:    cmte.TopIndvContributorsTxs,
+			TopCmteOrgContributorsAmt: cmte.TopCmteOrgContributorsAmt,
+			TopCmteOrgContributorsTxs: cmte.TopCmteOrgContributorsTxs,
+			TransferRecsAmt:           cmte.TransferRecsAmt,
+			TransferRecsTxs:           cmte.TransferRecsTxs,
+			TopExpRecipientsAmt:       cmte.TopExpRecipientsAmt,
+			TopExpRecipientsTxs:       cmte.TopExpRecipientsTxs,
 		}
 		wrap = w
-	case *donations.Candidate:
+	case Candidate:
+		cand := obj.(Candidate)
 		w := Candidate{
-			ID:                   obj.(*donations.Candidate).ID,
-			Name:                 obj.(*donations.Candidate).Name,
-			Party:                obj.(*donations.Candidate).Party,
-			ElectnYr:             obj.(*donations.Candidate).ElectnYr,
-			OfficeState:          obj.(*donations.Candidate).OfficeState,
-			Office:               obj.(*donations.Candidate).Office,
-			PCC:                  obj.(*donations.Candidate).PCC,
-			City:                 obj.(*donations.Candidate).City,
-			State:                obj.(*donations.Candidate).State,
-			TotalDirectInAmt:     obj.(*donations.Candidate).TotalDirectInAmt,
-			TotalDirectInTxs:     obj.(*donations.Candidate).TotalDirectInTxs,
-			AvgDirectIn:          obj.(*donations.Candidate).AvgDirectIn,
-			TotalDirectOutAmt:    obj.(*donations.Candidate).TotalDirectOutAmt,
-			TotalDirectOutTxs:    obj.(*donations.Candidate).TotalDirectOutTxs,
-			AvgDirectOut:         obj.(*donations.Candidate).AvgDirectOut,
-			NetBalanceDirectTx:   obj.(*donations.Candidate).NetBalanceDirectTx,
-			DirectRecipientsAmts: obj.(*donations.Candidate).DirectRecipientsAmts,
-			DirectRecipientsTxs:  obj.(*donations.Candidate).DirectRecipientsTxs,
-			DirectSendersAmts:    obj.(*donations.Candidate).DirectSendersAmts,
-			DirectSendersTxs:     obj.(*donations.Candidate).DirectSendersTxs,
+			ID:                   cand.ID,
+			Name:                 cand.Name,
+			Party:                cand.Party,
+			ElectnYr:             cand.OfficeState,
+			Office:               cand.Office,
+			PCC:                  cand.PCC,
+			City:                 cand.City,
+			State:                cand.State,
+			TotalDirectOutAmt:    cand.TotalDirectOutAmt,
+			TotalDirectOutTxs:    cand.TotalDirectOutTxs,
+			AvgDirectOut:         cand.AvgDirectOut,
+			TotalDirectInAmt:     cand.TotalDirectInAmt,
+			TotalDirectInTxs:     cand.TotalDirectInTxs,
+			AvgDirectIn:          cand.AvgDirectIn,
+			DirectRecipientsAmts: cand.DirectRecipientsAmts,
+			DirectRecipientsTxs:  cand.DirectRecipientsTxs,
+			DirectSendersAmts:    cand.DirectSendersAmts,
+			DirectSendersTxs:     cand.DirectSendersTxs,
 		}
 		wrap = w
 	default:
 		_ = t
 		wrap = nil
+		fmt.Println("invalid interface found")
+	}
+	return wrap
+}
+
+// derive object form attribute value map
+func wrapObjAv(av map[string]interface{}, obj interface{}) interface{} {
+	var wrap interface{}
+	switch t := obj.(type) {
+	case Individual:
+		w := Individual{
+			ID:            wrapString(av["ID"]),
+			Name:          wrapString(av["Name"]),
+			City:          wrapString(av["City"]),
+			State:         wrapString(av["State"]),
+			Zip:           wrapString(av["Zip"]),
+			Occupation:    wrapString(av["Occupation"]),
+			TotalOutAmt:   wrapFloat(av["TotalOutAmt"]),
+			TotalOutTxs:   wrapFloat(av["TotalOutTxs"]),
+			AvgTxOut:      wrapFloat(av["AvgTxOut"]),
+			TotalInAmt:    wrapFloat(av["TotalInAmt"]),
+			TotalInTxs:    wrapFloat(av["TotalInTxs"]),
+			AvgTxIn:       wrapFloat(av["AvgTxIn"]),
+			NetBalance:    wrapFloat(av["NetBalance"]),
+			RecipientsAmt: wrapTotals(av["RecipientsAmt"]),
+			RecipientsTxs: wrapTotals(av["RecipientsTxs"]),
+			SendersAmt:    wrapTotals(av["SendersAmt"]),
+			SendersTxs:    wrapTotals(av["SendersTxs"]),
+		}
+
+		wrap = w
+	case Committee:
+		w := Committee{
+			ID:           wrapString(av["ID"]),
+			Name:         wrapString(av["Name"]),
+			TresName:     wrapString(av["Tresname"]),
+			City:         wrapString(av["City"]),
+			State:        wrapString(av["State"]),
+			Designation:  wrapString(av["Designation"]),
+			Type:         wrapString(av["Type"]),
+			Party:        wrapString(av["Party"]),
+			FilingFreq:   wrapString(av["FilingFreq"]),
+			OrgType:      wrapString(av["OrgType"]),
+			ConnectedOrg: wrapString(av["ConnectedOrg"]),
+			CandID:       wrapString(av["CandID"]),
+		}
+		wrap = w
+	case CmteTxData:
+		w := CmteTxData{
+			CmteID:                    wrapString(av["CmteID"]),
+			CandID:                    wrapString(av["CandID"]),
+			Party:                     wrapString(av["Party"]),
+			ContributionsInAmt:        wrapFloat(av["ContributionsInAmt"]),
+			ContributionsInTxs:        wrapFloat(av["ContributionsInTxs"]),
+			AvgContributionIn:         wrapFloat(av["AvgContributionInAmt"]),
+			OtherReceiptsInAmt:        wrapFloat(av["OtherReciptsInAmt"]),
+			OtherReceiptsInTxs:        wrapFloat(av["OtherReciptsInTxs"]),
+			AvgOtherIn:                wrapFloat(av["AvgOtherInAmt"]),
+			TotalIncomingAmt:          wrapFloat(av["TotalIncomingAmt"]),
+			TotalIncomingTxs:          wrapFloat(av["TotalIncomingTxs"]),
+			AvgIncoming:               wrapFloat(av["AvgIncoming"]),
+			TransfersAmt:              wrapFloat(av["TransfersAmt"]),
+			TransfersTxs:              wrapFloat(av["TransfersTxs"]),
+			AvgTransfer:               wrapFloat(av["AvgTransfer"]),
+			ExpendituresAmt:           wrapFloat(av["ExpendituresAmt"]),
+			ExpendituresTxs:           wrapFloat(av["ExpendituresTxs"]),
+			AvgExpenditure:            wrapFloat(av["AvgExpenditure"]),
+			TotalOutgoingAmt:          wrapFloat(av["TotalOutgoingAmt"]),
+			TotalOutgoingTxs:          wrapFloat(av["TotalOutgoingTxs"]),
+			AvgOutgoing:               wrapFloat(av["AvgOutgoing"]),
+			NetBalance:                wrapFloat(av["NetBalance"]),
+			TopIndvContributorsAmt:    wrapTotals(av["TopIndvContributorsAmt"]),
+			TopIndvContributorsTxs:    wrapTotals(av["TopIndvContributorsTxs"]),
+			TopCmteOrgContributorsAmt: wrapTotals(av["TopCmteOrgContributorsAmt"]),
+			TopCmteOrgContributorsTxs: wrapTotals(av["TopCmteORgContributorsTxs"]),
+			TransferRecsAmt:           wrapTotals(av["TransferRecsAmt"]),
+			TransferRecsTxs:           wrapTotals(av["TransferRecsTxs"]),
+			TopExpRecipientsAmt:       wrapTotals(av["TopExpRecipientsAmt"]),
+			TopExpRecipientsTxs:       wrapTotals(av["TopExpRecipientsTxs"]),
+		}
+		wrap = w
+	case Candidate:
+		w := Candidate{
+			ID:                   wrapString(av["ID"]),
+			Name:                 wrapString(av["Name"]),
+			Party:                wrapString(av["Party"]),
+			ElectnYr:             wrapString(av["ElectnYr"]),
+			OfficeState:          wrapString(av["OfficeState"]),
+			Office:               wrapString(av["Office"]),
+			PCC:                  wrapString(av["PCC"]),
+			City:                 wrapString(av["City"]),
+			State:                wrapString(av["State"]),
+			TotalDirectOutAmt:    wrapFloat(av["TotalDirectOutAmt"]),
+			TotalDirectOutTxs:    wrapFloat(av["TotalDirectOutTxs"]),
+			AvgDirectOut:         wrapFloat(av["AvgDirectOut"]),
+			TotalDirectInAmt:     wrapFloat(av["TotalDirectInAmt"]),
+			TotalDirectInTxs:     wrapFloat(av["TotalDirectInTxs"]),
+			AvgDirectIn:          wrapFloat(av["AvgDirectIn"]),
+			DirectRecipientsAmts: wrapTotals(av["DirectRecipientsAmts"]),
+			DirectRecipientsTxs:  wrapTotals(av["DirectRecipientsTxs"]),
+			DirectSendersAmts:    wrapTotals(av["DirectSendersAmts"]),
+			DirectSendersTxs:     wrapTotals(av["DirectSendersTxs"]),
+		}
+		wrap = w
+	default:
+		_ = t
+		wrap = nil
+	}
+	return wrap
+}
+
+func wrapString(intf interface{}) string {
+	str := ""
+	if intf == nil {
+		return str
+	}
+	str = intf.(string)
+	return str
+}
+
+func wrapFloat(intf interface{}) float32 {
+	fl := float32(0.0)
+	if intf == nil {
+		return fl
+	}
+	fl = float32(intf.(float64))
+	return fl
+}
+
+func wrapTotals(intf interface{}) map[string]float32 {
+	wrap := make(map[string]float32)
+	if intf == nil {
+		return wrap
+	}
+	m := intf.(map[string]interface{})
+	for k, v := range m {
+		wrap[k] = float32(v.(float64))
 	}
 	return wrap
 }

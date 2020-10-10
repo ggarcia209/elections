@@ -57,15 +57,18 @@ function getSearchResponse(query) {
             console.log(err.message)
             if (err.message == "MAX_LENGTH") {
                 displayErrorMsg()
+                return
             }
-            return
+            if (err.message == "NO_RESULTS") {
+                displayNoResults()
+                return
+            }
+            if (err.message == "DEADLINE_EXCEEDED") {
+                displayTimeout()
+                return
+            }
         }
-        let msg = resp.getMsg()
-        console.log(msg)
-        if (msg == "NO_RESULTS") {
-            displayNoResults()
-            return
-        }
+
         displaySearchResults(resp)
     });
     return
@@ -108,6 +111,14 @@ function displayErrorMsg() {
     let resultsString = "";
     resultsString += "<li class='list-full-item'>"
     resultsString += "Too many results! Please refine your search by adding one or more search terms and use the search bar above to try again.";
+    resultsString += "</li>";
+    document.querySelector("#search-list").innerHTML = resultsString;
+}
+
+function displayTimeout() {
+    let resultsString = "";
+    resultsString += "<li class='list-full-item'>"
+    resultsString += "Oops! The request took too long to complete. Please refresh the page to try again, or modify your query to include less keywords.";
     resultsString += "</li>";
     document.querySelector("#search-list").innerHTML = resultsString;
 }

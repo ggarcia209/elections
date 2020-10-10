@@ -42,7 +42,7 @@ type SearchEntry struct {
 
 // LookupEntry is used to store & retreive SearchData objects from DynamoDB
 type LookupEntry struct {
-	Partition string // first 2 chars of FEC ID / first 3 letters of MD5 hash ID
+	Partition string // last 2 chars of FEC ID / first 2 letters of MD5 hash ID
 	ID        string
 	Name      string
 	City      string
@@ -85,10 +85,19 @@ func (s prtEntries) Len() int           { return len(s) }
 func (s prtEntries) Less(i, j int) bool { return s[i].Prt < s[j].Prt }
 func (s prtEntries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
+// object info returned from dynamodb and sent through chan
 type chanResult struct {
 	SD  SearchData
 	Err error
 }
+
+// used to record objects missing from dynamoDB
+type missingLog struct {
+	Partition string
+	ID        string
+}
+
+/* DYNAMO OPERATIONS */
 
 // CreateQuery returns a Query object with the given data
 func CreateQuery(text, UID string) Query {
@@ -99,6 +108,252 @@ func CreateQuery(text, UID string) Query {
 	}
 	return q
 }
+
+// LookupSearchDataFromDynamo retreives corresponding SearchData obj for ID from DynamoDB
+func LookupSearchDataFromDynamo(db *dynamo.DbInfo, ids []string) ([]SearchData, error) {
+	tn := "cf-lookup"
+	results := []SearchData{}
+	dataChan := make(chan chanResult)
+	var wg sync.WaitGroup
+
+	for _, ID := range ids {
+		wg.Add(1)
+		go getSearchDataAsync(db, ID, tn, dataChan, &wg)
+	}
+	for i := 0; i < len(ids); i++ {
+		msg := <-dataChan
+		obj, err := msg.SD, msg.Err
+		if err != nil {
+			fmt.Println(err)
+		}
+		if obj.ID == "" {
+			continue
+		}
+		sd := SearchData{
+			ID:       obj.ID,
+			Name:     obj.Name,
+			City:     obj.City,
+			State:    obj.State,
+			Employer: obj.Employer,
+			Bucket:   obj.Bucket,
+			Years:    obj.Years,
+		}
+		results = append(results, sd)
+	}
+	wg.Wait()
+
+	return results, nil
+}
+
+// get SearchData objects from dynamo lookup table asynchronously (called in goroutine)
+func getSearchDataAsync(db *dynamo.DbInfo, ID, tn string, dc chan chanResult, wg *sync.WaitGroup) {
+	defer wg.Done()
+	prt := getLookupDynamoPrt(ID)
+	q := dynamo.CreateNewQueryObj(prt, ID)
+	refObj := LookupEntry{}
+	sd := SearchData{
+		ID:       "",
+		Name:     "Unknown",
+		City:     "???",
+		State:    "???",
+		Employer: "",
+		Bucket:   "indviduals",
+		Years:    []string{"all-time"},
+	}
+
+	retries := 0
+	maxRetries := 5
+	for { // retry loop - breaks if successful / returns if maxRetries exceeded
+		obj, err := dynamo.GetItem(db.Svc, q, db.Tables[tn], refObj)
+		if err != nil {
+			if awsErr, ok := err.(awserr.Error); ok {
+				if awsErr.Code() == "RequestError" {
+					// wait and retry
+					fmt.Println("Request failed - retrying...")
+					time.Sleep(50 * time.Millisecond)
+					retries++
+					if retries > maxRetries {
+						msg := "MAX_RETRIES_EXCEEDED"
+						fmt.Println(msg)
+						err = fmt.Errorf(msg)
+						cr := chanResult{sd, err}
+						dc <- cr
+						return
+					}
+					continue
+				}
+				fmt.Println("getSearchDataAsync failed: ", awsErr.Code(), awsErr.Message())
+			} else {
+				fmt.Println("getSearchDataAsync failed: ", err.Error())
+				cr := chanResult{sd, err}
+				dc <- cr
+				return
+			}
+		}
+		if err != nil {
+			fmt.Println("getSearchDataAsync failed: ", err)
+			cr := chanResult{sd, err}
+			dc <- cr
+			return
+		}
+
+		switch t := obj.(type) {
+		case LookupEntry:
+			lu := obj.(LookupEntry)
+			sd = SearchData{
+				ID:       lu.ID,
+				Name:     lu.Name,
+				City:     lu.City,
+				State:    lu.State,
+				Employer: lu.Employer,
+				Bucket:   lu.Bucket,
+				Years:    lu.Years,
+			}
+			if sd.ID == "" {
+				fmt.Println("NO ID FOUND: ", prt, ID)
+				err := fmt.Errorf("OBJ_NOT_FOUND")
+				fmt.Println("logging missing item...")
+				logErr := logMissingItem(db, ID, true) // log item if missing from db
+				if logErr != nil {
+					fmt.Println("failed to log missing item: ", logErr)
+					err = fmt.Errorf("OBJ_NOT_FOUND_LOG_FAILED")
+				}
+				cr := chanResult{sd, err}
+				dc <- cr
+				return
+			}
+		case map[string]interface{}:
+			intf := obj.(map[string]interface{})
+			id, name, city, state, employer, bucket := "", "", "", "", "", ""
+			years := []string{}
+			if intf["ID"] == nil {
+				fmt.Println("NO ID FOUND: ", prt, ID)
+				err := fmt.Errorf("OBJ_NOT_FOUND")
+				fmt.Println("logging missing item...")
+				logErr := logMissingItem(db, ID, true)
+				if logErr != nil {
+					fmt.Println("failed to log missing item: ", logErr)
+					err = fmt.Errorf("OBJ_NOT_FOUND_LOG_FAILED")
+				}
+				cr := chanResult{sd, err}
+				dc <- cr
+				return
+			} else {
+				id = intf["ID"].(string)
+			}
+			if intf["Name"] == nil {
+				name = "Unknown"
+			} else {
+				name = intf["Name"].(string)
+			}
+			if intf["City"] == nil {
+				city = "???"
+			} else {
+				city = intf["City"].(string)
+			}
+			if intf["State"] == nil {
+				state = "???"
+			} else {
+				state = intf["State"].(string)
+			}
+			if intf["Employer"] == nil {
+				employer = ""
+			} else {
+				employer = intf["Employer"].(string)
+			}
+			if intf["Bucket"] == nil {
+				bucket = "committees"
+			} else {
+				bucket = intf["Bucket"].(string)
+			}
+			if intf["Years"] == nil {
+				years = append(years, "all-time")
+			} else {
+				for _, yr := range intf["Years"].([]interface{}) {
+					years = append(years, yr.(string))
+				}
+			}
+			sd = SearchData{
+				ID:       id,
+				Name:     name,
+				City:     city,
+				State:    state,
+				Employer: employer,
+				Bucket:   bucket,
+				Years:    years,
+			}
+		default:
+			_ = t
+			fmt.Println("invalid interface found")
+		}
+
+		cr := chanResult{sd, nil}
+		dc <- cr
+		break
+	}
+
+	return
+}
+
+// derive dynamo table partition from ID
+func getLookupDynamoPrt(id string) string {
+	prt := ""
+	if len(id) == 9 { // get last 2 chars of FEC ID
+		ss := strings.Split(id, "")
+		st := ss[len(id)-2:]
+		prt := strings.Join(st, "")
+		return prt
+	}
+	if len(id) == 32 { // get first 2 chars of hash ID
+		ss := strings.Split(id, "")
+		st := ss[:2]
+		prt := strings.Join(st, "")
+		return prt
+	}
+	return prt
+}
+
+// log items not found in dynamo tables
+func logMissingItem(db *dynamo.DbInfo, ID string, lookup bool) error {
+	item := missingLog{ID: ID}
+	tn := "cf-missing"
+	if lookup {
+		item.Partition = "lookup"
+	} else {
+		item.Partition = "objects"
+	}
+
+	retries := 0
+	maxRetries := 5
+	for { // retry loop - breaks if successful / returns if maxRetries exceeded
+		err := dynamo.CreateItem(db.Svc, item, db.Tables[tn])
+		if err != nil {
+			if awsErr, ok := err.(awserr.Error); ok {
+				if awsErr.Code() == "RequestError" {
+					// wait and retry
+					fmt.Println("Request failed - retrying...")
+					time.Sleep(50 * time.Millisecond)
+					retries++
+					if retries > maxRetries {
+						msg := "MAX_RETRIES_EXCEEDED"
+						fmt.Println(msg)
+						err := fmt.Errorf(msg)
+						return err
+					}
+					continue
+				}
+				fmt.Println("logMissingItem failed: ", awsErr.Code(), awsErr.Message())
+			} else {
+				fmt.Println("logMissingItem failed: ", err.Error())
+				return fmt.Errorf(awsErr.Code())
+			}
+		}
+		break
+	}
+	return nil
+}
+
+/* DISK OPERATIONS */
 
 // GetResultsFromShards returns search results from the sharded index stored on disk
 func GetResultsFromShards(id *IndexData, q Query) ([]string, error) {
@@ -224,11 +479,9 @@ func GetResultsFromShards(id *IndexData, q Query) ([]string, error) {
 			}
 
 			if min0 > max1 {
-				fmt.Println("skipping shard ", y)
 				continue // skip
 			}
 			if max0 < min1 {
-				fmt.Println("breaking at shard ", y)
 				break // stop
 			}
 
@@ -324,7 +577,388 @@ func GetResultsFromShards(id *IndexData, q Query) ([]string, error) {
 	return common, nil
 }
 
-// GetResultsFromDynamo returns search results from the sharded index stored in DynamoDB
+// get ids in single shard
+func getShard(db *bolt.DB, id string) ([]string, error) {
+	result := []string{}
+	prt := getPartition(id)
+
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(prt))
+		id = strings.TrimSpace(id)
+		data := b.Get([]byte(id))
+		ids, err := decodeResultsList(data)
+		if err != nil {
+			return fmt.Errorf("tx failed: %v", err)
+		}
+		result = ids
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("getShard failed: %s", err)
+	}
+
+	return result, nil
+}
+
+// check if single term query is ID for lookup
+func checkForID(id string) bool {
+	fmt.Println("ID: ", id)
+	if len(id) == 32 {
+		fmt.Println("ID found - len 32")
+		return true
+	}
+	if len(id) != 9 {
+		fmt.Println("not ID - len != 9 || 32")
+		return false
+	}
+
+	fecIDs := map[string]bool{
+		"C": true, "c": true, "H": true, "h": true,
+		"S": true, "s": true, "P": true, "p": true,
+	}
+	nums := map[string]bool{
+		"0": true, "1": true, "2": true, "3": true, "4": true,
+		"5": true, "6": true, "7": true, "8": true, "9": true,
+	}
+	ss := strings.Split(id, "")
+	for i, s := range ss {
+		if i == 0 {
+			if !fecIDs[s] {
+				fmt.Println("not FEC ID code")
+				return false
+			}
+		}
+		if i > 0 && !nums[s] {
+			fmt.Println("not id - alphanumeric sequence found")
+			return false
+		}
+	}
+	fmt.Println("ID found")
+	return true
+}
+
+// sortMap converts k:v pairs to struct, adds and sorts by len(v)
+func sortMap(m map[string][]string) []Data {
+	// []Data represnts inverted index and corresponding SearchData objects
+	var ss []Data
+	for k, v := range m {
+		ss = append(ss, Data{k, sortIDs(v), len(v)}) // term, refs, len
+	}
+
+	sort.Slice(ss, func(i, j int) bool {
+		return ss[i].Len < ss[j].Len
+	})
+
+	return ss
+}
+
+// sort lookupPairs by ID (key) values
+func sortIDs(lu []string) []string {
+	sort.Slice(lu, func(i, j int) bool {
+		return lu[i] < lu[j]
+	})
+	return lu
+}
+
+// intersection returns the intersection of two integer slices
+func intersection(s1, s2 []string) []string {
+	if len(s1) > len(s2) {
+		// swap
+		s1, s2 = s2, s1
+	}
+	if len(s1) == 0 {
+		return s2
+	}
+	max := s1[len(s1)-1]
+	checkMap := make(map[string]bool)
+	common := []string{}
+
+	for _, v := range s1 {
+		checkMap[v] = true
+	}
+	for _, v := range s2 {
+		if v > max {
+			break // break if v.ID > largest ID value in smaller slice
+		}
+		if checkMap[v] { // common to both Entries
+			common = append(common, v)
+		}
+	}
+	return common
+}
+
+// GetIndexData retrieves the index metadata from disk
+func GetIndexData() (*IndexData, error) {
+	id, err := getIndexData()
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("ViewIndexData failed: %v", err)
+	}
+	return id, nil
+}
+
+// LookupSearchDataFromCache retrieves SearchData objects from an in-memory cache
+func LookupSearchDataFromCache(ids []string, cache map[string]SearchData) ([]string, []SearchData) {
+	sds := []SearchData{}
+	nilIDs := []string{}
+
+	for _, ID := range ids {
+		sd := cache[ID]
+		if sd.ID != "" {
+			sds = append(sds, sd)
+		} else {
+			nilIDs = append(nilIDs, ID)
+		}
+	}
+
+	return nilIDs, sds
+}
+
+// LookupSearchData Retreives corresponding SearchData obj for ID from disk
+func LookupSearchData(ids []string) ([]SearchData, error) {
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
+	}
+
+	results, err := getSearchData(db, ids)
+	if err != nil {
+		fmt.Println(err)
+		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
+	}
+
+	return results, nil
+}
+
+// ViewIndex displays the index
+func ViewIndex() error {
+	ct := 0
+
+	// get partition map
+	partitions, err := GetPartitionMap()
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ViewIndex failed: %v", err)
+	}
+	if len(partitions) == 0 {
+		fmt.Println("*** Index does not exist! ***")
+		return nil
+	}
+
+	// sort partition map
+	es := prtEntries{}
+	for k, v := range partitions {
+		e := prtEntry{
+			Prt: k,
+			B:   v,
+		}
+		es = append(es, e)
+	}
+	sort.Sort(&es)
+
+	// open db
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ViewIndex failed: %v", err)
+	}
+	defer db.Close()
+
+	totalWCU := 0.0
+	// iterate through each key in each partiton in alphabetical order
+	err = db.View(func(tx *bolt.Tx) error {
+		for _, prt := range es {
+			b := tx.Bucket([]byte(prt.Prt))
+			c := b.Cursor()
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				d, err := decodeResultsList(v)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("tx failed: %v", err)
+				}
+				fmt.Printf("Partition: %s\tTerm: %s\tReferences: %d\tSize: %d\n", prt.Prt, k, len(d), len(v))
+				ct++
+				wcuPerShard := float64((len(v) / 1000)) // 1KB = 1 WCU
+				totalWCU += wcuPerShard
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ViewIndex failed: %v", err)
+	}
+
+	rate := 1.25 / 1000000.0
+	price := totalWCU * rate
+	fmt.Println()
+	fmt.Println("***** SCAN FINISHED *****")
+	fmt.Println()
+	fmt.Printf("total price: %.2f\n", price)
+
+	fmt.Println("\nTotal entries: ", ct)
+	return nil
+}
+
+// ViewLookup displays the complete list of lookup objects
+func ViewLookup() error {
+	ct := 0
+
+	// open db
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ViewIndex failed: %v", err)
+	}
+	defer db.Close()
+
+	totalWCU := 0.0
+	i := 0
+	// iterate through each key in each partiton in alphabetical order
+	err = db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("lookup"))
+		c := b.Cursor()
+		for k, _ := c.First(); k != nil; k, _ = c.Next() {
+			fmt.Printf("%d.\t%s\n", i, k)
+			ct++
+			totalWCU++
+			i++
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("ViewIndex failed: %v", err)
+	}
+
+	rate := 1.25 / 1000000.0
+	price := totalWCU * rate
+	fmt.Println()
+	fmt.Println("***** SCAN FINISHED *****")
+	fmt.Println()
+	fmt.Printf("total price: %.2f\n", price)
+
+	fmt.Println("\nTotal entries: ", ct)
+	return nil
+}
+
+// BatchGetSequential retrieves a sequential list of n objects from the database starting at the given key.
+// Returns []SearchData and []SearchEntry objects. SearchEntry objects are partitioned for upload to DynamoDB.
+func BatchGetSequential(bucket, startKey string, n int) ([]interface{}, string, error) {
+	objs := []interface{}{}
+	currKey := startKey
+
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
+	}
+
+	if err := db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		b := tx.Bucket([]byte(bucket))
+
+		c := b.Cursor()
+
+		if startKey == "" {
+			skBytes, _ := c.First()
+			startKey = string(skBytes)
+		}
+
+		for k, v := c.Seek([]byte(startKey)); k != nil; k, v = c.Next() {
+			if bucket == "lookup" {
+				sd, err := decodeSearchData(v)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("tx failed: %v", err)
+				}
+				prt := getLookupDynamoPrt(sd.ID)
+				obj := LookupEntry{
+					Partition: prt,
+					ID:        sd.ID,
+					Name:      sd.Name,
+					City:      sd.City,
+					State:     sd.State,
+					Employer:  sd.Employer,
+					Bucket:    sd.Bucket,
+					Years:     sd.Years,
+				}
+				objs = append(objs, obj)
+			} else {
+				res, err := decodeResultsList(v)
+				if err != nil {
+					fmt.Println(err)
+					return fmt.Errorf("tx failed: %v", err)
+				}
+				// get dynamo partiton name (first letter + partiton number)
+				prt := getDynamoPrt(string(k))
+				obj := SearchEntry{Partition: prt, Term: string(k), IDs: res}
+				objs = append(objs, obj)
+			}
+			currKey = string(k)
+			if len(objs) == n {
+				break
+			}
+		}
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
+	}
+	if len(objs) < n {
+		currKey = ""
+	}
+	return objs, currKey, nil
+}
+
+func getDynamoPrt(term string) string {
+	ss := strings.Split(term, ".")
+	pn := "" // partition number
+	if len(ss) > 1 {
+		pn = "." + ss[1]
+	}
+	sss := strings.Split(ss[0], "")
+	prt := sss[0] + pn
+	return prt
+}
+
+/* OTHER */
+
+// ConsolidateSearchData consolidates SearchData lists from cache and disk in their original order.
+func ConsolidateSearchData(origIDs []string, frmCache, frmDb []SearchData) []SearchData {
+	sds := make(map[string]SearchData)
+	agg := []SearchData{}
+	for _, sd := range frmCache {
+		sds[sd.ID] = sd
+	}
+	for _, sd := range frmDb {
+		sds[sd.ID] = sd
+	}
+	for _, ID := range origIDs {
+		if len(sds[ID].Years) == 0 {
+			continue
+		}
+		agg = append(agg, sds[ID])
+	}
+
+	// sort results by most recent years
+	sort.Slice(agg, func(i, j int) bool {
+		if agg[i].Years[0] != agg[j].Years[0] {
+			return agg[i].Years[0] > agg[j].Years[0]
+		}
+		return len(agg[i].Years) > len(agg[j].Years)
+	})
+
+	return agg
+}
+
+/* DEPRECATED */
+
+// DEPRECATED
+/* // GetResultsFromDynamo returns search results from the sharded index stored in DynamoDB
 func GetResultsFromDynamo(db *dynamo.DbInfo, id *IndexData, q Query) ([]string, error) {
 	st := time.Now()
 	if q.Text == "" {
@@ -535,520 +1169,9 @@ func GetResultsFromDynamo(db *dynamo.DbInfo, id *IndexData, q Query) ([]string, 
 
 	fmt.Println("finish - ", time.Since(st))
 	return common, nil
-}
-
-// LookupSearchDataFromCache retreives SearchData objects from in memory cache
-func LookupSearchDataFromCache(ids []string, cache map[string]SearchData) ([]string, []SearchData) {
-	sds := []SearchData{}
-	nilIDs := []string{}
-
-	for _, ID := range ids {
-		sd := cache[ID]
-		if sd.ID != "" {
-			sds = append(sds, sd)
-		} else {
-			nilIDs = append(nilIDs, ID)
-		}
-	}
-
-	return nilIDs, sds
-}
-
-// LookupSearchData Retreives corresponding SearchData obj for ID from disk
-func LookupSearchData(ids []string) ([]SearchData, error) {
-	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
-	defer db.Close()
-	if err != nil {
-		fmt.Println(err)
-		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
-	}
-
-	results, err := getSearchData(db, ids)
-	if err != nil {
-		fmt.Println(err)
-		return []SearchData{}, fmt.Errorf("LookupSearchData failed: %v", err)
-	}
-
-	return results, nil
-}
-
-// LookupSearchDataFromDynamo retreives corresponding SearchData obj for ID from DynamoDB
-func LookupSearchDataFromDynamo(db *dynamo.DbInfo, ids []string) ([]SearchData, error) {
-	tn := "cf-lookup"
-	results := []SearchData{}
-	dataChan := make(chan chanResult)
-	var wg sync.WaitGroup
-
-	for _, ID := range ids {
-		wg.Add(1)
-		go getSearchDataAsync(db, ID, tn, dataChan, &wg)
-	}
-	for i := 0; i < len(ids); i++ {
-		msg := <-dataChan
-		obj, err := msg.SD, msg.Err
-		if err != nil {
-			fmt.Println(err)
-		}
-		sd := SearchData{
-			ID:       obj.ID,
-			Name:     obj.Name,
-			City:     obj.City,
-			State:    obj.State,
-			Employer: obj.Employer,
-			Bucket:   obj.Bucket,
-			Years:    obj.Years,
-		}
-		results = append(results, sd)
-	}
-	wg.Wait()
-
-	return results, nil
-}
-
-func getSearchDataAsync(db *dynamo.DbInfo, ID, tn string, dc chan chanResult, wg *sync.WaitGroup) {
-	defer wg.Done()
-	prt := getLookupDynamoPrt(ID)
-	q := dynamo.CreateNewQueryObj(prt, ID)
-	refObj := LookupEntry{}
-	sd := SearchData{
-		ID:       "",
-		Name:     "Unknown",
-		City:     "???",
-		State:    "???",
-		Employer: "",
-		Bucket:   "indviduals",
-		Years:    []string{"all-time"},
-	}
-
-	retries := 0
-	maxRetries := 5
-	for { // retry loop - breaks if successful / returns if maxRetries exceeded
-		obj, err := dynamo.GetItem(db.Svc, q, db.Tables[tn], refObj)
-		if err != nil {
-			if awsErr, ok := err.(awserr.Error); ok {
-				if awsErr.Code() == "RequestError" {
-					// wait and retry
-					fmt.Println("Request failed - retrying...")
-					time.Sleep(50 * time.Millisecond)
-					retries++
-					if retries > maxRetries {
-						msg := "MAX_RETRIES_EXCEEDED"
-						fmt.Println(msg)
-						err = fmt.Errorf(msg)
-						cr := chanResult{sd, err}
-						dc <- cr
-						return
-					}
-					continue
-				}
-				fmt.Println("getSearchDataAsync failed: ", awsErr.Code(), awsErr.Message())
-			} else {
-				fmt.Println("getSearchDataAsync failed: ", err.Error())
-				cr := chanResult{sd, err}
-				dc <- cr
-				return
-			}
-		}
-		if err != nil {
-			fmt.Println("getSearchDataAsync failed: ", err)
-			cr := chanResult{sd, err}
-			dc <- cr
-			return
-		}
-		intf := obj.(map[string]interface{})
-
-		id, name, city, state, employer, bucket := "", "", "", "", "", ""
-		years := []string{}
-		if intf["ID"] == nil {
-			id = "000000000"
-		} else {
-			id = intf["ID"].(string)
-		}
-		if intf["Name"] == nil {
-			name = "Unknown"
-		} else {
-			name = intf["Name"].(string)
-		}
-		if intf["City"] == nil {
-			city = "???"
-		} else {
-			city = intf["City"].(string)
-		}
-		if intf["State"] == nil {
-			state = "???"
-		} else {
-			state = intf["State"].(string)
-		}
-		if intf["Employer"] == nil {
-			employer = ""
-		} else {
-			employer = intf["Employer"].(string)
-		}
-		if intf["Bucket"] == nil {
-			bucket = "committees"
-		} else {
-			bucket = intf["Bucket"].(string)
-		}
-		if intf["Years"] == nil {
-			years = append(years, "all-time")
-		} else {
-			for _, yr := range intf["Years"].([]interface{}) {
-				years = append(years, yr.(string))
-			}
-		}
-		sd = SearchData{
-			ID:       id,
-			Name:     name,
-			City:     city,
-			State:    state,
-			Employer: employer,
-			Bucket:   bucket,
-			Years:    years,
-		}
-		cr := chanResult{sd, nil}
-		dc <- cr
-		break
-	}
-
-	return
-}
-
-// ConsolidateSearchData consolidates SearchData lists from cache and disk in their original order.
-func ConsolidateSearchData(origIDs []string, frmCache, frmDisk []SearchData) []SearchData {
-	sds := make(map[string]SearchData)
-	agg := []SearchData{}
-	for _, sd := range frmCache {
-		sds[sd.ID] = sd
-	}
-	for _, sd := range frmDisk {
-		sds[sd.ID] = sd
-	}
-	for _, ID := range origIDs {
-		agg = append(agg, sds[ID])
-	}
-
-	// sort results by most recent year
-	sort.Slice(agg, func(i, j int) bool {
-		if agg[i].Years[0] != agg[j].Years[0] {
-			return agg[i].Years[0] > agg[j].Years[0]
-		}
-		return len(agg[i].Years) > len(agg[j].Years)
-	})
-
-	return agg
-}
-
-// ViewIndex displays the index
-func ViewIndex() error {
-	ct := 0
-
-	// get partition map
-	partitions, err := GetPartitionMap()
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("ViewIndex failed: %v", err)
-	}
-	if len(partitions) == 0 {
-		fmt.Println("*** Index does not exist! ***")
-		return nil
-	}
-
-	// sort partition map
-	es := prtEntries{}
-	for k, v := range partitions {
-		e := prtEntry{
-			Prt: k,
-			B:   v,
-		}
-		es = append(es, e)
-	}
-	sort.Sort(&es)
-
-	// open db
-	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("ViewIndex failed: %v", err)
-	}
-	defer db.Close()
-
-	totalWCU := 0.0
-	// iterate through each key in each partiton in alphabetical order
-	err = db.View(func(tx *bolt.Tx) error {
-		for _, prt := range es {
-			b := tx.Bucket([]byte(prt.Prt))
-			c := b.Cursor()
-			for k, v := c.First(); k != nil; k, v = c.Next() {
-				d, err := decodeResultsList(v)
-				if err != nil {
-					fmt.Println(err)
-					return fmt.Errorf("tx failed: %v", err)
-				}
-				fmt.Printf("Partition: %s\tTerm: %s\tReferences: %d\tSize: %d\n", prt.Prt, k, len(d), len(v))
-				ct++
-				wcuPerShard := float64((len(v) / 1000)) // 1KB = 1 WCU
-				totalWCU += wcuPerShard
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("ViewIndex failed: %v", err)
-	}
-
-	rate := 1.25 / 1000000.0
-	price := totalWCU * rate
-	fmt.Println()
-	fmt.Println("***** SCAN FINISHED *****")
-	fmt.Println()
-	fmt.Printf("total price: %.2f\n", price)
-
-	fmt.Println("\nTotal entries: ", ct)
-	return nil
-}
-
-// ViewIndex displays the index
-func ViewLookup() error {
-	ct := 0
-
-	// open db
-	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("ViewIndex failed: %v", err)
-	}
-	defer db.Close()
-
-	totalWCU := 0.0
-	i := 0
-	// iterate through each key in each partiton in alphabetical order
-	err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("lookup"))
-		c := b.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			fmt.Printf("%d.\t%s\n", i, k)
-			ct++
-			totalWCU++
-			i++
-		}
-		return nil
-	})
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("ViewIndex failed: %v", err)
-	}
-
-	rate := 1.25 / 1000000.0
-	price := totalWCU * rate
-	fmt.Println()
-	fmt.Println("***** SCAN FINISHED *****")
-	fmt.Println()
-	fmt.Printf("total price: %.2f\n", price)
-
-	fmt.Println("\nTotal entries: ", ct)
-	return nil
-}
-
-// BatchGetSequential retrieves a sequential list of n objects from the database starting at the given key.
-// Returns []SearchData and []SearchEntry objects. SearchEntry objects are partitioned for upload to DynamoDB.
-func BatchGetSequential(bucket, startKey string, n int) ([]interface{}, string, error) {
-	objs := []interface{}{}
-	currKey := startKey
-
-	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
-	defer db.Close()
-	if err != nil {
-		fmt.Println(err)
-		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
-	}
-
-	if err := db.View(func(tx *bolt.Tx) error {
-		// Assume bucket exists and has keys
-		b := tx.Bucket([]byte(bucket))
-
-		c := b.Cursor()
-
-		if startKey == "" {
-			skBytes, _ := c.First()
-			startKey = string(skBytes)
-		}
-
-		for k, v := c.Seek([]byte(startKey)); k != nil; k, v = c.Next() {
-			if bucket == "lookup" {
-				sd, err := decodeSearchData(v)
-				if err != nil {
-					fmt.Println(err)
-					return fmt.Errorf("tx failed: %v", err)
-				}
-				prt := getLookupDynamoPrt(sd.ID)
-				obj := LookupEntry{
-					Partition: prt,
-					ID:        sd.ID,
-					Name:      sd.Name,
-					City:      sd.City,
-					State:     sd.State,
-					Employer:  sd.Employer,
-					Bucket:    sd.Bucket,
-					Years:     sd.Years,
-				}
-				objs = append(objs, obj)
-			} else {
-				res, err := decodeResultsList(v)
-				if err != nil {
-					fmt.Println(err)
-					return fmt.Errorf("tx failed: %v", err)
-				}
-				// get dynamo partiton name (first letter + partiton number)
-				prt := getDynamoPrt(string(k))
-				obj := SearchEntry{Partition: prt, Term: string(k), IDs: res}
-				objs = append(objs, obj)
-			}
-			currKey = string(k)
-			if len(objs) == n {
-				break
-			}
-		}
-		return nil
-	}); err != nil {
-		fmt.Println(err)
-		return nil, currKey, fmt.Errorf("BatchGetSequential failed: %v", err)
-	}
-	if len(objs) < n {
-		currKey = ""
-	}
-	return objs, currKey, nil
-}
-
-// GetIndexData retrieves the IndexData search index metadata object from disk
-func GetIndexData() (*IndexData, error) {
-	id, err := getIndexData()
-	if err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("ViewIndexData failed: %v", err)
-	}
-	return id, nil
-}
-
-/*
-// getRefs finds the references for each term in query
-func getRefs(q []string, id *IndexData) (map[string][]string, int, error) {
-	var resultMap = make(map[string][]string)
-	var noIDs bool
-	x := 0 // value > 0 indicates 1+ terms in query returned no matching IDs; no results for query
-
-	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
-	if err != nil {
-		fmt.Println(err)
-		return nil, 0, fmt.Errorf("getRefs failed: %v", err)
-	}
-	defer db.Close()
-
-	// Get index list for each term in query - use map
-	for _, v := range q {
-		if filter(v) {
-			continue
-		}
-		prt := getPartition(v)
-		key := ""
-		result := []string{}
-		// get ids for each term and any shards
-		for i := 0; i < int(id.Shards[v].Shards+1.0); i++ {
-			err := db.View(func(tx *bolt.Tx) error {
-				b := tx.Bucket([]byte(prt))
-				v = strings.TrimSpace(v)
-				key = v
-				if i > 0 {
-					key = v + "." + strconv.Itoa(i)
-				}
-				data := b.Get([]byte(key))
-				ids, err := decodeResultsList(data)
-				if err != nil {
-					return fmt.Errorf("tx failed: %v", err)
-				}
-				if len(ids) == 0 {
-					fmt.Println("no IDs found for term: ", v)
-					noIDs = true
-					return nil
-				}
-				fmt.Printf("ids found for '%s': %d\n", v, len(ids))
-				result = append(result, ids...)
-				return nil
-			})
-			if err != nil {
-				return nil, 0, fmt.Errorf("getRefs failed: %s", err)
-			}
-		}
-		if noIDs {
-			x++
-			continue
-		}
-		resultMap[v] = result
-	}
-	return resultMap, x, nil
 } */
 
-// check if single term query is ID for lookup
-func checkForID(id string) bool {
-	fmt.Println("ID: ", id)
-	if len(id) == 32 {
-		fmt.Println("ID found - len 32")
-		return true
-	}
-	if len(id) != 9 {
-		fmt.Println("not ID - len != 9 || 32")
-		return false
-	}
-
-	fecIDs := map[string]bool{
-		"C": true, "c": true, "H": true, "h": true,
-		"S": true, "s": true, "P": true, "p": true,
-	}
-	nums := map[string]bool{
-		"0": true, "1": true, "2": true, "3": true, "4": true,
-		"5": true, "6": true, "7": true, "8": true, "9": true,
-	}
-	ss := strings.Split(id, "")
-	for i, s := range ss {
-		if i == 0 {
-			if !fecIDs[s] {
-				fmt.Println("not FEC ID code")
-				return false
-			}
-		}
-		if i > 0 && !nums[s] {
-			fmt.Println("not id - alphanumeric sequence found")
-			return false
-		}
-	}
-	fmt.Println("ID found")
-	return true
-}
-
-// get ids in single shard
-func getShard(db *bolt.DB, id string) ([]string, error) {
-	result := []string{}
-	prt := getPartition(id)
-
-	err := db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(prt))
-		id = strings.TrimSpace(id)
-		data := b.Get([]byte(id))
-		ids, err := decodeResultsList(data)
-		if err != nil {
-			return fmt.Errorf("tx failed: %v", err)
-		}
-		result = ids
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("getShard failed: %s", err)
-	}
-
-	return result, nil
-}
-
-// get ids in single shard from DynamoDB
+/* // get ids in single shard from DynamoDB
 func getShardFromDynamo(db *dynamo.DbInfo, id string) ([]string, error) {
 	dPrt := getDynamoPrt(id)
 	dq := dynamo.CreateNewQueryObj(dPrt, id)
@@ -1109,84 +1232,65 @@ func getRefsFromDynamo(db *dynamo.DbInfo, t string, id *IndexData) ([]string, in
 	}
 	return result, x, nil
 }
+*/
 
-// sortMap converts k:v pairs to struct, adds and sorts by len(v)
-func sortMap(m map[string][]string) []Data {
-	// []Data represnts inverted index and corresponding SearchData objects
-	var ss []Data
-	for k, v := range m {
-		ss = append(ss, Data{k, sortIDs(v), len(v)}) // term, refs, len
+/*
+// getRefs finds the references for each term in query
+func getRefs(q []string, id *IndexData) (map[string][]string, int, error) {
+	var resultMap = make(map[string][]string)
+	var noIDs bool
+	x := 0 // value > 0 indicates 1+ terms in query returned no matching IDs; no results for query
+
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	if err != nil {
+		fmt.Println(err)
+		return nil, 0, fmt.Errorf("getRefs failed: %v", err)
 	}
+	defer db.Close()
 
-	sort.Slice(ss, func(i, j int) bool {
-		return ss[i].Len < ss[j].Len
-	})
-
-	return ss
-}
-
-// sort lookupPairs by ID (key) values
-func sortIDs(lu []string) []string {
-	sort.Slice(lu, func(i, j int) bool {
-		return lu[i] < lu[j]
-	})
-	return lu
-}
-
-// intersection returns the intersection of two integer slices
-func intersection(s1, s2 []string) []string {
-	if len(s1) > len(s2) {
-		// swap
-		s1, s2 = s2, s1
-	}
-	if len(s1) == 0 {
-		return s2
-	}
-	max := s1[len(s1)-1]
-	checkMap := make(map[string]bool)
-	common := []string{}
-
-	for _, v := range s1 {
-		checkMap[v] = true
-	}
-	for _, v := range s2 {
-		if v > max {
-			break // break if v.ID > largest ID value in smaller slice
+	// Get index list for each term in query - use map
+	for _, v := range q {
+		if filter(v) {
+			continue
 		}
-		if checkMap[v] { // common to both Entries
-			common = append(common, v)
+		prt := getPartition(v)
+		key := ""
+		result := []string{}
+		// get ids for each term and any shards
+		for i := 0; i < int(id.Shards[v].Shards+1.0); i++ {
+			err := db.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte(prt))
+				v = strings.TrimSpace(v)
+				key = v
+				if i > 0 {
+					key = v + "." + strconv.Itoa(i)
+				}
+				data := b.Get([]byte(key))
+				ids, err := decodeResultsList(data)
+				if err != nil {
+					return fmt.Errorf("tx failed: %v", err)
+				}
+				if len(ids) == 0 {
+					fmt.Println("no IDs found for term: ", v)
+					noIDs = true
+					return nil
+				}
+				fmt.Printf("ids found for '%s': %d\n", v, len(ids))
+				result = append(result, ids...)
+				return nil
+			})
+			if err != nil {
+				return nil, 0, fmt.Errorf("getRefs failed: %s", err)
+			}
 		}
+		if noIDs {
+			x++
+			continue
+		}
+		resultMap[v] = result
 	}
-	return common
-}
-
-func getDynamoPrt(term string) string {
-	ss := strings.Split(term, ".")
-	pn := "" // partition number
-	if len(ss) > 1 {
-		pn = "." + ss[1]
-	}
-	sss := strings.Split(ss[0], "")
-	prt := sss[0] + pn
-	return prt
-}
-
-func getLookupDynamoPrt(id string) string {
-	prt := ""
-	if len(id) == 9 { // get last 2 chars of FEC ID
-		ss := strings.Split(id, "")
-		st := ss[len(id)-2:]
-		prt := strings.Join(st, "")
-		return prt
-	}
-	if len(id) == 32 { // get first 2 chars of hash ID
-		ss := strings.Split(id, "")
-		st := ss[:2]
-		prt := strings.Join(st, "")
-		return prt
-	}
-	return prt
-}
+	return resultMap, x, nil
+} */
 
 /* func main() {
 	// command-line flags/if statements for choosing function
