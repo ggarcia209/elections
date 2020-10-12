@@ -1,6 +1,10 @@
+// Package databuilder conatins operations for updating datasets in memory.
+// This package is primarily used by the admin service to create the
+// primary datasets from the raw input, followed by the secondary
+// datasets.
+// This file contains operations for creating the Committee
+// specific rankings lists.
 package databuilder
-
-// Refactored 8/3/20 - removed Organization cases and references
 
 import (
 	"fmt"
@@ -18,7 +22,7 @@ type comparison struct {
 	CompTxs      map[string]float32
 }
 
-// update contributor maps for incoming transactions posted by filing committee
+// Update contributor maps for incoming transactions posted by filing committee.
 func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *donations.Contribution) (comparison, error) {
 	comp := comparison{}
 	switch t := sender.(type) {
@@ -34,7 +38,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 		}
 		err := compare(&comp)
 		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
+			fmt.Println(err)
 			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
 		}
 	case *donations.Candidate:
@@ -49,7 +53,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 		}
 		err := compare(&comp)
 		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
+			fmt.Println(err)
 			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
 		}
 	case *donations.CmteTxData:
@@ -57,7 +61,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 		comp = cmteCompGen(receiver, sender.(*donations.CmteTxData), cont)
 		err := compare(&comp)
 		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
+			fmt.Println(err)
 			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
 		}
 	default:
@@ -67,7 +71,7 @@ func updateTopDonors(receiver *donations.CmteTxData, sender interface{}, cont *d
 	return comp, nil
 }
 
-// update contributor maps for outgoing transactions posted by filing committee
+// Update contributor maps for outgoing transactions posted by filing committee.
 func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (comparison, error) {
 	comp := comparison{}
 	switch t := receiver.(type) {
@@ -83,7 +87,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (co
 		}
 		err := compare(&comp)
 		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
+			fmt.Println(err)
 			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
 		}
 	case *donations.Candidate:
@@ -98,7 +102,7 @@ func updateTopRecipients(sender *donations.CmteTxData, receiver interface{}) (co
 		}
 		err := compare(&comp)
 		if err != nil {
-			fmt.Println("updateTopDonors failed: ", err)
+			fmt.Println(err)
 			return comparison{}, fmt.Errorf("updateTopDonors failed: %v", err)
 		}
 	case *donations.CmteTxData:
@@ -123,13 +127,13 @@ func updateOpExpRecipients(sender *donations.CmteTxData, receiver *donations.Ind
 	}
 	err := compare(&comp)
 	if err != nil {
-		fmt.Println("updateOpExpRecipients failed: ", err)
+		fmt.Println(err)
 		return comparison{}, fmt.Errorf("updateOpExpRecipients failed: %v", err)
 	}
 	return comp, nil
 }
 
-// generates comparison object corresponding to incoming/outoing transaction
+// Generates comparison object corresponding to incoming/outoing transaction.
 func cmteCompGen(filer, other *donations.CmteTxData, cont *donations.Contribution) comparison {
 	comp := comparison{
 		RefID:        filer.CmteID,
@@ -148,7 +152,7 @@ func cmteCompGen(filer, other *donations.CmteTxData, cont *donations.Contributio
 	return comp
 }
 
-// compare compares the maps set in the comparison object to the threshold
+// compare compares the maps set in the comparison object to the threshold.
 func compare(comp *comparison) error {
 	var least Entries
 	var err error
@@ -159,7 +163,7 @@ func compare(comp *comparison) error {
 		es := sortTopX(comp.RefAmts)
 		least, err = setThresholdLeast10(es)
 		if err != nil {
-			fmt.Println("compare failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("compare failed: %v", err)
 		}
 	} else {
@@ -205,7 +209,7 @@ func compare(comp *comparison) error {
 	return nil
 }
 
-// check to see if previous total of entry is in threshold range when updating existing entry
+// Check to see if previous total of entry is in threshold range when updating existing entry.
 func checkThreshold(newID string, m map[string]float32, th []interface{}) ([]interface{}, error) {
 	inRange := false
 	check := map[string]bool{newID: true}
@@ -218,7 +222,7 @@ func checkThreshold(newID string, m map[string]float32, th []interface{}) ([]int
 		es := sortTopX(m)
 		newRange, err := setThresholdLeast10(es)
 		if err != nil {
-			fmt.Println("checkThreshold failed: ", err)
+			fmt.Println(err)
 			return []interface{}{}, fmt.Errorf("checkThreshold failed: %v", err)
 		}
 		// update object's threshold list

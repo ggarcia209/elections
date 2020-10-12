@@ -1,3 +1,8 @@
+// Package persist contains operations for reading and writing disk data.
+// Most operations in this package are intended to be performed on the
+// admin local machine and are not intended to be used in the service logic.
+// This file contains operations for encoding/decoding protobufs for the
+// donations.Individual object.
 package persist
 
 import (
@@ -9,8 +14,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// convIndvToProto encodes LogData structs as protocol buffers
-func encodeIndv(indv donations.Individual) ([]byte, error) { // move conversions to protobuf package?
+func encodeIndv(indv donations.Individual) ([]byte, error) {
 	entry := &protobuf.Individual{
 		ID:            indv.ID,
 		Name:          indv.Name,
@@ -34,7 +38,7 @@ func encodeIndv(indv donations.Individual) ([]byte, error) { // move conversions
 	}
 	data, err := proto.Marshal(entry)
 	if err != nil {
-		fmt.Println("encodeIndv failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("encodeIndv failed: %v", err)
 	}
 	return data, nil
@@ -44,7 +48,7 @@ func decodeIndv(data []byte) (donations.Individual, error) {
 	indv := &protobuf.Individual{}
 	err := proto.Unmarshal(data, indv)
 	if err != nil {
-		fmt.Println("decodeIndv failed: ", err)
+		fmt.Println(err)
 		return donations.Individual{}, fmt.Errorf("decodeIndv failed: %v", err)
 	}
 

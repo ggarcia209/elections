@@ -1,3 +1,11 @@
+// Package databuilder conatins operations for updating datasets in memory.
+// This package is primarily used by the admin service to create the
+// primary datasets from the raw input, followed by the secondary
+// datasets.
+// This file contains operations for aggregating multi-year datasets
+// for a single entity into one object and is still in progress.
+// These operations are inteneded to be used by the index service
+// in a future version and may be moved to a separate package.
 package databuilder
 
 import (

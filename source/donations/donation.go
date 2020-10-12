@@ -1,10 +1,16 @@
+// Package donations contains the base objects that are used throughout the application.
+// Objects within this package are primarily used for creating, updating, and persisting
+// the datasets derived from the input data.
+// Struct fields for objects in this file are populated from the data parsed
+// from the input .txt files. One object is created for each record.
 package donations
 
 import (
 	"time"
 )
 
-// Contribution represents a contribution
+// Contribution represents a contribution, expense, or other transaction
+// from a contribution/transactions bulk input file.
 type Contribution struct {
 	CmteID     string // filing committee
 	AmndtInd   string // ammendment indicator
@@ -29,7 +35,8 @@ type Contribution struct {
 	SubID      int // FEC record number, unique row ID
 }
 
-// Disbursement represents a disbursement
+// Disbursement represents a disbursement transaction
+// from an operationg expenses bulk input file.
 type Disbursement struct {
 	CmteID       string
 	amndtInd     string
@@ -58,62 +65,3 @@ type Disbursement struct {
 	BackRefTxID  string
 	RecID        string
 }
-
-// DEPRECATED
-
-/*
-// Donation represents a contribution from either an Individual or a Committee
-type Donation interface{}
-
-// IndvContribution reperesents a contribution from an individual
-type IndvContribution struct {
-	CmteID     string
-	AmndtInd   string // ammendment indicator
-	ReportType string
-	TxPGI      string // transaction primary-general indicator
-	imgNum     string // image number
-	TxType     string
-	EntityType string
-	Name       string
-	City       string
-	State      string
-	Zip        string
-	Employer   string
-	Occupation string
-	TxDate     time.Time
-	TxAmt      float32 // transaction amount
-	OtherID    string
-	TxID       string
-	FileNum    int
-	MemoCode   string
-	MemoText   string
-	SubID      int // FEC record number, unique row ID
-	DonorID    string
-}
-
-// CmteContribution represents a contribution from a committee
-type CmteContribution struct {
-	CmteID     string
-	AmndtInd   string // ammendment indicator
-	ReportType string
-	TxPGI      string // transaction primary-general indicator
-	imgNum     string // image number
-	TxType     string
-	EntityType string
-	Name       string
-	City       string
-	State      string
-	Zip        string
-	Employer   string
-	Occupation string
-	TxDate     time.Time
-	TxAmt      float32 // transaction amount
-	OtherID    string
-	CandID     string // candidate ID
-	TxID       string
-	FileNum    int
-	MemoCode   string
-	MemoText   string
-	SubID      int // FEC record number, unique row ID
-}
-*/

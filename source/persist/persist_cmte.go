@@ -1,3 +1,8 @@
+// Package persist contains operations for reading and writing disk data.
+// Most operations in this package are intended to be performed on the
+// admin local machine and are not intended to be used in the service logic.
+// This file contains operations for encoding/decoding protobufs for the
+// donations.Committee, CmteTxData, and CmteFinancials objects.
 package persist
 
 import (
@@ -10,7 +15,7 @@ import (
 )
 
 // ecnodeCmte/decodeCmte encodes/decodes Committee structs as protocol buffers
-func encodeCmte(cmte donations.Committee) ([]byte, error) { // move conversions to protobuf package?
+func encodeCmte(cmte donations.Committee) ([]byte, error) {
 	entry := &protobuf.Committee{
 		ID:           cmte.ID,
 		Name:         cmte.Name,
@@ -28,7 +33,7 @@ func encodeCmte(cmte donations.Committee) ([]byte, error) { // move conversions 
 	}
 	data, err := proto.Marshal(entry)
 	if err != nil {
-		fmt.Println("encodeCmte failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("encodeCmte failed: %v", err)
 	}
 	return data, nil
@@ -73,7 +78,7 @@ func encodeCmteTxData(data donations.CmteTxData) ([]byte, error) {
 	}
 	bytes, err := proto.Marshal(entry)
 	if err != nil {
-		fmt.Println("encodeCmte failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("encodeCmte failed: %v", err)
 	}
 	return bytes, nil
@@ -96,7 +101,7 @@ func decodeCmte(data []byte) (donations.Committee, error) {
 	cmte := &protobuf.Committee{}
 	err := proto.Unmarshal(data, cmte)
 	if err != nil {
-		fmt.Println("decodeCmte failed: ", err)
+		fmt.Println(err)
 		return donations.Committee{}, fmt.Errorf("decodeCmte failed: %v", err)
 	}
 
@@ -123,7 +128,7 @@ func decodeCmteTxData(input []byte) (donations.CmteTxData, error) {
 	data := &protobuf.CmteTxData{}
 	err := proto.Unmarshal(input, data)
 	if err != nil {
-		fmt.Println("decodeCmteTxData failed: ", err)
+		fmt.Println(err)
 		return donations.CmteTxData{}, fmt.Errorf("decodeCmteTxData failed: %v", err)
 	}
 
@@ -203,6 +208,7 @@ func encodeCmteFinancials(cmte donations.CmteFinancials) ([]byte, error) { // mo
 		PartyExp:        cmte.PartyExp,
 		NonFedSharedExp: cmte.NonFedSharedExp,
 	}
+	// Temp. deprecated - error parsing time / time not used in current version.
 	/* ts, err := ptypes.TimestampProto(cmte.CovgEndDate)
 	if err != nil {
 		fmt.Println(err)
@@ -211,7 +217,7 @@ func encodeCmteFinancials(cmte donations.CmteFinancials) ([]byte, error) { // mo
 	entry.CovgEndDate = ts */
 	data, err := proto.Marshal(entry)
 	if err != nil {
-		fmt.Println("encodeCmteFinancials failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("encodeCmteFinancials failed: %v", err)
 	}
 	return data, nil
@@ -221,7 +227,7 @@ func decodeCmteFinancials(data []byte) (donations.CmteFinancials, error) {
 	cmte := &protobuf.CmteFinancials{}
 	err := proto.Unmarshal(data, cmte)
 	if err != nil {
-		fmt.Println("decodeCmteFinancials failed: ", err)
+		fmt.Println(err)
 		return donations.CmteFinancials{}, fmt.Errorf("decodeCmteFinancials failed: %v", err)
 	}
 

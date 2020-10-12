@@ -1,3 +1,9 @@
+// Package databuilder conatins operations for updating datasets in memory.
+// This package is primarily used by the admin service to create the
+// primary datasets from the raw input, followed by the secondary
+// datasets.
+// This file contains operations for sorting & re-sorting the
+// rankings maps when adding & comparing new entries.
 package databuilder
 
 import (
@@ -14,7 +20,7 @@ func (s Entries) Len() int           { return len(s) }
 func (s Entries) Less(i, j int) bool { return s[i].Total > s[j].Total }
 func (s Entries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-// PopLeast pops the smalles value from the list of least values
+// PopLeast pops the smalles value from the list of least values.
 func (s *Entries) popLeast() *donations.Entry {
 	a := *s
 	if len(a) == 0 {
@@ -26,7 +32,7 @@ func (s *Entries) popLeast() *donations.Entry {
 }
 
 // reSortLeast re-sorts the least 5 or 10 values when a new value breaks the threshold (least[len(least)-1].Total)
-// and returns the ID of the key to be deleted and the new sorted list of least values
+// and returns the ID of the key to be deleted and the new sorted list of least values.
 func reSortLeast(new *donations.Entry, es Entries) (string, Entries) {
 	copy := es
 	// if new.Total >= largest value in threshold list
@@ -47,7 +53,7 @@ func reSortLeast(new *donations.Entry, es Entries) (string, Entries) {
 	return delID, copy
 }
 
-// sortTopX sorts the Top x Donors/Recipients maps from greatest -> smallest (decreasing order)
+// sortTopX sorts the Top x Donors/Recipients maps from greatest -> smallest (decreasing order).
 func sortTopX(m map[string]float32) Entries {
 	var es Entries
 	for k, v := range m {
@@ -58,7 +64,7 @@ func sortTopX(m map[string]float32) Entries {
 	return es
 }
 
-// setThresholdLeast10 sets a threshold with the smallest 10 values in the Top x
+// setThresholdLeast10 sets a threshold with the smallest 10 values in the Top x.
 func setThresholdLeast10(es Entries) (Entries, error) {
 	if len(es) < 10 {
 		for i, e := range es {
@@ -74,13 +80,3 @@ func setThresholdLeast10(es Entries) (Entries, error) {
 func newEntry(k string, v float32) *donations.Entry {
 	return &donations.Entry{ID: k, Total: v}
 }
-
-// TEMPORARILY DEPRECATED
-// setThresholdLeast5 sets a threshold with the smallest 5 values in the Top x
-// sorted greatest -> smallest
-/* func setThresholdLeast5(es Entries) (Entries, error) {
-	if len(es) < 5 {
-		return nil, fmt.Errorf("=etThresholdLeast5 failed: not enough elements in list")
-	}
-	return es[len(es)-5:], nil
-} */

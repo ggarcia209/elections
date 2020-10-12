@@ -1,3 +1,6 @@
+// Package indexing contains operations for building, searching, and viewing
+// an index created from the complete data.
+// This file contains operations for building the index in memory.
 package indexing
 
 import (
@@ -52,7 +55,6 @@ type DataMap map[string]*SearchData
 var mu sync.Mutex
 
 // BuildIndex creates a new search index from the objects in the db/offline_db.db
-// TEST IDEMPOTENCY ACROSS YEARS
 func BuildIndex(year string) error {
 	var wg sync.WaitGroup
 
@@ -118,8 +120,7 @@ func BuildIndex(year string) error {
 	return nil
 }
 
-// UpdateIndex updates the Index with terms dervied from the given bucket
-// TEST IDEMPOTENCY ACROSS YEARS
+// UpdateIndex updates the Index with terms dervied from the given bucket.
 func UpdateIndex(year, bucket string) error {
 	var wg sync.WaitGroup
 	id, err := getIndexData()
@@ -263,109 +264,6 @@ func candRtn(year string, id *IndexData, wg *sync.WaitGroup) error {
 	}
 	mu.Unlock()
 	fmt.Println("candidate data saved")
-	return nil
-}
-
-// TEMPORARILY DEPRECATED
-// process top individuals by funds received/sent and add to Index
-func getTopIndvData(year, bucket string, index indexMap, lookup lookupPairs) error {
-	fmt.Println("processing top individuals...")
-	ids := []string{}
-	n := 20000
-	x := n
-
-	// get Top Individuals by incoming & outgoing funds
-	odID := year + "-individuals-donor-ALL"
-	topIndv, err := persist.GetObject(year, "top_overall", odID)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("getTopIndvData failed: %v", err)
-	}
-	odID = year + "-individuals-rec-ALL"
-	topIndvRec, err := persist.GetObject(year, "top_overall", odID)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("getTopIndvData failed: %v", err)
-	}
-
-	fmt.Println("Got TopIndv Objects")
-
-	// create list of IDs for BatchGetByID
-	for k := range topIndv.(*donations.TopOverallData).Amts {
-		ids = append(ids, k)
-	}
-	for k := range topIndvRec.(*donations.TopOverallData).Amts {
-		ids = append(ids, k)
-	}
-
-	// get partition map
-	pm, err := GetPartitionMap()
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("getTopIndvData failed: %v", err)
-	}
-	if len(pm) == 0 {
-		pm = make(map[string]bool)
-	}
-
-	for {
-		if len(ids) < n { // queue exhausted - last write
-			n = len(ids) // set starting index to 0
-		}
-		// pop n IDs from stack and return corresponding objects
-		objs, _, err := persist.BatchGetByID(year, bucket, ids[len(ids)-n:])
-		if err != nil {
-			fmt.Println(err)
-			return fmt.Errorf("getTopIndvData failed: %v", err)
-		}
-		if len(objs) == 0 {
-			break
-		}
-
-		// create SearchData objects (map[id]*SearchData)
-		lu := createSearchData(year, objs)
-
-		// proces SearchData objects and add terms to Index
-		for k, sd := range lu {
-			// derive search terms from object data
-			terms := getTerms(sd)
-			termsFmt := formatTerms(terms)
-			for _, term := range termsFmt {
-				if filter(term) {
-					continue
-				}
-				prt := getPartition(term)
-				if index[prt] == nil {
-					index[prt] = make(map[string][]string)
-				}
-
-				index[prt][term] = append(index[prt][term], k)
-				lookup[k] = sd
-				pm[prt] = true
-			}
-		}
-
-		if len(objs) < x || len(ids) == n { // last batch write complete
-			break
-		}
-
-		// remove processed IDs from stack
-		ids = ids[:len(ids)-n]
-	}
-
-	mu.Lock()
-	err = savePartitionMap(pm)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("getTopIndvData failed: %v", err)
-	}
-	mu.Unlock()
-
-	fmt.Println("partition map saved")
-
-	fmt.Println("***** BUILD INDEX - 'individuals' FINSIHED *****")
-	fmt.Println()
-
 	return nil
 }
 

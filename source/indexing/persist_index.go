@@ -1,3 +1,7 @@
+// Package indexing contains operations for building, searching, and viewing
+// an index created from the complete data.
+// This file contains operations for writing the index to
+// and reading from disk as shards.
 package indexing
 
 import (
@@ -34,6 +38,34 @@ type shardRanges struct {
 // list wrapped in struct for protobuf encoding
 type rangeTuple struct {
 	Range []string // (min, max)
+}
+
+// get PartitionMap
+func GetPartitionMap() (map[string]bool, error) {
+	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
+	defer db.Close()
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("getPartition failed: %v", err)
+	}
+
+	var data []byte
+
+	// tx
+	if err := db.View(func(tx *bolt.Tx) error {
+		data = tx.Bucket([]byte("index_data")).Get([]byte("partition_map"))
+		return nil
+	}); err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("getPartitionMap failed: %v", err)
+	}
+
+	pm, err := decodePartitionMap(data)
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("getPartitionMap failed: %v", err)
+	}
+	return pm, nil
 }
 
 // WriteOutIndex writes data from OUTPUT_PATH/db/search_index.db to ./index/db/search_data.db
@@ -249,40 +281,10 @@ func saveIndex(id *IndexData, index indexMap, lookup lookupPairs) (int, int, err
 							return fmt.Errorf("tx failed failed: %v", err)
 						}
 
-						// DEBUGGING
-						if len(prev) == 0 {
-							fmt.Println("!!! EMPTY SHARD")
-						}
-						if i < int(id.Shards[term].Shards) && len(prev) < maxSize {
-							fmt.Println(" !!! INCOMPLETE SHARD")
-						}
-						/* repeats := make(map[string]bool)
-						for _, ID := range prev {
-							repeats[ID] = true
-						}
-						if len(repeats) < len(prev) {
-							fmt.Println("!!! INTERSHARD REPEATS FOUND")
-							fmt.Println("original len: ", len(prev))
-							fmt.Println("intershard set", len(repeats))
-						} */
-
 						// add shard to aggregate total for re-ordering
 						totalPrev = append(totalPrev, prev...)
 						prTotal += len(prev)
 					}
-
-					// debugging
-					/* repeats := make(map[string]bool)
-					r := 0
-					for _, ID := range totalPrev {
-						if repeats[ID] == true {
-							r++
-						}
-						repeats[ID] = true
-					}
-					if r != 0 {
-						fmt.Println("!!! REPEATS: ", r)
-					} */
 
 					// create set of new/existing IDs and update index
 					update := mergeIDs(ids, totalPrev)
@@ -744,34 +746,6 @@ func savePartitionMap(pm map[string]bool) error {
 		return fmt.Errorf("saveIndexData failed: %v", err)
 	}
 	return nil
-}
-
-// get PartitionMap
-func GetPartitionMap() (map[string]bool, error) {
-	db, err := bolt.Open(OUTPUT_PATH+"/db/search_index.db", 0644, nil)
-	defer db.Close()
-	if err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("getPartition failed: %v", err)
-	}
-
-	var data []byte
-
-	// tx
-	if err := db.View(func(tx *bolt.Tx) error {
-		data = tx.Bucket([]byte("index_data")).Get([]byte("partition_map"))
-		return nil
-	}); err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("getPartitionMap failed: %v", err)
-	}
-
-	pm, err := decodePartitionMap(data)
-	if err != nil {
-		fmt.Println(err)
-		return nil, fmt.Errorf("getPartitionMap failed: %v", err)
-	}
-	return pm, nil
 }
 
 // encode SearchData to protobuf

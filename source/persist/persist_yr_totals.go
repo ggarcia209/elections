@@ -1,3 +1,8 @@
+// Package persist contains operations for reading and writing disk data.
+// Most operations in this package are intended to be performed on the
+// admin local machine and are not intended to be used in the service logic.
+// This file contains operations for encoding/decoding protobufs for the
+// donations.YearlyTotal object.
 package persist
 
 import (
@@ -8,8 +13,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// encode to protobuf
-func encodeYrTotal(yt donations.YearlyTotal) ([]byte, error) { // move conversions to protobuf package?
+func encodeYrTotal(yt donations.YearlyTotal) ([]byte, error) {
 	entry := &protobuf.YearlyTotal{
 		ID:       yt.ID,
 		Year:     yt.Year,
@@ -19,7 +23,7 @@ func encodeYrTotal(yt donations.YearlyTotal) ([]byte, error) { // move conversio
 	}
 	data, err := proto.Marshal(entry)
 	if err != nil {
-		fmt.Println("encodeOverallData failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("encodeOverallData failed: %v", err)
 	}
 	return data, nil

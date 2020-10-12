@@ -1,4 +1,6 @@
-// Package parse contains operations for scanning the bulk data files and returning a list of objects derived from each file.
+// Package parse contains operations for scanning the bulk data files
+// and returning a list of objects derived from each file.
+// Date parsing is currently deprecated in this version.
 package parse
 
 import (
@@ -12,8 +14,8 @@ import (
 
 type mapOfFields map[int]string
 
-// ScanCandidates scans 100 lines of a candidates file
-// and returns 100 Candidate objects per call
+// ScanCandidates scans 10000 lines of a candidates file
+// and returns 10000 Candidate objects per call.
 func ScanCandidates(file io.ReadSeeker, start int64) ([]interface{}, int64, error) {
 	offset := int64(start)
 	// seek to starting byte offset
@@ -63,8 +65,8 @@ func ScanCandidates(file io.ReadSeeker, start int64) ([]interface{}, int64, erro
 	return queue, offset, nil
 }
 
-// ScanCommittees scans 100 lines of a committees file
-// and returns 100 Committee & corresponding CmteTxData objects per call
+// ScanCommittees scans 10000 lines of a committees file
+// and returns 10000 Committee & corresponding CmteTxData objects per call.
 func ScanCommittees(file io.ReadSeeker, start int64) ([]interface{}, []interface{}, int64, error) {
 	offset := int64(start)
 	// seek to starting byte offset
@@ -132,8 +134,8 @@ func ScanCommittees(file io.ReadSeeker, start int64) ([]interface{}, []interface
 	return queue, dataQueue, offset, nil
 }
 
-// ScanCmpnFin scans 100 lines of a committee financials file
-// and returns 100 CmteFinancials objects per call
+// ScanCmpnFin scans 10000 lines of a campaing financials file
+// and returns 10000 CmpnFinancials objects per call.
 func ScanCmpnFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) {
 	offset := start
 	// seek to starting byte offset
@@ -286,8 +288,8 @@ func ScanCmpnFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) 
 	return queue, offset, nil
 }
 
-// ScanCmteFin scans 100 lines of a committee financials file
-// and returns 100 CmteFinancials objects per call
+// ScanCmteFin scans 10000 lines of a committee financials file
+// and returns 10000 CmteFinancials objects per call
 func ScanCmteFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) {
 	offset := start
 	// seek to starting byte offset
@@ -433,8 +435,8 @@ func ScanCmteFin(file io.ReadSeeker, start int64) ([]interface{}, int64, error) 
 	return queue, offset, nil
 }
 
-// ScanContributions scans 500 lines of a contributions file
-// and returns 500 Contribution objects per call
+// ScanContributions scans 10000 lines of a contributions file
+// and returns 10000 Contribution objects per call.
 func ScanContributions(year string, file io.ReadSeeker, start int64) ([]*donations.Contribution, int64, error) {
 	// seek to starting byte offset
 	offset := int64(start)
@@ -509,8 +511,8 @@ func ScanContributions(year string, file io.ReadSeeker, start int64) ([]*donatio
 	return icQueue, offset, nil
 }
 
-// ScanDisbursements scans 500 lines of a disbursements file
-// and returns 500 Disbursement objects per call
+// ScanDisbursements scans 10000 lines of a disbursements file
+// and returns 10000 Disbursement objects per call.
 func ScanDisbursements(year string, file io.ReadSeeker, start int64) ([]*donations.Disbursement, int64, error) {
 	// seek to starting byte offset
 	offset := int64(start)
@@ -578,59 +580,7 @@ func ScanDisbursements(year string, file io.ReadSeeker, start int64) ([]*donatio
 	return dQueue, offset, nil
 }
 
-// Scan25CmteLink parses 25 rows of a candidate-committee links records file
-// and creates a list of 25 items to be stored in the database
-func Scan25CmteLink(file io.ReadSeeker, start int64) ([]*donations.CmteLink, int64, error) {
-	offset := int64(start)
-	// seek to starting byte offset
-	if _, err := file.Seek(offset, 0); err != nil {
-		return nil, start, err
-	}
-
-	scanner := bufio.NewScanner(file)
-	fieldMap := make(mapOfFields)
-	queue := []*donations.CmteLink{}
-
-	// scanLines records the byte offset in order to recover from a failure
-	scanLines := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		advance, token, err = bufio.ScanLines(data, atEOF)
-		offset += int64(advance)
-		return
-	}
-	scanner.Split(scanLines)
-
-	for scanner.Scan() {
-		row := scanner.Text()
-
-		// scan row and map field values
-		fieldMap = scanRow(row, fieldMap)
-
-		// convert values from string
-		ey, _ := strconv.Atoi(fieldMap[1])
-
-		// create object to be stored in database
-		link := &donations.CmteLink{
-			CandID:   fieldMap[0],
-			ElectnYr: ey,
-			CmteID:   fieldMap[3],
-			CmteType: fieldMap[4],
-			CmteDsgn: fieldMap[5],
-			LinkID:   fieldMap[6],
-		}
-
-		// add donation to queue of items, stop at 25 items
-		queue = append(queue, link)
-		if len(queue) == 25 {
-			break
-		}
-		fieldMap = make(mapOfFields)
-	}
-
-	return queue, offset, nil
-}
-
-/* Utility funcs */
-
+// Utility funcs
 func scanRow(row string, m map[int]string) map[int]string {
 	scanner := bufio.NewScanner(strings.NewReader(row))
 	scanner.Split(rowSplit)

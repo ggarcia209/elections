@@ -1,8 +1,13 @@
+// Package donations contains the base objects that are used throughout the application.
+// Objects within this package are primarily used for creating, updating, and persisting
+// the datasets derived from the input data.
+// Struct fields for objects in this file are populated from the data parsed
+// from the input .txt files. One object is created for each record.
 package donations
 
 import "time"
 
-// Candidate represents a candidate
+// Candidate represents a candidate for federal office (House, Senate, President).
 type Candidate struct {
 	ID                   string
 	Name                 string
@@ -34,18 +39,7 @@ type Candidate struct {
 	DirectSendersTxs     map[string]float32
 }
 
-// CmteLink represents the link between a candidate and their primary committee
-type CmteLink struct {
-	CandID   string
-	ElectnYr int
-	fecYr    int
-	CmteID   string
-	CmteType string
-	CmteDsgn string // Committee Designation
-	LinkID   string
-}
-
-// CmpnFinancials contains financial data reported by a candidate's campaign
+// CmpnFinancials contains financial data reported by a candidate's campaign.
 type CmpnFinancials struct {
 	CandID         string
 	Name           string

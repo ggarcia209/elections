@@ -1,3 +1,8 @@
+// Package persist contains operations for reading and writing disk data.
+// Most operations in this package are intended to be performed on the
+// admin local machine and are not intended to be used in the service logic.
+// This file contains operations for periodically persisting metadata for
+// long running operations in the event of failure.
 package persist
 
 import (
@@ -11,7 +16,8 @@ import (
 
 var mu = &sync.Mutex{}
 
-// LogOffset records the byte offset value in the database
+// LogOffset records the byte offset of .txt input files while scanning
+// and creating/updating datasets.
 func LogOffset(year, key string, offset int64) error {
 	mu.Lock()
 	defer mu.Unlock()
@@ -43,7 +49,7 @@ func LogOffset(year, key string, offset int64) error {
 	return nil
 }
 
-// GetOffset retreives the offset value from the database in the event of failure
+// GetOffset retreives the byte offset value from the database in the event of failure.
 func GetOffset(year, key string) (int64, error) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -77,7 +83,8 @@ func GetOffset(year, key string) (int64, error) {
 	return val, nil
 }
 
-// LogKey logs the key of the last object uploaded to DynamoDB for the given year/bucket
+// LogKey logs the key of the last object uploaded to DynamoDB for the given year/bucket.
+// LogKey can also be implemented with other BatchWrite/BatchGet operations.
 func LogKey(year, bucket, key string) error {
 	mu.Lock()
 	defer mu.Unlock()
@@ -110,7 +117,7 @@ func LogKey(year, bucket, key string) error {
 }
 
 // GetKey retreives the key of the last object uploaded to DynamoDB for the given year/bucket
-// returns nil if none
+// returns nil if none.
 func GetKey(year, bucket string) (string, error) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -144,7 +151,7 @@ func GetKey(year, bucket string) (string, error) {
 	return key, nil
 }
 
-// LogPath saves the input/output file path to disk cache
+// LogPath saves the input/output file path set by admin to disk cache.
 func LogPath(path string, input bool) error {
 	mu.Lock()
 	defer mu.Unlock()
@@ -182,8 +189,8 @@ func LogPath(path string, input bool) error {
 	return nil
 }
 
-// GetPath retreives the input/output filepaths
-// returns nil if none
+// GetPath retreives the input/output filepaths.
+// Returns nil if none.
 func GetPath(input bool) (string, error) {
 	mu.Lock()
 	defer mu.Unlock()

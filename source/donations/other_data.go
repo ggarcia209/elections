@@ -1,9 +1,17 @@
+// Package donations contains the base objects that are used throughout the application.
+// Objects within this package are primarily used for creating, updating, and persisting
+// the datasets derived from the input data.
+// Datasets for objects in this file are derived from the procesed objects
+// in the other files in this package, once all raw transaction data has been processed.
+// This file also contains & exposes functions for instantiating
+// these bjects outside of the package.
 package donations
 
 import "fmt"
 
-// TopOverallData stores an entry for the Top 100 Overall data types.
-// Each instance corresponds to a specific Year/Bucket/Cateogry/Party
+// TopOverallData stores a map of the top x number of objects
+// for a specific category (Top 500 by default).
+// Each instance corresponds to a specific Year/Bucket/Cateogry/Party.
 // Ex: ("all_time/cmte_tx_data/rec/ALL")
 type TopOverallData struct {
 	ID        string // hash(yr+bucket+cat+pty)
@@ -17,7 +25,7 @@ type TopOverallData struct {
 }
 
 // YearlyTotal contains the total sum of funds donated/transferred/spent
-// for a given year and party (including Year: all_time & Party: ALL)
+// for a given year and party (including Year: all_time & Party: ALL).
 type YearlyTotal struct {
 	ID       string  // hash(year+cat+pty)
 	Year     string  // "2018"
@@ -26,7 +34,13 @@ type YearlyTotal struct {
 	Total    float32 // total sum
 }
 
-// InitSecondaryDataObjs creates
+// Entry represents a key/value pair from a Top X map and is used to sort and update the map.
+type Entry struct {
+	ID    string
+	Total float32
+}
+
+// InitSecondaryDataObjs initializes a set of TopOverall and YearlyTotal objects for the given year.
 func InitSecondaryDataObjs(year string) ([]interface{}, []interface{}) {
 	ods := initTopOverallDataObjs(year)
 	yts := initYearlyTotalObjs(year)
@@ -34,8 +48,8 @@ func InitSecondaryDataObjs(year string) ([]interface{}, []interface{}) {
 }
 
 // initTopOverallDataObjs creates a TopOverallData object for each
-// category and returns the objects in a list
-// Formats object ID's as year-bucket-category-party
+// category and returns the objects in a list.
+// Formats object ID's as year-bucket-category-party.
 func initTopOverallDataObjs(year string) []interface{} {
 	limit := 500
 	od := []interface{}{}
@@ -132,7 +146,7 @@ func initTopOverallDataObjs(year string) []interface{} {
 	return od
 }
 
-// initYearlyTotalObjs initializes the YearlyTotal objects for the given year
+// initYearlyTotalObjs initializes the YearlyTotal objects for the given year.
 func initYearlyTotalObjs(year string) []interface{} {
 	yts := []interface{}{}
 
@@ -176,12 +190,6 @@ func initYearlyTotalObjs(year string) []interface{} {
 	yts = append(yts, expUnk)
 
 	return yts
-}
-
-// Entry represents a key/value pair from a Top X map and is used to sort and update the map.
-type Entry struct {
-	ID    string
-	Total float32
 }
 
 func initTopOverallObj(year, bucket, cat, pty string, limit int) *TopOverallData {

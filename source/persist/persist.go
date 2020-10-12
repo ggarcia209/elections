@@ -1,4 +1,7 @@
-// Package persist contains functions to persist data stored in memory to the local disk
+// Package persist contains operations for reading and writing disk data.
+// Most operations in this package are intended to be performed on the
+// admin local machine and are not intended to be used in the service logic.
+// This file contains the exported functions that are called by higher level packages.
 package persist
 
 import (
@@ -14,7 +17,8 @@ import (
 // OUTPUT_PATH sets the output path for all database & search index storage & retreiveal operations.
 var OUTPUT_PATH = "." // default value
 
-// InitDiskCache creates the disk cache directory next to the admin app
+// InitDiskCache creates the disk cache directory next to the application.
+// This function is called by each of the admin, server, and index services.
 func InitDiskCache() {
 	// metadata - store in /admin_app
 	if _, err := os.Stat("../db"); os.IsNotExist(err) {
@@ -23,7 +27,7 @@ func InitDiskCache() {
 	}
 }
 
-// Init inititalizes the program by creating the db directory, disk_cache.db, offline_db.db, and corresponding buckets
+// Init inititalizes the admin program by creating the db directory, disk_cache.db, offline_db.db, and corresponding buckets.
 func Init(year string) error {
 	createDB()
 
@@ -37,7 +41,7 @@ func Init(year string) error {
 	return nil
 }
 
-// StoreObjects persists a list of objects to the on-disk database as a batch write transaction
+// StoreObjects persists a list of objects to the on-disk database as a batch write transaction.
 func StoreObjects(year string, objs []interface{}) error {
 	// open/create bucket in db/offline_db.db
 	// put protobuf item and use donor.ID as key
@@ -75,7 +79,7 @@ func StoreObjects(year string, objs []interface{}) error {
 	return nil
 }
 
-// PutObject puts an object by year:bucket:key
+// PutObject puts an object by year:bucket:key.
 func PutObject(year string, object interface{}) error {
 	// encode object
 	bucket, key, data, err := encodeToProto(object)
@@ -107,7 +111,7 @@ func PutObject(year string, object interface{}) error {
 	return nil
 }
 
-// GetObject gets an object by year:bucket:key and returns it as an interface
+// GetObject gets an object by year:bucket:key and returns it as an interface.
 func GetObject(year, bucket, key string) (interface{}, error) {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	if err != nil {
@@ -127,7 +131,7 @@ func GetObject(year, bucket, key string) (interface{}, error) {
 		return nil, fmt.Errorf("GetObject failed: %v", err)
 	}
 
-	obj, err := decodeFromProto(bucket, data) // change to decode
+	obj, err := decodeFromProto(bucket, data)
 	if err != nil {
 		fmt.Println(err)
 		return nil, fmt.Errorf("GetObject failed: %v", err)
@@ -223,7 +227,7 @@ func BatchGetByID(year, bucket string, IDs []string) ([]interface{}, []string, e
 	return objs, nilIDs, nil
 }
 
-// GetTopOverall retreives the TopOverall objects from disk to store in memory
+// GetTopOverall retreives the TopOverall objects from disk to store in memory.
 func GetTopOverall(year string) ([]interface{}, error) {
 	objs := []interface{}{}
 
@@ -260,7 +264,7 @@ func GetTopOverall(year string) ([]interface{}, error) {
 	return objs, nil
 }
 
-// SaveTopOverall saves a list of TopOverall objects by year/bucket/category
+// SaveTopOverall saves a list of TopOverall objects by year/bucket/category.
 func SaveTopOverall(year, bucket string, ods []interface{}) error {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	if err != nil {
@@ -406,8 +410,8 @@ func ViewDataByBucket(year, bucket, start string) (string, error) {
 	return curr, nil
 }
 
-// encodeToProto encodes an object interface to protobuf
-// Returns bucket, key (ID), serialized data, and err
+// encodeToProto encodes an object interface to protobuf.
+// Returns bucket, key (ID), serialized data, and err.
 func encodeToProto(obj interface{}) (string, string, []byte, error) {
 	if obj == nil {
 		fmt.Println("empty object passed to encodeProto")
@@ -493,7 +497,7 @@ func encodeToProto(obj interface{}) (string, string, []byte, error) {
 	}
 }
 
-// decodeFromProto encodes an object interface to protobuf
+// decodeFromProto decodes a protobuf object.
 // Returns pointer to deserialized object as interface{}
 func decodeFromProto(bucket string, data []byte) (interface{}, error) {
 	switch bucket {
@@ -589,6 +593,7 @@ func createDB() {
 	}
 }
 
+// initializes BoltDB buckets datasets are stored in on disk
 func createObjBuckets(year string) error {
 	buckets := []string{"individuals", "committees", "candidates", "cmte_tx_data", "cmte_fin", "cmpn_fin", "top_overall", "yearly_totals"}
 	for _, bucket := range buckets {
@@ -602,6 +607,7 @@ func createObjBuckets(year string) error {
 	return nil
 }
 
+// create an individual boltDB bucket
 func createBucket(year, name string) error {
 	db, err := bolt.Open(OUTPUT_PATH+"/db/offline_db.db", 0644, nil)
 	defer db.Close()

@@ -1,3 +1,7 @@
+// Package cache contains operations for creating an
+// in-memory cache of objects read from disk.
+// This file contains functions for creating the
+// cache from the on disk data.
 package cache
 
 import (
@@ -9,7 +13,7 @@ import (
 	"github.com/elections/source/persist"
 )
 
-// CreateCache creates a temporary in-memory cache of filer and other objects derived from a list of Contributions or Disbursements
+// CreateCache creates a temporary in-memory cache of filer and other objects derived from a list of Contributions or Disbursements.
 func CreateCache(year string, txQueue interface{}) (map[string]map[string]interface{}, error) {
 	var cache map[string]map[string]interface{}
 	var err error
@@ -230,7 +234,7 @@ func createCacheFromDisbursement(year string, txQueue []*donations.Disbursement)
 	return cache, nil
 }
 
-// SerializeCache converts a cache from map[string]map[string]interface{} to []interface{}
+// SerializeCache converts a cache from map[string]map[string]interface{} to []interface{}.
 func SerializeCache(cache map[string]map[string]interface{}) []interface{} {
 	objs := []interface{}{}
 

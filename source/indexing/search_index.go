@@ -1,3 +1,8 @@
+// Package indexing contains operations for building, searching, and viewing
+// an index created from the complete data.
+// This file contains operations for searching the index
+// and retrieving object summary data from either
+// BoltDB (disk) or DynamoDB.
 package indexing
 
 import (
@@ -13,34 +18,34 @@ import (
 	"github.com/elections/source/dynamo"
 )
 
-// Query uses text from user input to look up corresponding results
+// Query uses text from user input to look up corresponding results.
 type Query struct {
 	Text      string
 	UserID    string
 	TimeStamp time.Time
 }
 
-// Data is used to find the DocID's common to all terms in query
+// Data is used to find the DocID's common to all terms in query.
 type Data struct {
 	Key   string
 	Value []string // sorted by ID value
 	Len   int
 }
 
-// Entry represents a k/v pair in a sorted map
+// Entry represents a k/v pair in a sorted map.
 type Entry struct {
 	ID   string
 	Data SearchData
 }
 
-// SearchEntry is used to store & retreive a Search Index entry from DynamoDB
+// SearchEntry is used to store & retreive a Search Index entry from DynamoDB.
 type SearchEntry struct {
 	Partition string
 	Term      string
 	IDs       []string
 }
 
-// LookupEntry is used to store & retreive SearchData objects from DynamoDB
+// LookupEntry is used to store & retreive SearchData objects from DynamoDB.
 type LookupEntry struct {
 	Partition string // last 2 chars of FEC ID / first 2 letters of MD5 hash ID
 	ID        string
@@ -52,46 +57,46 @@ type LookupEntry struct {
 	Years     []string
 }
 
-// Entries represents a sorted map
+// Entries represents a sorted map.
 type Entries []Entry
 
 func (s Entries) Len() int           { return len(s) }
 func (s Entries) Less(i, j int) bool { return s[i].ID < s[j].ID }
 func (s Entries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-// shardEntry is used to sort terms by number of shards for the given term
+// shardEntry is used to sort terms by number of shards for the given term.
 type shardEntry struct {
 	ID     string
 	Shards float32
 }
 
-// Entries represents a sorted map
+// shardEntries represents a sorted map
 type shardEntries []shardEntry
 
 func (s shardEntries) Len() int           { return len(s) }
 func (s shardEntries) Less(i, j int) bool { return s[i].Shards < s[j].Shards }
 func (s shardEntries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-// prtEntry represents a k/v pair for a sorted partition map
+// prtEntry represents a k/v pair for a sorted partition map.
 type prtEntry struct {
 	Prt string
 	B   bool
 }
 
-// prtEntries represents a partition map to be sorted
+// prtEntries represents a partition map to be sorted.
 type prtEntries []prtEntry
 
 func (s prtEntries) Len() int           { return len(s) }
 func (s prtEntries) Less(i, j int) bool { return s[i].Prt < s[j].Prt }
 func (s prtEntries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-// object info returned from dynamodb and sent through chan
+// Object info returned from dynamodb and sent through chan.
 type chanResult struct {
 	SD  SearchData
 	Err error
 }
 
-// used to record objects missing from dynamoDB
+// Used to record objects missing from dynamoDB.
 type missingLog struct {
 	Partition string
 	ID        string

@@ -1,3 +1,7 @@
+// Package cache contains operations for creating an
+// in-memory cache of objects read from disk.
+// This file contains functions for creating objects
+// in memory if no record is found for a given entity.
 package cache
 
 import (

@@ -1,8 +1,15 @@
+// Package donations contains the base objects that are used throughout the application.
+// Objects within this package are primarily used for creating, updating, and persisting
+// the datasets derived from the input data.
+// Individual object data is derived from the Contribution and Disbursement objects.
+// Struct fields for other objects in this file are populated from the data parsed
+// from the input .txt files. One object is created for each record.
 package donations
 
 import "time"
 
-// Individual donor represents an individual donor.
+// Individual donor represents an individual donor,
+// business, or other private or non-federal govt. entity.
 type Individual struct {
 	ID            string
 	Name          string
@@ -25,8 +32,9 @@ type Individual struct {
 	SendersAmt    map[string]float32 // $ Value returned from each committee
 }
 
-// Committee represents a committee
-// Commitee objects both receive and send donations
+// Committee represents a federal politcal committee
+// registered with the FEC.
+// Commitee objects both receive and send transactions.
 type Committee struct {
 	ID           string
 	Name         string
@@ -85,7 +93,7 @@ type CmteTxData struct {
 	TopExpThreshold                []interface{}      // Minimum values to be in Top x Recipients
 }
 
-// CmteFinancials represents the financial data of a political action committee
+// CmteFinancials represents the financial data of a political action committee.
 type CmteFinancials struct {
 	CmteID      string
 	name        string

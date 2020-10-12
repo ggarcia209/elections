@@ -1,6 +1,10 @@
+// Package databuilder conatins operations for updating datasets in memory.
+// This package is primarily used by the admin service to create the
+// primary datasets from the raw input, followed by the secondary
+// datasets.
+// This file contains operations for updating the filing committee
+// and correspoding sender/receiver objects' datasets for every transaction.
 package databuilder
-
-// Refactored 8/3/20 - removed Organization cases and references
 
 import (
 	"fmt"
@@ -16,20 +20,20 @@ func TransactionUpdate(year string, txs interface{}, cache map[string]map[string
 	if cont { // tx type is standard contribution/disbursement type
 		err := contributionUpdate(year, txs.([]*donations.Contribution), cache)
 		if err != nil {
-			fmt.Println("TransactionUpdate failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("TransactionUpdate failed: %v", err)
 		}
 	} else { // tx type is operating expense disbursement
 		err := opExpensesUpdate(year, txs.([]*donations.Disbursement), cache)
 		if err != nil {
-			fmt.Println("TransactionUpdate failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("TransactionUpdate failed: %v", err)
 		}
 	}
 	return nil
 }
 
-// update data from Contribution transactiosn derived from contribution files
+// Update data from Contribution transactiosn derived from contribution files.
 func contributionUpdate(year string, conts []*donations.Contribution, cache map[string]map[string]interface{}) error {
 	for _, cont := range conts {
 		// get tx type info
@@ -58,14 +62,14 @@ func contributionUpdate(year string, conts []*donations.Contribution, cache map[
 		if incoming {
 			err := incomingTxUpdate(cont, filer.(*donations.CmteTxData), other, transfer, memo)
 			if err != nil {
-				fmt.Println("contributionUpdate failed: ", err)
+				fmt.Println(err)
 				fmt.Println("tx: ", cont.TxID)
 				return fmt.Errorf("contributionUpdate failed: %v", err)
 			}
 		} else {
 			err := outgoingTxUpdate(cont, filer.(*donations.CmteTxData), other, transfer, memo)
 			if err != nil {
-				fmt.Println("contributionUpdate failed: ", err)
+				fmt.Println(err)
 				fmt.Println("tx: ", cont.TxID)
 				return fmt.Errorf("contributionUpdate failed: %v", err)
 			}
@@ -75,7 +79,7 @@ func contributionUpdate(year string, conts []*donations.Contribution, cache map[
 	return nil
 }
 
-// update data from Disbursement transactions derived from operating expenses files
+// Update data from Disbursement transactions derived from operating expenses files.
 func opExpensesUpdate(year string, disbs []*donations.Disbursement, cache map[string]map[string]interface{}) error {
 	for _, disb := range disbs {
 		// get filing committee
@@ -95,7 +99,7 @@ func opExpensesUpdate(year string, disbs []*donations.Disbursement, cache map[st
 	return nil
 }
 
-// derive transaction type from contribution data
+// Derive transaction type from contribution data.
 func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
 	// initialize return values
 	incoming := false
@@ -171,7 +175,7 @@ func deriveTxTypes(cont *donations.Contribution) (string, bool, bool, bool) {
 		  rendering services or other material contributions for which they are paid by committees.
 */
 
-// update filing committee and sender object data for incoming transactions
+// Update filing committee and sender object data for incoming transactions.
 func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}, transfer, memo bool) error {
 	// update maps only if memo == true
 	// account for percentage of amounts received by memo transactions but do not add to totals
@@ -179,7 +183,7 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		// update maps
 		err := mapUpdateIncoming(cont, filerData, sender, transfer)
 		if err != nil {
-			fmt.Println("incomingTxUpdate failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("incomingTxUpdate failed: %v", err)
 		}
 		return nil
@@ -228,14 +232,14 @@ func incomingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 	// update maps
 	err := mapUpdateIncoming(cont, filerData, sender, transfer)
 	if err != nil {
-		fmt.Println("incomingTxUpdate failed: ", err)
+		fmt.Println(err)
 		return fmt.Errorf("incomingTxUpdate failed: %v", err)
 	}
 
 	return nil
 }
 
-// update filing committe and receiver object data for outgoing transactions
+// Update filing committe and receiver object data for outgoing transactions.
 func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxData, receiver interface{}, transfer, memo bool) error {
 	if cont.TxType == "24T" { // edge case - ignore earmarked transaction
 		return nil
@@ -246,7 +250,7 @@ func outgoingTxUpdate(cont *donations.Contribution, filerData *donations.CmteTxD
 		// update maps
 		err := mapUpdateOutgoing(cont, filerData, receiver, transfer)
 		if err != nil {
-			fmt.Println("outgoingTxUpdate failed: ", err)
+			fmt.Println(err)
 			return fmt.Errorf("outgoingTxUpdate failed: %v", err)
 		}
 		return nil
@@ -336,7 +340,7 @@ func disbursementTxUpdate(disb *donations.Disbursement, filer *donations.CmteTxD
 		  rendering services or other material contributions for which they are paid by committees.
 */
 
-// update maps for incoming transactions posted by filing committee
+// Update maps for incoming transactions posted by filing committee.
 func mapUpdateIncoming(cont *donations.Contribution, filerData *donations.CmteTxData, sender interface{}, transfer bool) error {
 	switch t := sender.(type) {
 	case *donations.Individual:
@@ -461,8 +465,9 @@ func mapUpdateIncoming(cont *donations.Contribution, filerData *donations.CmteTx
 	return nil
 }
 
-// update maps for outgoing transaction posted by filing committee - transactions to individuals
-// or organizations are always counted as expenses (loan repayments, refunds, independent expendiures, etc..)
+// Update maps for outgoing transaction posted by filing committee - transactions to individuals
+// or organizations are always counted as expenses (loan repayments, refunds, independent expendiures, etc..).
+// NOTE - direct contributions to a candidate will be listed in expenses.
 func mapUpdateOutgoing(cont *donations.Contribution, filerData *donations.CmteTxData, receiver interface{}, transfer bool) error {
 	switch t := receiver.(type) {
 	case *donations.Individual:
@@ -575,7 +580,7 @@ func mapUpdateOutgoing(cont *donations.Contribution, filerData *donations.CmteTx
 	return nil
 }
 
-// update maps for expenditures listed in operating expenses files
+// Update maps for expenditures listed in operating expenses files.
 func mapUpdateOpExp(disb *donations.Disbursement, filer *donations.CmteTxData, receiver *donations.Individual) error {
 	// re-initialize maps if nil
 	if len(filer.TopExpRecipientsAmt) == 0 {

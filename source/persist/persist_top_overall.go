@@ -1,3 +1,8 @@
+// Package persist contains operations for reading and writing disk data.
+// Most operations in this package are intended to be performed on the
+// admin local machine and are not intended to be used in the service logic.
+// This file contains operations for encoding/decoding protobufs for the
+// donations.TopOverallData object.
 package persist
 
 import (
@@ -9,8 +14,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// encode to protobuf
-func encodeOverallData(od donations.TopOverallData) ([]byte, error) { // move conversions to protobuf package?
+func encodeOverallData(od donations.TopOverallData) ([]byte, error) {
 	entry := &protobuf.TopOverallData{
 		ID:        od.ID,
 		Year:      od.Year,
@@ -23,7 +27,7 @@ func encodeOverallData(od donations.TopOverallData) ([]byte, error) { // move co
 	}
 	data, err := proto.Marshal(entry)
 	if err != nil {
-		fmt.Println("encodeOverallData failed: ", err)
+		fmt.Println(err)
 		return nil, fmt.Errorf("encodeOverallData failed: %v", err)
 	}
 	return data, nil
@@ -46,7 +50,7 @@ func decodeOverallData(data []byte) (donations.TopOverallData, error) {
 	od := &protobuf.TopOverallData{}
 	err := proto.Unmarshal(data, od)
 	if err != nil {
-		fmt.Println("decodeOverallData failed: ", err)
+		fmt.Println(err)
 		return donations.TopOverallData{}, fmt.Errorf("decodeOverallData failed: %v", err)
 	}
 

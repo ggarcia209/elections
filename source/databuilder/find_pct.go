@@ -1,3 +1,14 @@
+// Package databuilder conatins operations for updating datasets in memory.
+// This package is primarily used by the admin service to create the
+// primary datasets from the raw input, followed by the secondary
+// datasets.
+// This file contains operations for finding the percentage of funds
+// received by a target committee from a specified source entity.
+// Breadth-first search is used to find the the percentage of
+// inderect funds received by the target committee (money sent
+// to 3rd party before percentage of which is forwarded to target).
+// This file is still in progress and features will be inmplemented
+// in future version.
 package databuilder
 
 import (
@@ -41,12 +52,12 @@ func FindDirectPct(source interface{}, target *donations.CmteTxData) (float32, e
 	}
 }
 
-// FindDonationDirectPct finds the direct ownership percentage of a given committee
+// FindDonationDirectPct finds the direct ownership percentage of a given committee.
 func findDonationDirectPct(recs map[string]float32, target *donations.CmteTxData) float32 {
 	return recs[target.CmteID] / target.ContributionsInAmt
 }
 
-// FindDonationTotalPct finds the total percentage of a specified committee owned by a donor or committee
+// FindDonationTotalPct finds the total percentage of a specified committee owned by a donor or committee.
 func findDonationTotalPct(year string, recs map[string]float32, target *donations.CmteTxData, seen map[string]bool) (float32, error) {
 	// find direct contribution %
 	direct := recs[target.CmteID] / target.ContributionsInAmt
