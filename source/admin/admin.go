@@ -1,3 +1,9 @@
+// Package admin contains operations for running the local admin console service.
+// Only the functions in this package are exposed to the admin service; lower
+// level source packages remain encapsulated.
+// This file contains the operations for building the datasets from the
+// raw .txt bulk data files.
+// NOTE: logic is not UX optimized and may contain unresolved errors.
 package admin
 
 import (
@@ -53,7 +59,7 @@ func ProcessData() error {
 	}
 }
 
-// ProcessNewRecords processes the FEC bulk data files for the given year.
+// processNewRecords processes the FEC bulk data files for the given year.
 func processNewRecords() error {
 	fmt.Println("******************************************")
 	fmt.Println()

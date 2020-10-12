@@ -1,3 +1,9 @@
+// Package server contains operations for initializing and
+// communicating with the HTTP and gRPC servers.
+// This file contains various read operations for
+// information retrieval from BoltDB (search index only)
+// and DynamoDB (all other datasets). Most IR operations
+// are performed by the Index service.
 package server
 
 import (
@@ -14,26 +20,26 @@ import (
 	"github.com/elections/source/util"
 )
 
-// RankingsMap stores references to each rankings list by year
+// RankingsMap stores references to each rankings list by year.
 type RankingsMap map[string]map[string]RankingsData
 
-// YrTotalsMap stores references to each yearly total by year
+// YrTotalsMap stores references to each yearly total by year.
 type YrTotalsMap map[string]map[string]YrTotalData
 
-// SearchDataMap stores references to SearchData objects
+// SearchDataMap stores references to SearchData objects.
 type SearchDataMap map[string]indexing.SearchData
 
-// IndexData wraps and encapsulates the indexing.IndexData object
+// IndexData wraps and encapsulates the indexing.IndexData object.
 type IndexData indexing.IndexData
 
-// InitServerDiskCache creates the ../db directory on the local disk
+// InitServerDiskCache creates the ../db directory on the local disk.
 func InitServerDiskCache() {
 	persist.InitDiskCache()
 	indexing.OUTPUT_PATH = ".."
 	fmt.Println("local disk cache created")
 }
 
-// InitDynamo initialized a Dynamo session with default settings
+// InitDynamo initialized a Dynamo session with default settings.
 func InitDynamo() (*dynamo.DbInfo, error) {
 	// init sesh and db with default options
 	db, err := initDynamoDbDefault()
@@ -44,7 +50,7 @@ func InitDynamo() (*dynamo.DbInfo, error) {
 	return db, nil
 }
 
-// GetIndexData retreives the encapsulated IndexData object from disk
+// GetIndexData retreives the encapsulated IndexData object from disk.
 func GetIndexData() (*IndexData, error) {
 	id, err := indexing.GetIndexData()
 	if err != nil {
@@ -66,7 +72,7 @@ func GetIndexData() (*IndexData, error) {
 // finds the results matching each word in query.
 func SearchData(id *IndexData, txt string) ([]string, error) {
 	// get query from user / return & print results
-	indexing.OUTPUT_PATH = "/Volumes/T7/processed" // CHANGE TO LOCAL DIR
+	// indexing.OUTPUT_PATH = "./Volumes/T7/processed" // set output path in main
 	terms := formatTerms(strings.Split(txt, " "))
 	wrap := &indexing.IndexData{
 		Shards: make(indexing.ShardMap),
@@ -91,7 +97,7 @@ func SearchData(id *IndexData, txt string) ([]string, error) {
 	return common, nil
 }
 
-// GetSearchResults returns the SearchData object for the given IDs
+// GetSearchResults returns the SearchData object for the given IDs.
 func GetSearchResults(db *dynamo.DbInfo, ids []string, cache SearchDataMap) ([]indexing.SearchData, error) {
 	nilIDs, frmCache := indexing.LookupSearchDataFromCache(ids, cache)
 	frmDb, err := indexing.LookupSearchDataFromDynamo(db, nilIDs)
@@ -103,7 +109,7 @@ func GetSearchResults(db *dynamo.DbInfo, ids []string, cache SearchDataMap) ([]i
 	return sds, nil
 }
 
-// LookupByID finds an entity by ID
+// LookupByID finds an entity by ID.
 func LookupByID(db *dynamo.DbInfo, IDs []string) ([]indexing.SearchData, error) {
 	sds, err := indexing.LookupSearchDataFromDynamo(db, IDs)
 	if err != nil {
@@ -113,7 +119,7 @@ func LookupByID(db *dynamo.DbInfo, IDs []string) ([]indexing.SearchData, error) 
 	return sds, nil
 }
 
-// GetObjectFromDisk gets object from disk and returns pointer to obj as interface{}
+// GetObjectFromDisk gets object from disk and returns pointer to obj as interface{}.
 func GetObjectFromDisk(year, ID, bucket string) (interface{}, error) {
 	obj, err := persist.GetObject(year, bucket, ID)
 	if err != nil {
@@ -292,7 +298,7 @@ func GetObjectFromDisk(year, ID, bucket string) (interface{}, error) {
 }
 
 // GetObjectFromDynamo returns the yearly datasets
-// for the queried object and the given years
+// for the queried object and the given years.
 func GetObjectFromDynamo(db *dynamo.DbInfo, query *dynamo.Query, bucket string, years []string) ([]interface{}, error) {
 	datasets := []interface{}{}
 
@@ -317,7 +323,7 @@ func GetObjectFromDynamo(db *dynamo.DbInfo, query *dynamo.Query, bucket string, 
 	return datasets, nil
 }
 
-// CreateQueryFromSearchData returns a Dynamo Query object from SearchData info
+// CreateQueryFromSearchData returns a Dynamo Query object from SearchData info.
 func CreateQueryFromSearchData(sd indexing.SearchData) *dynamo.Query {
 	pk := ""
 
@@ -331,65 +337,7 @@ func CreateQueryFromSearchData(sd indexing.SearchData) *dynamo.Query {
 }
 
 // GetRankingsFromDynamo retrieves the TopOvearll datasets
-// for the given year from Dynamo to store in memory
-// TEST ONLY
-func GetRankingsFromDisk() (RankingsMap, error) {
-	persist.OUTPUT_PATH = "/Volumes/T7/processed"
-	rankings := make(RankingsMap)
-	years := []string{"2020"}
-	/*years := []string{
-		"2020", "2018", "2016", "2014", "2012", "2010", "2008", "2006", "2004", "2002",
-		"2000", "1998", "1996", "1994", "1992", "1990", "1988", "1986", "1984", "1982",
-		"1980",
-	} */
-
-	for _, yr := range years {
-		fmt.Printf("getting rankings for %s...\n", yr)
-		// get list of object IDs for the year,
-		odl, err := persist.GetTopOverall(yr)
-		if err != nil {
-			fmt.Println(err)
-			return rankings, fmt.Errorf("GetRankingsFromDisk failed: %v", err)
-		}
-		for _, od := range odl {
-			full := od.(*donations.TopOverallData)
-			// add rankiings list to map
-			if full.Bucket == "individuals" {
-				// clip individuals lists to 500 entries
-				sorted := util.SortMapObjectTotals(full.Amts)
-				clip := make(map[string]float32)
-				for i, e := range sorted {
-					if i == 500 {
-						break
-					}
-					clip[e.ID] = e.Total
-				}
-				full.Amts = clip
-			}
-			// add rankiings list to map
-			if rankings[yr] == nil {
-				rankings[yr] = make(map[string]RankingsData)
-			}
-			wrap := RankingsData{
-				ID:       full.ID,
-				Year:     full.Year,
-				Bucket:   full.Bucket,
-				Category: full.Category,
-				Party:    full.Party,
-				Rankings: full.Amts,
-			}
-			rankings[yr][wrap.ID] = wrap
-
-			// create preview list and add preview object to map
-			pre := createRankingsPreview(wrap)
-			rankings[yr][pre.ID] = pre
-		}
-	}
-	return rankings, nil
-}
-
-// GetRankingsFromDynamo retrieves the TopOvearll datasets
-// for the given year from Dynamo to store in memory
+// for the given year from Dynamo to store in memory.
 func GetRankingsFromDynamo(db *dynamo.DbInfo) (RankingsMap, error) {
 	persist.OUTPUT_PATH = "/Volumes/T7/processed"
 	rankings := make(RankingsMap)
@@ -456,9 +404,9 @@ func GetRankingsFromDynamo(db *dynamo.DbInfo) (RankingsMap, error) {
 	return rankings, nil
 }
 
-// GetRankingsFromDynamo retrieves the TopOvearll datasets
-// for the given year from Dynamo to store in memory
-// TEST ONLY
+// GetYrTotalsFromDisk retrieves the Yearly Total datasets
+// for the given year from disk to store in memory.
+// TEST ONLY - Refactor to retreive from DynamoDB
 func GetYrTotalsFromDisk() (YrTotalsMap, error) {
 	persist.OUTPUT_PATH = "/Volumes/T7/processed"
 	totals := make(YrTotalsMap)
@@ -711,7 +659,7 @@ func createRankingsNames(year string) []string {
 	names := []string{}
 	buckets := []string{"candidates", "cmte_tx_data", "individuals"}
 	cats := []string{"rec", "donor", "exp"}
-	ptys := []string{"ALL", ""}
+	ptys := []string{"ALL", "REP", "DEM", "IND", "OTH", ""}
 
 	for _, b := range buckets {
 		for _, c := range cats {

@@ -1,3 +1,5 @@
+// The server service is primarily responsible for serving static files to the web client,
+// and retrieving the information requested by the user from the Index service.
 package main
 
 import (

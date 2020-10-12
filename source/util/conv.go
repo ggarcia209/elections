@@ -1,3 +1,6 @@
+// Package util contains operations for basic utility functions.
+// This file contains operations for converting data types.
+// (these functions are not used in current version).
 package util
 
 import (

@@ -1,3 +1,9 @@
+// Package ui contains operations for interacting with a user
+// through the command line. Operations in this package are
+// completely abstracted from other application logic and
+// are designed to be implemnted with any CLI app.
+// Within the scope of this project, package ui is only
+// implemented in the admin service.
 package ui
 
 import (
@@ -8,8 +14,8 @@ import (
 	"strings"
 )
 
-// Menu represents a menu/choice of selections
-// The Options field repesents the options in a pre-defined order
+// Menu represents a menu/choice of selections.
+// The Options field repesents the options in a pre-defined order.
 // The OptionsMap field is used to reference each option by user-input numeric value.
 type Menu struct {
 	Name       string
@@ -17,7 +23,7 @@ type Menu struct {
 	OptionsMap map[int]string
 }
 
-// Ask4confirm asks for Y/N confirmation in a CLI application
+// Ask4confirm asks for Y/N confirmation in a CLI application.
 func Ask4confirm() bool {
 	var s string
 
@@ -48,7 +54,7 @@ func CreateMenu(name string, options []string) Menu {
 
 // Ask4MenuChoice asks user to choose an option from
 // the given menu and returns the int value of the selection.
-// Returned int values correspond to the k/v pairs in m.OptionsMap
+// Returned int values correspond to the k/v pairs in m.OptionsMap.
 func Ask4MenuChoice(m Menu) (int, error) {
 	fmt.Println("Please choose an option: ")
 	for i, opt := range m.Options {
@@ -83,7 +89,7 @@ func Ask4MenuChoice(m Menu) (int, error) {
 	}
 }
 
-// verify input is numerical value in string format
+// Verify input is numerical value in string format.
 func menuInputOk(s string) bool {
 	nums := map[string]bool{
 		"0": true, "1": true, "2": true, "3": true, "4": true,
@@ -141,7 +147,7 @@ func GetPathFromUser() string {
 	}
 }
 
-// GetYear gets year gets the chosen year from the user
+// GetYear gets year gets the chosen year from the user.
 func GetYear() string {
 	years := map[string]bool{
 		"2020": true, "2018": true, "2016": true, "2014": true, "2012": true,
@@ -171,7 +177,7 @@ func GetYear() string {
 	}
 }
 
-// GetQuery gets unformatted query input from user
+// GetQuery gets unformatted query input from user.
 func GetQuery() string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Enter search query: ")
@@ -185,7 +191,7 @@ func GetQuery() string {
 }
 
 // GetDynamoQuery gets a user-input sort, partition key pair
-// for retreiving an object from a DynamoDB Table
+// for retreiving an object from a DynamoDB Table.
 func GetDynamoQuery() map[string]string {
 	var prt string
 	var srt string

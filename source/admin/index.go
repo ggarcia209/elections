@@ -1,3 +1,9 @@
+// Package admin contains operations for running the local admin console service.
+// Only the functions in this package are exposed to the admin service; lower
+// level source packages remain encapsulated.
+// This file contains operations for building and updating the search index
+// and object lookup data from the processed datasets.
+// NOTE: logic is not UX optimized and may contain unresolved errors.
 package admin
 
 import (

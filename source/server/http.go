@@ -1,3 +1,7 @@
+// Package server contains operations for initializing and
+// communicating with the HTTP and gRPC servers.
+// This file contains HTTP handler functions for
+// serving the html, css, and js files to web clients.
 package server
 
 import (

@@ -1,7 +1,8 @@
-/* dynamotypes.go defines the Table and Query objects, and functions for creating them.
-In addition, it defines functions for creating DynamoDB AttributeValue objects and database keys in map format */
-
-// Package dynamo contains controls and objects for DynamoDB CRUD operations
+// Package dynamo contains controls and objects for DynamoDB CRUD operations.
+// Operations in this package are abstracted from all other application logic
+// and are designed to be used with any DynamoDB table and any object schema.
+// This file defines the Table and Query objects, and functions for creating them.
+// It also defines functions for creating DynamoDB AttributeValue objects and database keys in map format.
 package dynamo
 
 import (
@@ -10,7 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-// Table represents a table and holds basic information about it
+// Table represents a table and holds basic information about it.
+// This object is used to access the Dynamo Table requested for each CRUD op.
 type Table struct {
 	TableName      string
 	PrimaryKeyName string
@@ -20,35 +22,36 @@ type Table struct {
 }
 
 // DbInfo holds different variables to be passed to db operation functions
+// Contains the Db Svc, map of tables, and FailConfig.
 type DbInfo struct {
 	Svc        *dynamodb.DynamoDB
 	Tables     map[string]*Table
 	FailConfig *FailConfig
 }
 
-// SetSvc sets the Svc field of the DbInfo obj
+// SetSvc sets the Svc field of the DbInfo obj.
 func (d *DbInfo) SetSvc(svc *dynamodb.DynamoDB) {
 	d.Svc = svc
 }
 
-// SetFailConfig sets the FailConfig field of the DbInfo obj
+// SetFailConfig sets the FailConfig field of the DbInfo obj.
 func (d *DbInfo) SetFailConfig(fc *FailConfig) {
 	d.FailConfig = fc
 }
 
-// AddTable adds a new Table obj to the Tables field of the DbInfo obj
-// TableName field is used for map key
+// AddTable adds a new Table obj to the Tables field of the DbInfo obj.
+// TableName field is used for map key.
 func (d *DbInfo) AddTable(t *Table) {
 	d.Tables[t.TableName] = t
 }
 
-// InitDbInfo constructs a DbInfo object with default values
+// InitDbInfo constructs a DbInfo object with default values.
 func InitDbInfo() *DbInfo {
 	return &DbInfo{Svc: nil, Tables: make(map[string]*Table), FailConfig: nil}
 }
 
-// Query holds the search values for both the Partition and Sort Keys
-// Query also holds data for updating a specific item in the UpdateFieldName column
+// Query holds the search values for both the Partition and Sort Keys.
+// Query also holds data for updating a specific item in the UpdateFieldName column.
 type Query struct {
 	PrimaryValue    interface{}
 	SortValue       interface{}
@@ -56,26 +59,26 @@ type Query struct {
 	UpdateValue     interface{}
 }
 
-// New creates a new query by setting the Partition Key and Sort Key values
+// New creates a new query by setting the Partition Key and Sort Key values.
 func (q *Query) New(pv, sv interface{}) { q.PrimaryValue, q.SortValue = pv, sv }
 
-// UpdateCurrent sets the update fields for the current item
+// UpdateCurrent sets the update fields for the current item.
 func (q *Query) UpdateCurrent(fieldName string, value interface{}) {
 	q.UpdateFieldName, q.UpdateValue = fieldName, value
 }
 
-// UpdateNew selects a new item for an update
+// UpdateNew selects a new item for an update.
 func (q *Query) UpdateNew(pv, sv, fieldName string, value interface{}) {
 	q.PrimaryValue, q.SortValue, q.UpdateValue, q.UpdateFieldName = pv, sv, value, fieldName
 }
 
-// Reset clears all fields
+// Reset clears all fields.
 func (q *Query) Reset() {
 	q.PrimaryValue, q.SortValue, q.UpdateValue, q.UpdateFieldName = nil, nil, nil, ""
 }
 
-// CreateNewTableObj creates a new Table struct
-// The Table's key's Go types must be declared as strings
+// CreateNewTableObj creates a new Table struct.
+// The Table's key's Go types must be declared as strings.
 // ex: t := CreateNewTableObj("my_table", "Year", "int", "MovieName", "string")
 func CreateNewTableObj(tableName, pKeyName, pType, sKeyName, sType string) *Table {
 	typeMap := map[string]string{
@@ -97,7 +100,7 @@ func CreateNewTableObj(tableName, pKeyName, pType, sKeyName, sType string) *Tabl
 	return &Table{tableName, pKeyName, pt, sKeyName, st}
 }
 
-// CreateNewQueryObj creates a new Query struct
+// CreateNewQueryObj creates a new Query struct.
 // pval, sval == Primary/Partition key, Sort Key
 func CreateNewQueryObj(pval, sval interface{}) *Query {
 	return &Query{PrimaryValue: pval, SortValue: sval}
@@ -168,7 +171,7 @@ func createAV(val interface{}) *dynamodb.AttributeValue {
 	return nil
 }
 
-// KeyMaker creates a map of Partition and Sort Keys
+// keyMaker creates a map of Partition and Sort Keys.
 func keyMaker(q *Query, t *Table) map[string]*dynamodb.AttributeValue {
 	keys := make(map[string]*dynamodb.AttributeValue)
 	keys[t.PrimaryKeyName] = createAV(q.PrimaryValue)

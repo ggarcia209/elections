@@ -1,4 +1,7 @@
-// Package dynamo contains controls and objects for DynamoDB CRUD operations
+// Package dynamo contains controls and objects for DynamoDB CRUD operations.
+// Operations in this package are abstracted from all other application logic
+// and are designed to be used with any DynamoDB table and any object schema.
+// This file contains CRUD operations for working with DynamoDB.
 package dynamo
 
 import (
@@ -13,7 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-// InitSesh initializes a new session with default config/credentials
+// InitSesh initializes a new session with default config/credentials.
 func InitSesh() *dynamodb.DynamoDB {
 	// Initialize a session that the SDK will use to load
 	// credentials from the shared credentials file ~/.aws/credentials
@@ -33,7 +36,7 @@ func InitSesh() *dynamodb.DynamoDB {
 	return svc
 }
 
-// ListTables lists the tables in the database
+// ListTables lists the tables in the database.
 func ListTables(svc *dynamodb.DynamoDB) ([]string, int, error) {
 	names := []string{}
 	t := 0
@@ -77,8 +80,8 @@ func ListTables(svc *dynamodb.DynamoDB) ([]string, int, error) {
 	return names, t, nil
 }
 
-// CreateTable creates a new table with the parameters passed to the Table struct
-// NOTE: CreateTable creates Table in * On-Demand * billing mode
+// CreateTable creates a new table with the parameters passed to the Table struct.
+// NOTE: CreateTable creates Table in * On-Demand * billing mode.
 func CreateTable(svc *dynamodb.DynamoDB, table *Table) error {
 	input := &dynamodb.CreateTableInput{
 		AttributeDefinitions: []*dynamodb.AttributeDefinition{
@@ -102,10 +105,6 @@ func CreateTable(svc *dynamodb.DynamoDB, table *Table) error {
 				KeyType:       aws.String("RANGE"),
 			},
 		},
-		/* ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
-			ReadCapacityUnits:  aws.Int64(25), // free tier limit = 25
-			WriteCapacityUnits: aws.Int64(25), // free tier limit = 25
-		}, */
 		TableName: aws.String(table.TableName),
 	}
 
@@ -128,7 +127,7 @@ func CreateTable(svc *dynamodb.DynamoDB, table *Table) error {
 	return nil
 }
 
-// CreateItem puts a new item in the table
+// CreateItem puts a new item in the table.
 func CreateItem(svc *dynamodb.DynamoDB, item interface{}, table *Table) error {
 	av, err := dynamodbattribute.MarshalMap(item)
 	if err != nil {
@@ -153,9 +152,9 @@ func CreateItem(svc *dynamodb.DynamoDB, item interface{}, table *Table) error {
 	return nil
 }
 
-// GetItem reads an item from the database
-// Returns Attribute Value map interface (map[stirng]interface{}) if object found
-// Returns interface of type item if object not found
+// GetItem reads an item from the database.
+// Returns Attribute Value map interface (map[stirng]interface{}) if object found.
+// Returns interface of type item if object not found.
 func GetItem(svc *dynamodb.DynamoDB, q *Query, t *Table, item interface{}) (interface{}, error) {
 	key := keyMaker(q, t)
 	result, err := svc.GetItem(&dynamodb.GetItemInput{
@@ -177,7 +176,7 @@ func GetItem(svc *dynamodb.DynamoDB, q *Query, t *Table, item interface{}) (inte
 }
 
 // UpdateItem updates the specified item's attribute defined in the
-// Query object with the UpdateValue defined in the Query
+// Query object with the UpdateValue defined in the Query.
 func UpdateItem(svc *dynamodb.DynamoDB, q *Query, t *Table) error {
 	exprMap := make(map[string]*dynamodb.AttributeValue)
 	exprMap[":u"] = createAV(q.UpdateValue)
@@ -199,7 +198,7 @@ func UpdateItem(svc *dynamodb.DynamoDB, q *Query, t *Table) error {
 	return nil
 }
 
-// DeleteTable deletes the selected table
+// DeleteTable deletes the selected table.
 func DeleteTable(svc *dynamodb.DynamoDB, t *Table) error {
 	input := &dynamodb.DeleteTableInput{
 		TableName: aws.String(t.TableName),
@@ -231,7 +230,7 @@ func DeleteItem(svc *dynamodb.DynamoDB, q *Query, t *Table) error {
 	return nil
 }
 
-// BatchWriteCreate writes a list of items to the database
+// BatchWriteCreate writes a list of items to the database.
 func BatchWriteCreate(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []interface{}) error {
 	if len(items) > 25 {
 		return fmt.Errorf("too many items to process")
@@ -304,7 +303,7 @@ func BatchWriteCreate(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, items []
 	return nil
 }
 
-// BatchWriteDelete writes a list of items to the database
+// BatchWriteDelete deletes a list of items from the database.
 func BatchWriteDelete(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query) error {
 	if len(queries) > 25 {
 		return fmt.Errorf("too many items to process")
@@ -371,7 +370,7 @@ func BatchWriteDelete(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries 
 // BatchGet retrieves a list of items from the database
 // refObjs must be non-nil pointers of the same type,
 // 1 for each query/object returned.
-//   returns err if len(queries) != len(refObjs)
+//   - Returns err if len(queries) != len(refObjs).
 func BatchGet(svc *dynamodb.DynamoDB, t *Table, fc *FailConfig, queries []*Query, refObjs []interface{}) ([]interface{}, error) {
 	if len(queries) > 100 {
 		return nil, fmt.Errorf("too many items to process")

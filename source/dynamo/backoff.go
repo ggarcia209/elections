@@ -1,4 +1,8 @@
-// Package dynamo contains controls and objects for DynamoDB CRUD operations
+// Package dynamo contains controls and objects for DynamoDB CRUD operations.
+// Operations in this package are abstracted from all other application logic
+// and are designed to be used with any DynamoDB table and any object schema.
+// This file contains objects for implementing an exponential backoff
+// algorithm for DynamoDB error handling.
 package dynamo
 
 import (
@@ -7,8 +11,8 @@ import (
 	"time"
 )
 
-// FailConfig stores parameters for the exponential backoff algorithm
-// Attempt, Elapsed, MaxRetiresReached should always be initialized to 0, 0, false
+// FailConfig stores parameters for the exponential backoff algorithm.
+// Attempt, Elapsed, MaxRetiresReached should always be initialized to 0, 0, false.
 type FailConfig struct {
 	Base              float64
 	Cap               float64
@@ -18,11 +22,11 @@ type FailConfig struct {
 }
 
 // DefaultFailConfig is the default configuration for the exponential backoff alogrithm
-// with a base wait time of 50 miliseconds, and max wait time of 1 minute (60000 ms)
+// with a base wait time of 50 miliseconds, and max wait time of 1 minute (60000 ms).
 var DefaultFailConfig = &FailConfig{50, 60000, 0, 0, false}
 
 // ExponentialBackoff implements the exponential backoff algorithm for request retries
-// and returns true when the max number of retries has been reached (fc.Elapsed > fc.Cap)
+// and returns true when the max number of retries has been reached (fc.Elapsed > fc.Cap).
 func (fc *FailConfig) ExponentialBackoff() {
 	if fc.Elapsed == fc.Cap {
 		fc.MaxRetriesReached = true // max retries reached
@@ -43,7 +47,7 @@ func (fc *FailConfig) ExponentialBackoff() {
 	fc.Elapsed += wait
 }
 
-// Reset resets Attempt and Elapsed fields
+// Reset resets Attempt and Elapsed fields.
 func (fc *FailConfig) Reset() {
 	fc.Attempt = 0
 	fc.Elapsed = 0

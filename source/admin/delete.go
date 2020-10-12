@@ -1,3 +1,9 @@
+// Package admin contains operations for running the local admin console service.
+// Only the functions in this package are exposed to the admin service; lower
+// level source packages remain encapsulated.
+// This file contains the operations for deleting data from disk
+// and DynamoDB.
+// NOTE: logic is not UX optimized and may contain unresolved errors.
 package admin
 
 import (
@@ -8,7 +14,7 @@ import (
 	"github.com/elections/source/ui"
 )
 
-// Delete provides menu options for delete operations
+// Delete provides menu options for delete operations.
 func Delete() error {
 	opts := []string{
 		"Delete Dataset by Year",
@@ -94,7 +100,7 @@ func deleteYr() error {
 		return nil
 	}
 
-	fmt.Printf("Are you sure you want to delete all data for the year %s?\n", year)
+	fmt.Printf("Are you sure you want to delete ALL DATA for the YEAR %s?\n", year)
 	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
@@ -129,7 +135,7 @@ func deleteCat() error {
 		return nil
 	}
 
-	fmt.Printf("Are you sure you want to delete all data for the year/category %s - %s?\n", year, cat)
+	fmt.Printf("Are you sure you want to delete ALL DATA for the YEAR/CATEGORY %s - %s?\n", year, cat)
 	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
@@ -145,8 +151,9 @@ func deleteCat() error {
 	return nil
 }
 
+// delete database
 func delDB() error {
-	fmt.Printf("Are you sure you want to delete the database at %s?\n", persist.OUTPUT_PATH)
+	fmt.Printf("Are you sure you want to delete the DATABASE at %s?\n", persist.OUTPUT_PATH)
 	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
@@ -160,8 +167,9 @@ func delDB() error {
 	return nil
 }
 
+// delete search index
 func delIndex() error {
-	fmt.Printf("Are you sure you want to delete the search index at %s?\n", persist.OUTPUT_PATH)
+	fmt.Printf("Are you sure you want to delete the SEARCH INDEX at %s?\n", persist.OUTPUT_PATH)
 	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
@@ -175,8 +183,9 @@ func delIndex() error {
 	return nil
 }
 
+// delete metadata
 func delMeta() error {
-	fmt.Printf("Are you sure you want to delete all metadata at ../db?\n")
+	fmt.Printf("Are you sure you want to delete ALL METADATA at ../db?\n")
 	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")
@@ -190,8 +199,9 @@ func delMeta() error {
 	return nil
 }
 
+// delete all data
 func delAll() error {
-	fmt.Println("Are you sure you want to delete ALL data on disk?")
+	fmt.Println("Are you sure you want to delete ALL DATA on disk?")
 	yes := ui.Ask4confirm()
 	if !yes {
 		fmt.Println("Returning to menu...")

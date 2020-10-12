@@ -1,9 +1,12 @@
+// Package server contains operations for initializing and
+// communicating with the HTTP and gRPC servers.
+// This file contains objects that wrap each object in
+// package donations, strip unused fields, and
+// maintain encasuplation between the services' main
+// packages and the lower level source packages.
 package server
 
 import "time"
-
-// Objects in this file are used to wrap the objects in package donations and maintain encapsulation.
-// Some fields not used by grpc-web client are removed
 
 // RankingsData wraps the donations.TopOverall object
 type RankingsData struct {

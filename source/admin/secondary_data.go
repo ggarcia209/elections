@@ -1,3 +1,9 @@
+// Package admin contains operations for running the local admin console service.
+// Only the functions in this package are exposed to the admin service; lower
+// level source packages remain encapsulated.
+// This file contains operations for building the secondary datasets (overall rankings, totals)
+// from the primary data (individuals, committees, candidates).
+// NOTE: logic is not UX optimized and may contain unresolved errors.
 package admin
 
 import (

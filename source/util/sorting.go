@@ -1,10 +1,11 @@
-package util
-
+// Package util contains operations for basic utility functions.
+// This file contains operations for sorting different map types,
+// by both key & value.
 import (
 	"sort"
 )
 
-// SortedKV repesents a string/float pair representing an object's ID & relevant $ total
+// SortedKV repesents a string/float pair representing an object's ID & relevant $ total.
 type SortedKV struct {
 	ID    string
 	Total float32
@@ -17,7 +18,7 @@ func (s SortedTotalsMap) Len() int           { return len(s) }
 func (s SortedTotalsMap) Less(i, j int) bool { return s[i].Total > s[j].Total }
 func (s SortedTotalsMap) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-// SortedCheckKV repesents a string/bool pair used to sort a set by key created from a string/bool map
+// SortedCheckKV repesents a string/bool pair used to sort a set by key created from a string/bool map.
 type SortedCheckKV struct {
 	Key   string
 	Check bool
@@ -40,7 +41,7 @@ func SortMapObjectTotals(m map[string]float32) SortedTotalsMap {
 	return es
 }
 
-// SortCheckMap sorts a set created from string/bool map by ID
+// SortCheckMap sorts a set created from string/bool map by ID.
 func SortCheckMap(m map[string]bool) SortedCheckMap {
 	var es SortedCheckMap
 	for k, v := range m {

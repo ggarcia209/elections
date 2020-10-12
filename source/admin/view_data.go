@@ -1,3 +1,8 @@
+// Package admin contains operations for running the local admin console service.
+// Only the functions in this package are exposed to the admin service; lower
+// level source packages remain encapsulated.
+// This file contains operations for viewing datasets stored on the local disk.
+// NOTE: logic is not UX optimized and may contain unresolved errors.
 package admin
 
 import (
@@ -12,13 +17,13 @@ import (
 	"github.com/elections/source/util"
 )
 
-// entry represents a k/v pair in a sorted map
+// entry represents a k/v pair in a sorted map.
 type entry struct {
 	ID    string
 	Total float32
 }
 
-// entries represents a sorted map
+// entries represents a sorted map.
 type entries []entry
 
 func (s entries) Len() int           { return len(s) }
@@ -27,7 +32,7 @@ func (s entries) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // ViewMenu provides a submenu for searching the data,
 // viewing rankings by year/category/party,
-// and viewing the search index
+// and viewing the search index.
 func ViewMenu() error {
 	opts := []string{
 		"Search Data",

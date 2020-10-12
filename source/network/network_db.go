@@ -1,3 +1,7 @@
+// Package network contains operations for building social network graphs from
+// object data. This package is still in progress and is not implemented in the
+// current version. Generating the social network graph from the data points
+// derived from this package will be done by Python's NetworkX package.
 package network
 
 import (

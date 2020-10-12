@@ -1,3 +1,5 @@
+// Package idhash contains functions for deriving MD5 hash IDs
+// for Individual objects from Contribution and Disbursement ojects.
 package idhash
 
 import (

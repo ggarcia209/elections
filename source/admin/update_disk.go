@@ -1,3 +1,9 @@
+// Package admin contains operations for running the local admin console service.
+// Only the functions in this package are exposed to the admin service; lower
+// level source packages remain encapsulated.
+// This file contains operations for updating existing datasets from new bulk
+// data files. This code is still in progress and is not currently used in production.
+// NOTE: logic is not UX optimized and may contain unresolved errors.
 package admin
 
 import (
@@ -295,7 +301,7 @@ func updateCmteFinancials(year, filePath string) error {
 	return nil
 }
 
-// NOT idempotent - susequent updates from same file will corrupt data if called after EOF
+// NOT idempotent - subsequent updates from same file will corrupt data if called after EOF
 func updateCmteContributions(year, filepath string) error {
 	// defer wg.Done()
 
@@ -377,7 +383,7 @@ func updateCmteContributions(year, filepath string) error {
 	return nil
 }
 
-// NOT idempotent - susequent updates from same file will corrupt data if called after EOF
+// NOT idempotent - subsequent updates from same file will corrupt data if called after EOF
 func updateIndvContributions(year, filepath string) error {
 	// defer wg.Done()
 
@@ -459,7 +465,7 @@ func updateIndvContributions(year, filepath string) error {
 	return nil
 }
 
-// NOT idempotent - susequent updates from same file will corrupt data if called after EOF
+// NOT idempotent - subsequent updates from same file will corrupt data if called after EOF
 func updateDisbursements(year, filepath string) error {
 	// defer wg.Done()
 

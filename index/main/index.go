@@ -1,3 +1,6 @@
+// The index service is primarily responsible for information retrieval.
+// Search query results (list of common IDs) are retrieved from BoltDB local storage.
+// All other data, inlcuding both summary and complete object data, is retrieved from DynamoDB.
 package main
 
 import (

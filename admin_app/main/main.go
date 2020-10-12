@@ -1,3 +1,12 @@
+// The admin service enables a local user to create the datasets and view the data on the command line like a web client.
+// However, the admin service is distinct in that it is ran locally, and provides a much greater in-depth view of the data.
+// The primary features include:
+// - Building primary and secondary datasets from the FEC's bulk data files
+// - Building search index and lookup data
+// - Searching & viewing all data, including complete datasets by year/category,
+//   complete search index, and application metadata.
+// - Uploading datasets to DynamoDB tables
+// - Deleting data from disk & DynamoDB.
 package main
 
 import (
