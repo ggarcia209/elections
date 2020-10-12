@@ -112,7 +112,8 @@ func CreateQuery(text, UID string) Query {
 // LookupSearchDataFromDynamo retreives corresponding SearchData obj for ID from DynamoDB
 func LookupSearchDataFromDynamo(db *dynamo.DbInfo, ids []string) ([]SearchData, error) {
 	tn := "cf-lookup"
-	results := []SearchData{}
+	res := make(map[string]SearchData) // return results to map
+	ordered := []SearchData{}          // list ordered by ids
 	dataChan := make(chan chanResult)
 	var wg sync.WaitGroup
 
@@ -138,11 +139,16 @@ func LookupSearchDataFromDynamo(db *dynamo.DbInfo, ids []string) ([]SearchData, 
 			Bucket:   obj.Bucket,
 			Years:    obj.Years,
 		}
-		results = append(results, sd)
+		res[sd.ID] = sd
 	}
 	wg.Wait()
 
-	return results, nil
+	// retrieve each ID's corresponding result from map to maintain original ordering
+	for _, ID := range ids {
+		ordered = append(ordered, res[ID])
+	}
+
+	return ordered, nil
 }
 
 // get SearchData objects from dynamo lookup table asynchronously (called in goroutine)
