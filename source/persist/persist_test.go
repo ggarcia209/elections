@@ -7,7 +7,12 @@ import (
 	"github.com/elections/source/donations"
 )
 
-// var tests is used to test encode/decode, put/get, and batch write/read operations
+// var tests is used to test encode/decode, put/get, and batch write/read operations.
+// Tests in this file test encode/decode and write/read operations in each function.
+// Test objects are first encoded and saved to disk as protocol buffer objects then
+// read from disk and decoded. Data integrity is verified by matching the each
+// objects decoded ID to test.want[i].ID. All other fields can be assumed to be valid
+// given successful tests in persist_cand_test.go.
 var tests = []struct {
 	IDs   []string
 	input []interface{}
