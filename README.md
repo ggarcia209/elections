@@ -23,6 +23,7 @@ This project is still in progress and may contain some errors in code. Currently
 - Cleaning up code (err messages, print statements for debugging, unused/deprecated code, ect...)
 - Redoing unit tests with Go testing package (old testing folder with previous unit & integration tests was removed)
 - Final code checks & updates
+- Docker containerization
 - Deployment on EC2 using Kubernetes and Envoy as front proxy and service mesh
 
 Once complete, the application will be available at www.cashflowfec.com. More info and documentation 
