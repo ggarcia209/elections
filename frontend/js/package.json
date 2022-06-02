@@ -3,7 +3,7 @@
   "dependencies": {
     "google-protobuf": "^3.6.1",
     "grpc-web": "^1.2.0",
-    "protobufjs": "^6.10.1"
+    "protobufjs": "^6.11.3"
   },
   "devDependencies": {
     "browserify": "^16.2.2",
